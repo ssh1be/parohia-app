@@ -1,38 +1,4 @@
-"use client";
-
-import { useState } from "react";
-
 export default function NotifyPage() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [message, setMessage] = useState<string>("");
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!email) return;
-    setStatus("loading");
-    setMessage("");
-    try {
-      const response = await fetch("/api/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      if (response.ok) {
-        setStatus("success");
-        setMessage("Thanks! We'll email you when Parohia is ready.");
-        setEmail("");
-      } else {
-        const data = await response.json().catch(() => ({}));
-        setStatus("error");
-        setMessage(data?.error || "Something went wrong. Please try again.");
-      }
-    } catch (error) {
-      setStatus("error");
-      setMessage("Network error. Please try again.");
-    }
-  }
-
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 red-glow" aria-hidden />
@@ -46,32 +12,37 @@ export default function NotifyPage() {
               updates and the public release.
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-8 flex flex-col sm:flex-row gap-3">
+            <form
+              name="notify"
+              method="POST"
+              data-netlify="true"
+              netlify-honeypot="bot-field"
+              action="/notify/success"
+              className="mt-8 flex flex-col sm:flex-row gap-3"
+            >
+              <input type="hidden" name="form-name" value="notify" />
+              <p className="hidden">
+                <label>
+                  Don’t fill this out if you're human:
+                  <input name="bot-field" />
+                </label>
+              </p>
               <input
                 type="email"
                 name="email"
                 autoComplete="email"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 className="w-full sm:w-auto flex-1 rounded-md bg-white/5 px-4 py-3 text-sm text-white placeholder-white/50 outline-none ring-1 ring-inset ring-white/10 focus:ring-white/20"
               />
               <button
                 type="submit"
-                disabled={status === "loading"}
                 className="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white disabled:opacity-70"
                 style={{ background: "linear-gradient(135deg, #FA433F 0%, #8D0300 100%)" }}
               >
-                {status === "loading" ? "Submitting…" : "Notify me"}
+                Notify me
               </button>
             </form>
-
-            {message && (
-              <p className={`mt-4 text-sm ${status === "error" ? "text-red-300" : "text-green-300"}`}>
-                {message}
-              </p>
-            )}
 
             <div className="mt-8">
               <a href="/" className="inline-flex items-center gap-1 text-sm text-zinc-300 hover:text-white">
