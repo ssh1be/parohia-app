@@ -1,4 +1,21 @@
+"use client";
+
 export default function NotifyPage() {
+  async function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    try {
+      await fetch("/__forms.html", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(formData as any).toString(),
+      });
+      window.location.assign("/notify/success");
+    } catch {
+      // Silent fail; optionally add client-side error UI later
+    }
+  }
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 red-glow" aria-hidden />
@@ -14,10 +31,7 @@ export default function NotifyPage() {
 
             <form
               name="notify"
-              method="POST"
-              data-netlify="true"
-              netlify-honeypot="bot-field"
-              action="/notify/success"
+              onSubmit={handleFormSubmit}
               className="mt-8 flex flex-col sm:flex-row gap-3"
             >
               <input type="hidden" name="form-name" value="notify" />
