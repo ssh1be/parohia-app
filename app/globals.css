@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-brand-red: #FA433F;
+  --color-brand-dark: #8D0300;
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-black text-white antialiased;
+}
+
+.red-glow {
+  background: radial-gradient(60% 50% at 20% 10%, rgba(250, 67, 63, 0.20), rgba(141, 3, 0, 0) 60%),
+              radial-gradient(50% 40% at 80% 0%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%),
+              radial-gradient(30% 40% at 30% 60%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%);
+  /* Remove drop-shadow to avoid perceived seams between sections */
+  filter: none;
+}
+
+@media (max-width: 640px) {
+  .red-glow {
+    background: none;
+    filter: none;
+  }
+}
+
+.container-padding {
+  @apply px-6 sm:px-8 md:px-10 lg:px-12;
+}
+
+
+/* Ensure sections do not overlay semi-opaque backgrounds that break gradient continuity */
+main > section {
+  background-color: transparent !important;
+}
+
+
