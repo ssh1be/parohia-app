@@ -64,19 +64,11 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-        
-          <div className="mt-10 hidden">
-            <img
-              src="/mockup1.png"
-              alt="Parohia preview"
-              className="mx-auto w-full max-w-sm"
-            />
-          </div>
-         <div className="hidden md:block absolute right-0 top-0 -translate-x-1/2 translate-y-0 -z-30">
+         <div className="hidden 2xl:block absolute right-0 2xl:top-0 2xl:-translate-x-1/2 -z-30">
              <img
                src="/mockup1.png"
                alt="Parohia preview"
-               className="w-full max-w-lg"
+               className="w-auto md:max-w-sm lg:max-w-md xl:max-w-lg"
              />
          </div>
         
@@ -86,14 +78,14 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl container-padding pt-10 md:pt-24 pb-10 md:pb-16">
           <div className="grid gap-8 md:grid-cols-3">
             <FeatureCard
-              title="Orthodox Calendar"
-              description="Fast days, feasts, saints — beautifully presented alongside daily readings."
-              iconName="calendar-outline"
-            />
-            <FeatureCard
               title="Parish Connection"
               description="Follow announcements, schedule confessions, volunteer, and stay involved in your community."
               iconName="people-outline"
+            />
+            <FeatureCard
+              title="Orthodox Calendar"
+              description="Fast days, feasts, saints — beautifully presented alongside daily readings."
+              iconName="calendar-outline"
             />
             <FeatureCard
               title="Daily Reminders"

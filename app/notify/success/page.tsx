@@ -13,7 +13,7 @@ export default function NotifySuccessPage() {
 
             <div className="mt-8">
               <a href="/" className="inline-flex items-center gap-1 text-sm text-zinc-300 hover:text-white">
-                <ion-icon name="home" className="h-4 w-4 hydrated md" role="img"></ion-icon>
+                <ion-icon name="arrow-back" className="h-4 w-4 hydrated md" role="img"></ion-icon>
                 Back to home
               </a>
             </div>

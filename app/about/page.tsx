@@ -45,7 +45,7 @@ export default function AboutPage() {
               <p className="mt-4 text-zinc-300 leading-relaxed">
                 Parohia is currently being built and maintained by me, <span className="text-white font-medium">Alexandru Perussi</span>.
                 I am a student at Oregon State University graduating in December 2025. I was raised in the Orthodox Church and began
-                Parohia as a passion project to help parishes stay organized and connected. The ultimate goal is to help us further embrace our precious faith daily.
+                Parohia as a personal project to help parishes stay organized and connected. The ultimate goal is to help us further embrace our precious faith daily.
               </p>
             </div>
 
