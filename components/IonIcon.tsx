@@ -15,11 +15,8 @@ export default function IonIcon({ name, className }: IonIconProps) {
     async function ensureIoniconsLoaded() {
       if (typeof window === "undefined") return;
       if (customElements.get("ion-icon")) return;
-      try {
-        await import("https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js");
-      } catch {
-        // no-op: rely on layout scripts or previous loads
-      }
+      // Rely on scripts included in app layout. No remote import here to avoid type errors during build.
+      return;
     }
     ensureIoniconsLoaded();
   }, []);
