@@ -90,8 +90,8 @@ export default function FeaturesPage() {
       <section className="relative z-10 border-b border-white/10">
         <div className="mx-auto max-w-7xl container-padding pt-10 md:pt-14 pb-20">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Explore Parohia</h1>
-          <p className="mt-4 max-w-2xl text-lg text-zinc-300">
-            Parohia replaces scattered chats, emails, flyers, and PDFs with one home for your parish info.
+          <p className="mt-8 max-w-2xl text-lg text-zinc-300">
+            Replace scattered chats, emails, flyers, and PDFs with one home for your parish info.
             Orthodox calendar, parish schedules, announcements, events, volunteering and confession scheduling —
             all in one place, with respectful, configurable notifications so everyone stays in the loop.
           </p>
@@ -115,6 +115,12 @@ export default function FeaturesPage() {
         id="announcements-events"
         placeholderLabel=""
         image={{ src: "/feature3.png", alt: "Announcements feed & event details" }}
+      />
+
+      <FeatureBlock
+        id="volunteering-confessions"
+        placeholderLabel=""
+        image={{ src: "/feature4.png", alt: "Volunteering & Confession scheduling" }}
       />
 
       <section id="cta" className="relative z-10">

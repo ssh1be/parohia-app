@@ -41,7 +41,7 @@ export default function LandingPage() {
       <section className="relative z-10">
         <div className="mx-auto max-w-7xl container-padding pt-20 pb-24 md:pt-28 md:pb-32">
           <div className="max-w-3xl">
-            <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+            <h1 className="mt-6 text-5xl font-bold tracking-tight sm:text-5xl md:text-6xl">
               A Modern Companion for an Ancient Faith.
             </h1>
             <p className="mt-6 max-w-2xl text-lg text-zinc-300">
@@ -65,7 +65,7 @@ export default function LandingPage() {
           </div>
         </div>
         
-          <div className="mt-10 md:hidden">
+          <div className="mt-10 hidden">
             <img
               src="/mockup1.png"
               alt="Parohia preview"
@@ -83,7 +83,7 @@ export default function LandingPage() {
       </section>
 
       <section id="features" className="relative z-10 bg-white/[0.02]">
-        <div className="mx-auto max-w-7xl container-padding pt-16 md:pt-24 pb-10 md:pb-16">
+        <div className="mx-auto max-w-7xl container-padding pt-10 md:pt-24 pb-10 md:pb-16">
           <div className="grid gap-8 md:grid-cols-3">
             <FeatureCard
               title="Orthodox Calendar"
@@ -137,7 +137,7 @@ export default function LandingPage() {
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 md:p-10 backdrop-blur-sm">
             <h2 className="text-2xl md:text-3xl font-bold">We want to hear from you.</h2>
             <p className="mt-3 text-zinc-300">
-              Feedback and suggestions from Orthodox clergy and parishioners alike is invaluable to us.<br />
+              Feedback and suggestions from Orthodox clergy and parishioners is invaluable to us.<br />
               Please share your thoughts and ideas at <a href="mailto:support@parohia.app" className="text-white">support@parohia.app</a>
             </p>
             <div className="mt-6 flex flex-col sm:flex-row gap-3">

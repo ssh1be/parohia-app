@@ -36,6 +36,7 @@ declare namespace __next_route_internal_types__ {
     | `/about`
     | `/features`
     | `/notify`
+    | `/notify/success`
     | `/privacy`
     | `/terms`
   type DynamicRoutes<T extends string = string> = never
