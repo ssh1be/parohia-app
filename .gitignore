@@ -1,1 +1,57 @@
-/node_modules
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Node / package managers
+node_modules/
+.pnpm-store/
+
+# TypeScript
+*.tsbuildinfo
+
+# Env files (keep examples committed)
+.env
+.env.*
+!.env.example
+
+# Next.js (landing)
+.next/
+out/
+.vercel/
+.turbo/
+
+# Expo / React Native (Parohia)
+.expo/
+.expo-shared/
+.metro-cache/
+web-build/
+dist/
+build/
+.eas/
+
+# If you later add native projects and want them versioned, remove these lines
+android/
+ios/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Lint caches
+.eslintcache
+.stylelintcache
+
+# OS-specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs/editors (keep project .vscode if you want it tracked)
+*.swp
+*.swo
+.idea/
+

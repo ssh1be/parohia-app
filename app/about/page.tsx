@@ -40,7 +40,7 @@ export default function AboutPage() {
           </div>
 
           <div className="mt-10 grid gap-10 md:grid-cols-2 items-start">
-            <div className="order-1 md:order-1">
+            <div className="order-1 md:order-1 mt-16">
               <h2 className="text-xl font-semibold">Our Team</h2>
               <p className="mt-4 text-zinc-300 leading-relaxed">
                 Parohia is currently being built and maintained by me, <span className="text-white font-medium">Alexandru Perussi</span>.
@@ -52,7 +52,7 @@ export default function AboutPage() {
             <div className="order-2 md:order-2 md:self-start">
               <div className="relative inline-block rounded-2xl p-3 mx-auto md:ml-auto md:sticky md:top-28">
                 <AuthorPhoto
-                  src="/alexandru.jpg"
+                  src="/alexandru2.jpg"
                   alt="Alexandru Perussi"
                   fallbackSrc="/App_store_1024_1x.png"
                   className="h-64 w-64 md:h-80 md:w-80 rounded-xl object-cover shadow-lg"
