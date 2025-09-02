@@ -19,7 +19,7 @@ export default function AboutPage() {
               href="/features"
               className="rounded-md bg-white/5 px-4 py-2 text-sm text-white hover:bg-white/10"
             >
-              Features
+              Learn more
             </a>
             <a
               href="/notify"
@@ -83,5 +83,3 @@ export default function AboutPage() {
     </main>
   )
 }
-
-

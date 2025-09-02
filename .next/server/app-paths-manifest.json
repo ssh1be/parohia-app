@@ -1,6 +1,8 @@
 {
-  "/about/page": "app/about/page.js",
   "/page": "app/page.js",
   "/features/page": "app/features/page.js",
-  "/privacy/page": "app/privacy/page.js"
+  "/about/page": "app/about/page.js",
+  "/privacy/page": "app/privacy/page.js",
+  "/terms/page": "app/terms/page.js",
+  "/notify/page": "app/notify/page.js"
 }

@@ -76,10 +76,27 @@ export default function PrivacyPage() {
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">9. Contact</h2>
-          <p className="mt-4 text-zinc-200">For any questions about this Privacy Policy, contact us by email: <strong>[insert your email address]</strong></p>
+          <p className="mt-4 text-zinc-200">For any questions about this Privacy Policy, contact us by email: <strong>support@parohia.app</strong></p>
         </section>
         <footer className="mb-12"/>
       </div>
+      <footer id="contact" className="relative z-10 border-t border-white/10 bg-white/[0.03] backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl container-padding py-10 text-sm text-zinc-400">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <a href="/" className="flex items-center gap-2">
+              <img src="/App_store_1024_1x.png" alt="Parohia icon" className="h-8 w-8 rounded-lg" />
+              <div className="flex flex-col leading-tight">
+                <span className="text-lg font-semibold tracking-tight text-white">Parohia</span>
+              </div>
+            </a>
+            <div className="flex items-center gap-4">
+              <a href="/privacy" className="hover:text-white">Privacy</a>
+              <a href="/terms" className="hover:text-white">Terms</a>
+              <a href="mailto:support@parohia.app" className="hover:text-white">Contact</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </main>
   )
 }
