@@ -25,8 +25,8 @@ export default function NotifyPage() {
           <div className="max-w-2xl">
             <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">Get notified about Parohia!</h1>
             <p className="mt-6 text-lg text-zinc-300">
-              Parohia is still in development. Leave your email and we'll let you know about
-              updates and the public release.
+              Parohia is still in development. Leave us your email and we'll let you know about
+              updates, beta tests, and the public release.
             </p>
 
             <form
