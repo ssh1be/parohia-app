@@ -116,10 +116,11 @@ export default function LandingPage() {
           <StackCarousel
             images={[
               { src: "/home.png", alt: "Home screen" },
-              { src: "/calendar.png", alt: "Orthodox calendar view" },
+              { src: "/calendar3.png", alt: "Orthodox calendar view" },
               { src: "/calendar2.png", alt: "Calendar details and readings" },
               { src: "/events.png", alt: "Parish events list" },
               { src: "/events2.png", alt: "Event details screen" },
+              { src: "/notif.png", alt: "Notifications settings" },
             ]}
           />
         </div>
