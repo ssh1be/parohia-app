@@ -53,7 +53,7 @@ export default function LandingPage() {
                 className="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white"
                 style={{ background: 'linear-gradient(135deg, #FA433F 0%, #8D0300 100%)' }}
               >
-                Notify me
+                Join our newsletter
               </a>
               <a
                 href="/features"
