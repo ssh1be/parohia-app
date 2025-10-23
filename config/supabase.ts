@@ -3,8 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
 // Replace these with your actual Supabase project credentials
-const supabaseUrl = 'https://fiuxfvdpyahixtnviecn.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpdXhmdmRweWFoaXh0bnZpZWNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5NzQ5NTUsImV4cCI6MjA2ODU1MDk1NX0.xoSmo5cHdqX9eaKdMxf4B8Rwevnj5WLlyNjVOY4PASg';
+//const supabaseUrl = 'https://fiuxfvdpyahixtnviecn.supabase.co';
+//const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpdXhmdmRweWFoaXh0bnZpZWNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5NzQ5NTUsImV4cCI6MjA2ODU1MDk1NX0.xoSmo5cHdqX9eaKdMxf4B8Rwevnj5WLlyNjVOY4PASg';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Create storage adapter based on platform
 const createStorageAdapter = () => {

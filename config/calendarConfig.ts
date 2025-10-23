@@ -1,3 +1,3 @@
 export const CALENDAR_CONFIG = {
-  API_KEY: 'AIzaSyCuksj-U9oHDXrls39kLU06qL2kzV7Wu4I',
+  API_KEY: process.env.EXPO_PUBLIC_GOOGLE_CALENDAR_API_KEY!,
 };

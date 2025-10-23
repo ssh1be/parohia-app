@@ -34,10 +34,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/App_store_1024_1x.png",
+          "image": "./assets/images/Splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#C1211E"
+          "backgroundColor": "#DC2626"
         }
       ],
       [
