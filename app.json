@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "Parohia",
+    "slug": "Parohia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/App_store_1024_1x.png",
+    "scheme": "parohia",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ssh1be.Parohia",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "icon": "./assets/images/App_store_1024_1x.png"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.ssh1be.Parohia"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/App_store_1024_1x.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#C1211E"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/App_store_1024_1x.png",
+          "color": "#ffffff"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "owner": "ssh1be",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "694c5084-03fe-4106-b0ed-3e058bb65e6f"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/694c5084-03fe-4106-b0ed-3e058bb65e6f"
+    }
+  }
+}
