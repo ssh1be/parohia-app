@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type CarouselImage = {
   src: string;
@@ -9,13 +10,19 @@ type CarouselImage = {
 
 interface StackCarouselProps {
   images: CarouselImage[];
-  autoPlayMs?: number; // set <= 0 to disable autoplay
+  autoPlayMs?: number;
 }
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
 
-export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselProps) {
-  const [order, setOrder] = useState<number[]>(() => images.map((_, idx) => idx));
+export default function StackCarousel({
+  images,
+  autoPlayMs = 0,
+}: StackCarouselProps) {
+  const [order, setOrder] = useState<number[]>(() =>
+    images.map((_, idx) => idx)
+  );
   const [isPaused, setIsPaused] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const touchStartX = useRef<number | null>(null);
@@ -27,7 +34,9 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
   }, []);
 
   const retreat = useCallback(() => {
-    setOrder((prev) => (prev.length ? [prev[prev.length - 1], ...prev.slice(0, -1)] : prev));
+    setOrder((prev) =>
+      prev.length ? [prev[prev.length - 1], ...prev.slice(0, -1)] : prev
+    );
   }, []);
 
   useEffect(() => {
@@ -47,20 +56,23 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
     touchStartX.current = e.changedTouches[0]?.clientX ?? null;
   }, []);
 
-  const onTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    const startX = touchStartX.current;
-    if (startX == null) return;
-    const endX = e.changedTouches[0]?.clientX ?? startX;
-    const delta = endX - startX;
-    if (Math.abs(delta) > 30) {
-      if (delta > 0) {
-        retreat();
-      } else {
-        advance();
+  const onTouchEnd = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      const startX = touchStartX.current;
+      if (startX == null) return;
+      const endX = e.changedTouches[0]?.clientX ?? startX;
+      const delta = endX - startX;
+      if (Math.abs(delta) > 30) {
+        if (delta > 0) {
+          retreat();
+        } else {
+          advance();
+        }
       }
-    }
-    touchStartX.current = null;
-  }, [advance, retreat]);
+      touchStartX.current = null;
+    },
+    [advance, retreat]
+  );
 
   return (
     <div
@@ -79,10 +91,9 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
     >
       <div className="relative h-[600px] md:h-[740px]">
         {positions.map((imageIndex, stackIndex) => {
-          const depth = stackIndex; // 0 is top
-          const translateY = depth * 14; // px
-          const scale = 1 - depth * 0.07; // shrink slightly per layer
-          const rotate = 0; // remove tilt
+          const depth = stackIndex;
+          const translateY = depth * 14;
+          const scale = 1 - depth * 0.07;
           const opacity = 1 - depth * 0.08;
           const z = 50 - depth;
 
@@ -94,17 +105,18 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
               aria-hidden={depth !== 0}
             >
               <div
-                className="relative h-[100%] md:h-[100%] aspect-[9/19.5] rounded-xl overflow-hidden shadow-2xl"
+                className="relative h-full aspect-[9/19.5] rounded-2xl overflow-hidden shadow-2xl shadow-black/40"
                 style={{
-                  transform: `translateY(${translateY}px) scale(${scale}) rotate(${rotate}deg)`,
-                  transition: "transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 600ms ease",
+                  transform: `translateY(${translateY}px) scale(${scale})`,
+                  transition:
+                    "transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 600ms ease",
                   opacity,
                 }}
               >
                 <img
                   src={images[imageIndex].src}
                   alt={images[imageIndex].alt}
-                  className="h-full w-full object-contain bg-black/10"
+                  className="h-full w-full object-contain"
                   draggable={false}
                 />
               </div>
@@ -112,7 +124,7 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
           );
         })}
 
-        {/* Left/Right low-opacity previews */}
+        {/* Left/Right previews */}
         {total > 1 && (
           <>
             {/* Previous */}
@@ -122,12 +134,13 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
               style={{ zIndex: 20 }}
             >
               <div
-                className="relative aspect-[9/19.5] rounded-xl overflow-hidden shadow-xl"
+                className="relative aspect-[9/19.5] rounded-2xl overflow-hidden shadow-xl"
                 style={{
                   height: "86%",
                   transform: "translateY(36px) translateX(-28%) scale(0.9)",
-                  opacity: 0.6,
-                  transition: "transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 600ms ease",
+                  opacity: 0.5,
+                  transition:
+                    "transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 600ms ease",
                 }}
               >
                 <img
@@ -136,7 +149,7 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
                   className="h-full w-full object-contain"
                   draggable={false}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-black/40" />
+                <div className="pointer-events-none absolute inset-0 bg-black/50" />
               </div>
             </div>
 
@@ -147,12 +160,13 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
               style={{ zIndex: 20 }}
             >
               <div
-                className="relative aspect-[9/19.5] rounded-xl overflow-hidden shadow-xl"
+                className="relative aspect-[9/19.5] rounded-2xl overflow-hidden shadow-xl"
                 style={{
                   height: "86%",
                   transform: "translateY(36px) translateX(28%) scale(0.9)",
-                  opacity: 0.6,
-                  transition: "transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 600ms ease",
+                  opacity: 0.5,
+                  transition:
+                    "transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 600ms ease",
                 }}
               >
                 <img
@@ -161,37 +175,40 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
                   className="h-full w-full object-contain"
                   draggable={false}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-black/40" />
+                <div className="pointer-events-none absolute inset-0 bg-black/50" />
               </div>
             </div>
           </>
         )}
 
+        {/* Navigation buttons */}
         <button
           type="button"
           onClick={retreat}
-          className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/90 backdrop-blur-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+          className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-white/80 backdrop-blur-md hover:bg-black/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-colors"
           aria-label="Previous screenshot"
           style={{ zIndex: 60 }}
         >
-          ‹
+          <ChevronLeft className="h-5 w-5" />
         </button>
         <button
           type="button"
           onClick={advance}
-          className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/90 backdrop-blur-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+          className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-white/80 backdrop-blur-md hover:bg-black/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-colors"
           aria-label="Next screenshot"
           style={{ zIndex: 60 }}
         >
-          ›
+          <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
+      {/* Ambient glow behind carousel */}
       <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
-        <div className="h-[70%] w-[60%] rounded-[40%] bg-red-900/10 blur-3xl" />
+        <div className="h-[70%] w-[60%] rounded-[40%] bg-brand-red/8 blur-3xl" />
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-1.5">
+      {/* Dot indicators */}
+      <div className="mt-8 flex items-center justify-center gap-2">
         {images.map((_, i) => {
           const active = order[0] === i;
           return (
@@ -199,15 +216,18 @@ export default function StackCarousel({ images, autoPlayMs = 0 }: StackCarouselP
               type="button"
               key={i}
               onClick={() => {
-                // rotate order so that i becomes first
                 const idx = order.indexOf(i);
                 if (idx === -1) return;
-                setOrder((prev) => {
-                  const offset = idx;
-                  return [...prev.slice(offset), ...prev.slice(0, offset)];
-                });
+                setOrder((prev) => [
+                  ...prev.slice(idx),
+                  ...prev.slice(0, idx),
+                ]);
               }}
-              className={`h-1.5 rounded-full transition-all ${active ? "w-5 bg-white" : "w-2 bg-white/40 hover:bg-white/60"}`}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                active
+                  ? "w-6 bg-white"
+                  : "w-2 bg-white/30 hover:bg-white/50"
+              }`}
               aria-label={`Go to slide ${i + 1}`}
             />
           );

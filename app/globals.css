@@ -7,19 +7,27 @@
   --color-brand-dark: #8D0300;
 }
 
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
 html, body, #__next {
   height: 100%;
 }
 
 body {
-  @apply bg-black text-white antialiased;
+  background-color: #050505;
+  color: white;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ─── Legacy glow (kept for other pages) ─── */
 .red-glow {
   background: radial-gradient(60% 50% at 20% 10%, rgba(250, 67, 63, 0.20), rgba(141, 3, 0, 0) 60%),
               radial-gradient(50% 40% at 80% 0%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%),
               radial-gradient(30% 40% at 30% 60%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%);
-  /* Remove drop-shadow to avoid perceived seams between sections */
   filter: none;
 }
 
@@ -32,14 +40,50 @@ body {
   }
 }
 
+/* ─── Refined ambient glow for landing page ─── */
+.ambient-glow {
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 10%, rgba(250, 67, 63, 0.12), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 5%, rgba(141, 3, 0, 0.15), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(141, 3, 0, 0.06), transparent 60%);
+}
+
+@media (max-width: 640px) {
+  .ambient-glow {
+    background:
+      radial-gradient(ellipse 100% 60% at 50% -10%, rgba(250, 67, 63, 0.15), transparent 60%),
+      radial-gradient(ellipse 90% 50% at 50% 110%, rgba(141, 3, 0, 0.1), transparent 60%);
+  }
+}
+
+/* ─── Brand utilities ─── */
+@layer utilities {
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, #FA433F 0%, #8D0300 100%);
+  }
+
+  .text-brand-gradient {
+    background: linear-gradient(135deg, #FA433F 0%, #D4764E 50%, #D4A843 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* ─── Scroll-triggered animations ─── */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── Container padding (shared across pages) ─── */
 .container-padding {
   @apply px-6 sm:px-8 md:px-10 lg:px-12;
 }
-
-
-/* Ensure sections do not overlay semi-opaque backgrounds that break gradient continuity */
-main > section {
-  background-color: transparent !important;
-}
-
-
