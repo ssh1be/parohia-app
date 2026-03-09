@@ -5,7 +5,6 @@ A mobile app for Orthodox parishes, built with React Native and Expo.
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (LTS recommended)
-- [Expo CLI](https://docs.expo.dev/get-started/installation/)
 - [Expo Go](https://expo.dev/go) on your phone, or an Android/iOS emulator
 
 ## Getting Started
