@@ -7,12 +7,12 @@ A mobile app for Orthodox parishes, built with React Native and Expo.
 - [Node.js](https://nodejs.org/) (LTS recommended)
 - [Expo Go](https://expo.dev/go) on your phone, or an Android/iOS emulator
 
-## Getting Started
+## Contributing
 
 1. **Clone the repo**
 
 ```bash
-git clone https://github.com/your-org/Parohia.git
+git clone https://github.com/ssh1be/parohia-app.git
 cd Parohia
 ```
 
