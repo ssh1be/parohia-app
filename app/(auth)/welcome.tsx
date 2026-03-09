@@ -1,25 +1,19 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../contexts/AuthContext';
 import { router } from 'expo-router';
-// Using require for image import
+import { useColorScheme } from 'nativewind';
+import {
+  Image,
+  Linking,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 const parohiaIcon = require('../../assets/images/parohia_icon.png');
 
 export default function WelcomeScreen() {
-  const { user } = useAuth();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
-  // Don't redirect to main app - let onboarding handle navigation
-  React.useEffect(() => {
-    if (user) {
-      console.log('User authenticated, but staying in auth flow');
-    }
-  }, [user]);
 
   const handleSignIn = () => {
     router.push('/(auth)/login');
@@ -35,11 +29,11 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <View className="flex-1 bg-black relative overflow-hidden">
+    <View className="flex-1 bg-gray-50 dark:bg-black relative overflow-hidden">
       {/* Subtle Cross Pattern Background */}
       <View className="absolute inset-0 opacity-5">
         {/* This would need a custom SVG component for the cross pattern */}
-        <View className="w-full h-full bg-gray-800" />
+        <View className="w-full h-full bg-gray-100 dark:bg-gray-800" />
       </View>
       
         {/* Logo and Title */}
@@ -51,36 +45,36 @@ export default function WelcomeScreen() {
               resizeMode="contain"
             />
           </View>
-          <Text className="text-4xl font-bold text-white mb-2">Parohia</Text>
-          <Text className="text-xs text-white opacity-70 mb-14">Embrace the Orthodox Faith</Text>
+          <Text className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Parohia</Text>
+          <Text className="text-xs text-gray-900 dark:text-white opacity-70 mb-14">Embrace the Orthodox Faith</Text>
         
         {/* Login Options */}
         <View className="w-full space-y-4">
-          <TouchableOpacity 
-            className="w-full py-3.5 rounded-xl text-white font-medium bg-gray-800"
+          <Pressable 
+            className="w-full py-3.5 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 active:opacity-70"
             onPress={handleSignIn}
           >
             <View className="flex-row items-center justify-center">
-              <Ionicons name="log-in" size={20} color="white" style={{ marginRight: 8 }} />
-              <Text className="text-white font-medium">Sign In</Text>
+              <Ionicons name="log-in" size={20} color={isDark ? 'white' : '#374151'} style={{ marginRight: 8 }} />
+              <Text className="text-gray-900 dark:text-white font-medium">Sign In</Text>
             </View>
-          </TouchableOpacity>
+          </Pressable>
           
           <View className="flex-row items-center justify-center mt-8 mb-8">
-            <View className="h-px flex-grow bg-gray-700" />
-            <Text className="text-white opacity-60 text-xs px-4">or</Text>
-            <View className="h-px flex-grow bg-gray-700" />
+            <View className="h-px flex-grow bg-gray-200 dark:bg-gray-700" />
+            <Text className="text-gray-900 dark:text-white opacity-60 text-xs px-4">or</Text>
+            <View className="h-px flex-grow bg-gray-200 dark:bg-gray-700" />
           </View>
           
-          <TouchableOpacity 
-            className="w-full py-3.5 rounded-xl text-white font-medium bg-red-600"
+          <Pressable 
+            className="w-full py-3.5 rounded-xl text-white font-medium bg-red-600 active:opacity-70"
             onPress={handleCreateAccount}
           >
             <View className="flex-row items-center justify-center">
               <Ionicons name="add-circle" size={20} color="white" style={{ marginRight: 8 }} />
               <Text className="text-white font-medium">Create Account</Text>
             </View>
-          </TouchableOpacity>
+          </Pressable>
         </View>
         
         {/* Sign in with Google */}
@@ -96,11 +90,11 @@ export default function WelcomeScreen() {
         
         {/* Privacy Notice */}
         <View className="absolute bottom-8 left-0 right-0 flex justify-center px-10">
-          <Text className="text-xs text-white opacity-40 text-center">
+          <Text className="text-xs text-gray-900 dark:text-white opacity-40 text-center">
             By signing in, you agree to our{' '}
-            <Text className="underline">Terms of Service</Text>
+            <Text className="underline" onPress={() => Linking.openURL('https://parohia.app/terms')}>Terms of Service</Text>
             {' '}and{' '}
-            <Text className="underline">Privacy Policy</Text>
+            <Text className="underline" onPress={() => Linking.openURL('https://parohia.app/privacy')}>Privacy Policy</Text>
           </Text>
         </View>
       </View>

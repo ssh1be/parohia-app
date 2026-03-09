@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   Alert,
   KeyboardAvoidingView,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 import { useOnboarding } from '../../../contexts/OnboardingContext';
 import AddressAutocomplete from '../../../components/AddressAutocomplete';
 
@@ -20,6 +21,8 @@ import AddressAutocomplete from '../../../components/AddressAutocomplete';
 
 export default function ParishDetailsScreen() {
   const { data, updateData, previousStep } = useOnboarding();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   
   const [parishName, setParishName] = useState(data.parishName || '');
   const [jurisdiction, setJurisdiction] = useState(data.jurisdiction || '');
@@ -97,7 +100,7 @@ export default function ParishDetailsScreen() {
 
   return (
     <KeyboardAvoidingView 
-      className="flex-1 bg-black"
+      className="flex-1 bg-gray-50 dark:bg-black"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
@@ -111,13 +114,13 @@ export default function ParishDetailsScreen() {
           <View className="flex-1 px-6 pt-12 pb-8">
         {/* Back and Title */}
         <View className="flex-row items-center mb-6">
-          <TouchableOpacity 
-            className="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center"
+          <Pressable 
+            className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
             onPress={previousStep}
           >
-            <Ionicons name="arrow-back" size={16} color="white" />
-          </TouchableOpacity>
-          <Text className="ml-4 text-xl font-bold text-white">Parish Details</Text>
+            <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
+          </Pressable>
+          <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">Parish Details</Text>
         </View>
         
         {/* Progress Indicator */}
@@ -127,13 +130,13 @@ export default function ParishDetailsScreen() {
           <View className="flex-1 h-1 rounded-full bg-red-600" />
         </View>
         
-        <Text className="text-white text-lg font-bold mb-6">Parish Information</Text>
+        <Text className="text-gray-900 dark:text-white text-lg font-bold mb-6">Parish Information</Text>
         {/* Parish Form */}
         <View className="space-y-4">
           <View className="mb-2">
-            <Text className="text-white text-sm font-medium mb-2">Parish Name</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Name</Text>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="St. Mary Orthodox Church"
               placeholderTextColor="#9CA3AF"
               value={parishName}
@@ -142,9 +145,9 @@ export default function ParishDetailsScreen() {
           </View>
           
           <View className="mb-2">
-            <Text className="text-white text-sm font-medium mb-2">Jurisdiction</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Jurisdiction</Text>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="Orthodox Church in America (OCA)"
               placeholderTextColor="#9CA3AF"
               value={jurisdiction}
@@ -154,14 +157,14 @@ export default function ParishDetailsScreen() {
           
           <View className="">
             <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-white text-sm font-medium">Street Address</Text>
+              <Text className="text-gray-900 dark:text-white text-sm font-medium">Street Address</Text>
               {(address || city || state || zipCode) && (
-                <TouchableOpacity
+                <Pressable
                   onPress={clearAddressFields}
-                  className="px-2 py-1 rounded-lg bg-gray-700"
+                  className="px-2 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 active:opacity-70"
                 >
-                  <Text className="text-xs text-white opacity-70">Clear</Text>
-                </TouchableOpacity>
+                  <Text className="text-xs text-gray-900 dark:text-white opacity-70">Clear</Text>
+                </Pressable>
               )}
             </View>
             <AddressAutocomplete
@@ -176,9 +179,9 @@ export default function ParishDetailsScreen() {
           
           <View className="flex-row space-x-3 mb-2">
             <View className="flex-1 mr-2">
-              <Text className="text-white text-sm font-medium mb-2">City</Text>
+              <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">City</Text>
               <TextInput
-                className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+                className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
                 placeholder="Portland"
                 placeholderTextColor="#9CA3AF"
                 value={city}
@@ -186,9 +189,9 @@ export default function ParishDetailsScreen() {
               />
             </View>
             <View className="flex-1">
-              <Text className="text-white text-sm font-medium mb-2">State</Text>
+              <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">State</Text>
               <TextInput
-                className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+                className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
                 placeholder="OR"
                 placeholderTextColor="#9CA3AF"
                 value={state}
@@ -200,9 +203,9 @@ export default function ParishDetailsScreen() {
           </View>
           
           <View className="mb-2">
-            <Text className="text-white text-sm font-medium mb-2">ZIP Code</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">ZIP Code</Text>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="97201"
               placeholderTextColor="#9CA3AF"
               value={zipCode}
@@ -213,9 +216,9 @@ export default function ParishDetailsScreen() {
           </View>
           
           <View className="mb-2">
-            <Text className="text-white text-sm font-medium mb-2">Parish Phone Number (Optional)</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Phone Number (Optional)</Text>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="(503) 123-4567"
               placeholderTextColor="#9CA3AF"
               value={parishPhoneNumber}
@@ -225,9 +228,9 @@ export default function ParishDetailsScreen() {
           </View>
           
           <View className="mb-2">
-            <Text className="text-white text-sm font-medium mb-2">Parish Website (Optional)</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Website (Optional)</Text>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="https://www.stmaryorthodox.org"
               placeholderTextColor="#9CA3AF"
               value={parishWebsite}
@@ -238,9 +241,9 @@ export default function ParishDetailsScreen() {
           </View>
           
           <View className="mb-2">
-            <Text className="text-white text-sm font-medium mb-2">Parish Email (Optional)</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Email (Optional)</Text>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="info@stmaryorthodox.org"
               placeholderTextColor="#9CA3AF"
               value={parishEmail}
@@ -251,16 +254,16 @@ export default function ParishDetailsScreen() {
           </View>
         </View>
         
-        <Text className="text-xs text-white opacity-70 mt-6 mb-6">
+        <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-6 mb-6">
           Your parish will need to be verified before you can fully access administrator features. We'll guide you through this process after registration.
         </Text>
         
-        <TouchableOpacity
-          className="w-full py-3.5 rounded-xl text-white font-medium bg-red-600 shadow-md mb-8"
+        <Pressable
+          className="w-full py-3.5 rounded-xl text-white font-medium bg-red-600 shadow-md mb-8 active:opacity-70"
           onPress={handleComplete}
         >
           <Text className="text-white font-medium text-center">Complete Registration</Text>
-        </TouchableOpacity>
+        </Pressable>
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>

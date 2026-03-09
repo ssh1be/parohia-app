@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  Pressable,
   ScrollView,
   Switch,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -15,6 +16,8 @@ import DateTimePicker from './DateTimePicker';
 
 export default function NotificationSettings() {
   const { preferences, scheduledNotifications, updatePreferences, cancelAllNotifications, loading, refreshNotifications } = useNotifications();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [updating, setUpdating] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
 
@@ -60,10 +63,23 @@ export default function NotificationSettings() {
     try {
       setUpdating(true);
       await updatePreferences({ dailyDigestTime: time });
-      // Refresh notifications to reschedule daily digest with new time
       await refreshNotifications();
     } catch (error) {
       Alert.alert('Error', 'Failed to update daily digest time');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDigestModeChange = async (mode: 'day_of' | 'day_before') => {
+    if (mode === preferences.dailyDigestMode) return;
+    try {
+      setUpdating(true);
+      const defaultTime = mode === 'day_before' ? '20:00' : '08:00';
+      await updatePreferences({ dailyDigestMode: mode, dailyDigestTime: defaultTime });
+      await refreshNotifications();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update digest mode');
     } finally {
       setUpdating(false);
     }
@@ -104,60 +120,60 @@ export default function NotificationSettings() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-black justify-center items-center">
-        <ActivityIndicator size="large" color="white" />
-        <Text className="text-white mt-4">Loading notification settings...</Text>
+      <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
+        <ActivityIndicator size="large" color={isDark ? 'white' : '#374151'} />
+        <Text className="text-gray-900 dark:text-white mt-4">Loading notification settings...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-black">
+    <ScrollView className="flex-1 bg-gray-50 dark:bg-black">
       <View className="p-6 space-y-6">
         {/* Header */}
         <View className="mb-6">
-          <Text className="text-2xl font-bold text-white mb-2">Notification Settings</Text>
-          <Text className="text-gray-400 text-sm">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Notification Settings</Text>
+          <Text className="text-gray-500 dark:text-gray-400 text-sm">
             Configure how and when you receive notifications about parish events
           </Text>
         </View>
 
         {/* Notification Status */}
-        <View className="bg-gray-800 rounded-xl p-4 mb-4">
+        <View className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 mb-4">
           <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-white font-semibold text-lg">Notification Status</Text>
+            <Text className="text-gray-900 dark:text-white font-semibold text-lg">Notification Status</Text>
             <View className={`px-2 py-1 rounded-lg ${preferences.enabled ? 'bg-green-600' : 'bg-red-600'}`}>
               <Text className="text-white text-xs font-medium">
                 {preferences.enabled ? 'Enabled' : 'Disabled'}
               </Text>
             </View>
           </View>
-          <Text className="text-gray-400 text-sm">
+          <Text className="text-gray-500 dark:text-gray-400 text-sm">
             {preferences.enabled 
               ? `Notifications will be sent ${preferences.reminderTime} minutes before events`
               : 'Notifications are currently disabled'
             }
           </Text>
           {preferences.enabled && preferences.dailyDigest && (
-            <Text className="text-gray-400 text-sm mt-1">
-              Daily digest sent at {formatTime(preferences.dailyDigestTime)}
+            <Text className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+              Daily digest sent {preferences.dailyDigestMode === 'day_before' ? 'the evening before' : 'the morning of'} at {formatTime(preferences.dailyDigestTime)}
             </Text>
           )}
         </View>
 
         {/* Enable Notifications */}
-        <View className="bg-gray-900 rounded-xl p-4 mb-2">
+        <View className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-2">
           <View className="flex-row justify-between items-center">
             <View className="flex-1">
-              <Text className="text-white font-semibold text-lg">Enable Notifications</Text>
-              <Text className="text-gray-400 text-sm mt-1">
+              <Text className="text-gray-900 dark:text-white font-semibold text-lg">Enable Notifications</Text>
+              <Text className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                 Receive notifications about upcoming parish events
               </Text>
             </View>
             <Switch
               value={preferences.enabled}
               onValueChange={(value) => handleToggle('enabled', value)}
-              trackColor={{ false: '#374151', true: '#3B82F6' }}
+              trackColor={{ false: isDark ? '#374151' : '#D1D5DB', true: '#3B82F6' }}
               thumbColor={preferences.enabled ? '#FFFFFF' : '#9CA3AF'}
               disabled={updating}
             />
@@ -166,21 +182,21 @@ export default function NotificationSettings() {
 
         {/* Reminder Time */}
         {preferences.enabled && (
-          <View className="bg-gray-900 rounded-xl p-4 mb-2">
-            <Text className="text-white font-semibold text-lg mb-3">Reminder Time</Text>
-            <Text className="text-gray-400 text-sm mb-4">
+          <View className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-2">
+            <Text className="text-gray-900 dark:text-white font-semibold text-lg mb-3">Reminder Time</Text>
+            <Text className="text-gray-500 dark:text-gray-400 text-sm mb-4">
               How long before an event should you be notified?
             </Text>
             
             {/* Dropdown Trigger */}
-            <TouchableOpacity
+            <Pressable
               onPress={() => setDropdownVisible(true)}
               disabled={updating}
-              className="flex-row items-center justify-between p-3 rounded-lg border border-gray-700 bg-gray-800"
+              className="flex-row items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 active:opacity-70"
             >
-              <Text className="text-white">{selectedOption?.label || 'Select time'}</Text>
+              <Text className="text-gray-900 dark:text-white">{selectedOption?.label || 'Select time'}</Text>
               <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
+            </Pressable>
 
             {/* Dropdown Modal */}
             <Modal
@@ -189,95 +205,133 @@ export default function NotificationSettings() {
               animationType="fade"
               onRequestClose={() => setDropdownVisible(false)}
             >
-              <TouchableOpacity
-                className="flex-1 bg-black/50 justify-center items-center"
+              <Pressable
+                className="flex-1 bg-black/30 dark:bg-black/50 justify-center items-center active:opacity-70"
                 activeOpacity={1}
                 onPress={() => setDropdownVisible(false)}
               >
-                <View className="bg-gray-900 rounded-xl p-4 mx-6 w-80 max-w-sm">
-                  <Text className="text-white font-semibold text-lg mb-4 text-center">
+                <View className="bg-white dark:bg-gray-900 rounded-xl p-4 mx-6 w-80 max-w-sm">
+                  <Text className="text-gray-900 dark:text-white font-semibold text-lg mb-4 text-center">
                     Select Reminder Time
                   </Text>
                   <View className="space-y-2">
                     {reminderTimeOptions.map((option) => (
-                      <TouchableOpacity
+                      <Pressable
                         key={option.value}
                         onPress={() => {
                           handleReminderTimeChange(option.value);
                           setDropdownVisible(false);
                         }}
                         disabled={updating}
-                        className={`flex-row items-center justify-between p-3 rounded-lg border mb-2 ${
+                        className={`flex-row items-center justify-between p-3 rounded-lg border mb-2 active:opacity-70 ${
                           preferences.reminderTime === option.value
                             ? 'border-blue-500 bg-blue-500/10'
-                            : 'border-gray-700 bg-gray-800'
+                            : 'border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800'
                         }`}
                       >
-                        <Text className="text-white">{option.label}</Text>
+                        <Text className="text-gray-900 dark:text-white">{option.label}</Text>
                         {preferences.reminderTime === option.value && (
                           <Ionicons name="checkmark" size={20} color="#3B82F6" />
                         )}
-                      </TouchableOpacity>
+                      </Pressable>
                     ))}
                   </View>
-                  <TouchableOpacity
+                  <Pressable
                     onPress={() => setDropdownVisible(false)}
-                    className="mt-4 p-3 bg-gray-800 rounded-lg"
+                    className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg active:opacity-70"
                   >
-                    <Text className="text-gray-400 text-center">Cancel</Text>
-                  </TouchableOpacity>
+                    <Text className="text-gray-500 dark:text-gray-400 text-center">Cancel</Text>
+                  </Pressable>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             </Modal>
           </View>
         )}
 
         {/* Daily Digest */}
         {preferences.enabled && (
-          <View className="bg-gray-900 rounded-xl p-4 mb-2">
+          <View className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-2">
             <View className="flex-row justify-between items-center">
               <View className="flex-1">
-                <Text className="text-white font-semibold text-lg">Daily Digest</Text>
-                
+                <Text className="text-gray-900 dark:text-white font-semibold text-lg">Daily Digest</Text>
               </View>
-              
               <Switch
                 value={preferences.dailyDigest}
                 onValueChange={(value) => handleToggle('dailyDigest', value)}
-                trackColor={{ false: '#374151', true: '#3B82F6' }}
+                trackColor={{ false: isDark ? '#374151' : '#D1D5DB', true: '#3B82F6' }}
                 thumbColor={preferences.dailyDigest ? '#FFFFFF' : '#9CA3AF'}
                 disabled={updating}
               />
             </View>
-            <Text className="text-gray-400 text-sm mt-1">
+            <Text className="text-gray-500 dark:text-gray-400 text-sm mt-1">
               Receive a summary of all events for the day
             </Text>
             {preferences.dailyDigest && (
-              <DateTimePicker
-                value={preferences.dailyDigestTime}
-                onChange={handleDailyDigestTimeChange}
-                placeholder="Select time"
-                mode="time"
-                label=""
-              />
+              <View className="mt-4">
+                <Text className="text-gray-900 dark:text-white font-medium text-sm mb-2">When to receive</Text>
+                <View className="flex-row space-x-2">
+                  <Pressable
+                    onPress={() => handleDigestModeChange('day_of')}
+                    disabled={updating}
+                    className={`flex-1 p-3 rounded-lg border mr-2 active:opacity-70 ${
+                      preferences.dailyDigestMode === 'day_of'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
+                        : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
+                    }`}
+                  >
+                    <Text className={`text-center font-medium ${
+                      preferences.dailyDigestMode === 'day_of'
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}>Day of</Text>
+                    <Text className="text-gray-400 dark:text-gray-500 text-xs text-center mt-1">Morning of events</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleDigestModeChange('day_before')}
+                    disabled={updating}
+                    className={`flex-1 p-3 rounded-lg border active:opacity-70 ${
+                      preferences.dailyDigestMode === 'day_before'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
+                        : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
+                    }`}
+                  >
+                    <Text className={`text-center font-medium ${
+                      preferences.dailyDigestMode === 'day_before'
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}>Day before</Text>
+                    <Text className="text-gray-400 dark:text-gray-500 text-xs text-center mt-1">Evening before events</Text>
+                  </Pressable>
+                </View>
+                <View className="mt-3">
+                  <Text className="text-gray-900 dark:text-white font-medium text-sm mb-2">Digest time</Text>
+                  <DateTimePicker
+                    value={preferences.dailyDigestTime}
+                    onChange={handleDailyDigestTimeChange}
+                    placeholder="Select time"
+                    mode="time"
+                    label=""
+                  />
+                </View>
+              </View>
             )}
           </View>
         )}
 
         {/* Sound */}
         {preferences.enabled && (
-          <View className="bg-gray-900 rounded-xl p-4 mb-2">
+          <View className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-2">
             <View className="flex-row justify-between items-center">
               <View className="flex-1">
-                <Text className="text-white font-semibold text-lg">Sound</Text>
-                <Text className="text-gray-400 text-sm mt-1">
+                <Text className="text-gray-900 dark:text-white font-semibold text-lg">Sound</Text>
+                <Text className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                   Play sound when notifications arrive
                 </Text>
               </View>
               <Switch
                 value={preferences.soundEnabled}
                 onValueChange={(value) => handleToggle('soundEnabled', value)}
-                trackColor={{ false: '#374151', true: '#3B82F6' }}
+                trackColor={{ false: isDark ? '#374151' : '#D1D5DB', true: '#3B82F6' }}
                 thumbColor={preferences.soundEnabled ? '#FFFFFF' : '#9CA3AF'}
                 disabled={updating}
               />
@@ -287,18 +341,18 @@ export default function NotificationSettings() {
 
         {/* Vibration */}
         {preferences.enabled && (
-          <View className="bg-gray-900 rounded-xl p-4 mb-2">
+          <View className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-2">
             <View className="flex-row justify-between items-center">
               <View className="flex-1">
-                <Text className="text-white font-semibold text-lg">Vibration</Text>
-                <Text className="text-gray-400 text-sm mt-1">
+                <Text className="text-gray-900 dark:text-white font-semibold text-lg">Vibration</Text>
+                <Text className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                   Vibrate when notifications arrive
                 </Text>
               </View>
               <Switch
                 value={preferences.vibrationEnabled}
                 onValueChange={(value) => handleToggle('vibrationEnabled', value)}
-                trackColor={{ false: '#374151', true: '#3B82F6' }}
+                trackColor={{ false: isDark ? '#374151' : '#D1D5DB', true: '#3B82F6' }}
                 thumbColor={preferences.vibrationEnabled ? '#FFFFFF' : '#9CA3AF'}
                 disabled={updating}
               />
@@ -309,26 +363,26 @@ export default function NotificationSettings() {
 
 
         {/* Cancel All Notifications */}
-        {/* <View className="bg-gray-900 rounded-xl p-4 mb-2">
-          <TouchableOpacity
+        {/* <View className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-2">
+          <Pressable
             onPress={handleCancelAllNotifications}
             className="flex-row items-center justify-center p-3 bg-red-600 rounded-lg"
           >
             <Ionicons name="notifications-off" size={20} color="white" />
             <Text className="text-white font-semibold ml-2">Cancel All Notifications</Text>
-          </TouchableOpacity>
-          <Text className="text-gray-400 text-sm text-center mt-2">
+          </Pressable>
+          <Text className="text-gray-500 dark:text-gray-400 text-sm text-center mt-2">
             This will cancel all scheduled notifications
           </Text>
         </View> */}
 
         {/* Info Section */}
-        <View className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+        <View className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-500/30 rounded-xl p-4">
           <View className="flex-row items-start">
             <Ionicons name="information-circle" size={20} color="#3B82F6" />
             <View className="ml-3 flex-1">
               <Text className="text-blue-400 font-semibold mb-1">How it works</Text>
-              <Text className="text-gray-300 text-sm">
+              <Text className="text-gray-600 dark:text-gray-300 text-sm">
                 Notifications are automatically scheduled based on your parish's Google Calendar events. 
                 They will be sent at the reminder time you set before each event. Daily digest notifications 
                 will be sent at your preferred time each day.

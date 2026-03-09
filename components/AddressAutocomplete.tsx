@@ -3,11 +3,12 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   Modal,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 
 interface AddressComponent {
   long_name: string;
@@ -41,6 +42,8 @@ export default function AddressAutocomplete({
   onChangeText,
   onClear
 }: AddressAutocompleteProps) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [internalAddress, setInternalAddress] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -145,7 +148,7 @@ export default function AddressAutocomplete({
     <View className={`relative ${className}`}>
       <View className="relative">
         <TextInput
-          className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700 pr-10"
+          className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pr-10"
           placeholder={placeholder}
           placeholderTextColor="#9CA3AF"
           value={address}
@@ -158,21 +161,21 @@ export default function AddressAutocomplete({
         />
         {isLoading && (
           <View className="absolute right-3 top-3">
-            <Ionicons name="refresh" size={16} color="white" style={{ opacity: 0.5 }} />
+            <Ionicons name="refresh" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.5 }} />
           </View>
         )}
       </View>
       
       {showSuggestions && suggestions.length > 0 && (
-        <View className="absolute top-full left-0 right-0 z-50 mt-1 bg-gray-800 rounded-xl border border-gray-700 max-h-48">
+        <View className="absolute top-full left-0 right-0 z-50 mt-1 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 max-h-48">
           {suggestions.map((item, index) => (
-            <TouchableOpacity
+            <Pressable
               key={item.place_id || index}
-              className="py-3 px-4 border-b border-gray-700 bg-gray-800 first:rounded-t-xl last:rounded-b-xl last:border-b-0"
+              className="py-3 px-4 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 first:rounded-t-xl last:rounded-b-xl last:border-b-0 active:opacity-70"
               onPress={() => handleAddressSelect(item)}
             >
-              <Text className="text-white text-sm">{item.display_name}</Text>
-            </TouchableOpacity>
+              <Text className="text-gray-900 dark:text-white text-sm">{item.display_name}</Text>
+            </Pressable>
           ))}
         </View>
       )}

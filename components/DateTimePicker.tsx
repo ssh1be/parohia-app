@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, Platform } from 'react-native';
+import { View, Text, Pressable, Modal, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface DateTimePickerProps {
@@ -18,6 +19,8 @@ export default function CustomDateTimePicker({
   mode, 
   label 
 }: DateTimePickerProps) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [showPicker, setShowPicker] = useState(false);
   
   // Parse date value properly to avoid timezone issues
@@ -90,12 +93,12 @@ export default function CustomDateTimePicker({
 
   return (
     <View>
-      <Text className="text-gray-300 text-sm mb-2">{label}</Text>
-      <TouchableOpacity
-        className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600 flex-row items-center justify-between"
+      {label ? <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">{label}</Text> : null}
+      <Pressable
+        className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-300 dark:border-gray-600 flex-row items-center justify-between active:opacity-70"
         onPress={() => setShowPicker(true)}
       >
-        <Text className={`${value ? 'text-white' : 'text-gray-500'}`}>
+        <Text className={`${value ? 'text-gray-900 dark:text-white' : 'text-gray-500'}`}>
           {formatDisplayValue()}
         </Text>
         <Ionicons 
@@ -103,7 +106,7 @@ export default function CustomDateTimePicker({
           size={20} 
           color="#9CA3AF" 
         />
-      </TouchableOpacity>
+      </Pressable>
 
       {showPicker && (
         <Modal
@@ -111,9 +114,9 @@ export default function CustomDateTimePicker({
           transparent={true}
           animationType="slide"
         >
-          <View className="flex-1 justify-center items-center bg-black/80 px-4">
-            <View className="bg-gray-900 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
-              <Text className="text-white text-lg font-semibold mb-4 text-center">
+          <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
+            <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-sm border border-gray-200 dark:border-gray-700">
+              <Text className="text-gray-900 dark:text-white text-lg font-semibold mb-4 text-center">
                 Select {mode === 'date' ? 'Date' : 'Time'}
               </Text>
               
@@ -132,24 +135,24 @@ export default function CustomDateTimePicker({
                     width: Platform.OS === 'ios' ? 200 : '100%',
                     height: Platform.OS === 'ios' ? 200 : 50
                   }}
-                  textColor="white"
+                  textColor={isDark ? 'white' : 'black'}
                 />
               </View>
 
               <View className="flex-row space-x-3">
-                <TouchableOpacity
-                  className="flex-1 bg-gray-700 rounded-lg py-3 mr-2"
+                <Pressable
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
                   onPress={handleCancel}
                 >
-                  <Text className="text-white text-center font-medium">Cancel</Text>
-                </TouchableOpacity>
+                  <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
+                </Pressable>
                 
-                <TouchableOpacity
-                  className="flex-1 bg-red-600 rounded-lg py-3"
+                <Pressable
+                  className="flex-1 bg-red-600 rounded-lg py-3 active:opacity-70"
                   onPress={handleConfirm}
                 >
                   <Text className="text-white text-center font-medium">Confirm</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </View>
           </View>

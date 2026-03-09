@@ -1,4 +1,5 @@
 import { Redirect } from "expo-router";
+import { useColorScheme } from "nativewind";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
@@ -6,6 +7,8 @@ import { isOnboardingComplete } from "../utils/onboardingStorage";
 
 export default function Index() {
   const { user, loading } = useAuth();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
 
@@ -25,9 +28,9 @@ export default function Index() {
   // While authenticated user is checking onboarding, show loader
   if (user && !onboardingChecked) {
     return (
-      <View className="flex-1 bg-black justify-center items-center">
-        <ActivityIndicator size="large" color="white" />
-        <Text className="text-white mt-4">Loading...</Text>
+      <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
+        <ActivityIndicator size="large" color={isDark ? 'white' : '#374151'} />
+        <Text className="text-gray-900 dark:text-white mt-4">Loading...</Text>
       </View>
     );
   }
@@ -35,9 +38,9 @@ export default function Index() {
   // Do not block unauthenticated auth screens during initial auth init
   if (loading && !user) {
     return (
-      <View className="flex-1 bg-black justify-center items-center">
-        <ActivityIndicator size="large" color="white" />
-        <Text className="text-white mt-4">Loading...</Text>
+      <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
+        <ActivityIndicator size="large" color={isDark ? 'white' : '#374151'} />
+        <Text className="text-gray-900 dark:text-white mt-4">Loading...</Text>
       </View>
     );
   }

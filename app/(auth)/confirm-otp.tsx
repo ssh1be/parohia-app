@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   Alert,
   ActivityIndicator,
   ScrollView,
@@ -13,6 +13,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import { useAuth } from '../../contexts/AuthContext';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../config/supabase';
@@ -24,23 +25,18 @@ export default function ConfirmOTPScreen() {
   const [resendLoading, setResendLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const { user } = useAuth();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const email = params.email as string;
 
   // Show loading if email is not yet available
   if (!email) {
     return (
-      <View className="flex-1 bg-black justify-center items-center">
-        <ActivityIndicator size="large" color="white" />
+      <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
+        <ActivityIndicator size="large" color={isDark ? 'white' : '#374151'} />
       </View>
     );
   }
-
-  // Don't redirect to main app - let onboarding handle navigation
-  useEffect(() => {
-    if (user) {
-      console.log('User authenticated, but staying in onboarding flow');
-    }
-  }, [user]);
 
   // Redirect back to login if no email is provided
   useEffect(() => {
@@ -116,7 +112,7 @@ export default function ConfirmOTPScreen() {
 
   return (
     <KeyboardAvoidingView 
-      className="flex-1 bg-black"
+      className="flex-1 bg-gray-50 dark:bg-black"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
@@ -130,13 +126,13 @@ export default function ConfirmOTPScreen() {
           <View className="flex-1 px-6 pt-12 pb-8">
             {/* Back and Title */}
             <View className="flex-row items-center mb-6">
-              <TouchableOpacity 
-                className="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center"
+              <Pressable 
+                className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
                 onPress={() => router.back()}
               >
-                <Ionicons name="arrow-back" size={16} color="white" />
-              </TouchableOpacity>
-              <Text className="ml-4 text-xl font-bold text-white">
+                <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
+              </Pressable>
+              <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">
                 Verify Email
               </Text>
             </View>
@@ -148,11 +144,11 @@ export default function ConfirmOTPScreen() {
                   <Ionicons name="mail" size={32} color="white" />
                 </View>
                 
-                <Text className="text-2xl font-bold text-white text-center mb-2">
+                <Text className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-2">
                   Check Your Email
                 </Text>
                 
-                <Text className="text-white opacity-70 text-center mb-2">
+                <Text className="text-gray-900 dark:text-white opacity-70 text-center mb-2">
                   We've sent a 6-digit verification code to:
                 </Text>
                 
@@ -160,16 +156,16 @@ export default function ConfirmOTPScreen() {
                   {email}
                 </Text>
                 
-                <Text className="text-white opacity-70 text-center text-sm">
+                <Text className="text-gray-900 dark:text-white opacity-70 text-center text-sm">
                   Enter the code below to verify your email address
                 </Text>
               </View>
               
               {/* OTP Input */}
               <View className="mb-8">
-                <Text className="text-white text-sm font-medium mb-3">Verification Code</Text>
+                <Text className="text-gray-900 dark:text-white text-sm font-medium mb-3">Verification Code</Text>
                 <TextInput
-                  className="w-full py-4 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700 text-center text-xl tracking-widest"
+                  className="w-full py-4 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-center text-xl tracking-widest"
                   placeholder="000000"
                   placeholderTextColor="#9CA3AF"
                   value={otp}
@@ -182,8 +178,8 @@ export default function ConfirmOTPScreen() {
               </View>
               
               {/* Verify Button */}
-              <TouchableOpacity
-                className={`w-full py-3.5 rounded-xl text-white font-medium shadow-md mb-6 flex-row items-center justify-center ${
+              <Pressable
+                className={`w-full py-3.5 rounded-xl text-white font-medium shadow-md mb-6 flex-row items-center justify-center active:opacity-70 ${
                   loading 
                     ? 'bg-gray-600' 
                     : 'bg-red-600'
@@ -204,25 +200,25 @@ export default function ConfirmOTPScreen() {
                 <Text className="text-white font-medium">
                   {loading ? 'Verifying...' : 'Verify Email'}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
               
               {/* Resend OTP */}
               <View className="items-center">
-                <Text className="text-white opacity-70 text-sm mb-4">
+                <Text className="text-gray-900 dark:text-white opacity-70 text-sm mb-4">
                   Didn't receive the code?
                 </Text>
                 
-                <TouchableOpacity
-                  className={`py-2 px-4 rounded-lg ${
+                <Pressable
+                  className={`py-2 px-4 rounded-lg active:opacity-70 ${
                     countdown > 0 || resendLoading
                       ? 'opacity-50'
-                      : 'bg-gray-800'
+                      : 'bg-gray-100 dark:bg-gray-800'
                   }`}
                   onPress={handleResendOTP}
                   disabled={countdown > 0 || resendLoading}
                 >
                   {resendLoading ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
                   ) : (
                     <Text className="text-blue-400 font-medium">
                       {countdown > 0 
@@ -231,7 +227,7 @@ export default function ConfirmOTPScreen() {
                       }
                     </Text>
                   )}
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </View>
           </View>

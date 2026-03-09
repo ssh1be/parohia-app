@@ -21,16 +21,15 @@ export const saveOnboardingData = async (
       throw new Error('Failed to get user data');
     }
 
-    // 1. Save user profile
     const { data: profileData, error: profileError } = await supabase
       .from('user_profiles')
-      .insert({
+      .upsert({
         id: userId,
         full_name: data.fullName,
         user_type: data.userType,
         email: user.email,
         phone_number: data.phoneNumber || null,
-      })
+      }, { onConflict: 'id' })
       .select()
       .single();
 
@@ -71,7 +70,11 @@ export const saveOnboardingData = async (
       parishId = parishData.id;
       console.log('Parish saved:', parishData);
     } else if (data.userType === 'regular_user' && data.selectedParishId) {
-      // Connect regular user to existing parish
+      await supabase
+        .from('user_parish_connections')
+        .delete()
+        .eq('user_id', userId);
+
       const { error: connectionError } = await supabase
         .from('user_parish_connections')
         .insert({

@@ -75,52 +75,26 @@ export const setOnboardingComplete = async (userId: string) => {
 
 export const isOnboardingComplete = async (userId: string): Promise<boolean> => {
   try {
-    // First check if user profile exists
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('user_type')
+      .select('id')
       .eq('id', userId)
       .single();
 
-    if (profileError) {
+    if (!profileError && profile) {
+      return true;
+    }
+
+    // Fallback: check AsyncStorage in case Supabase is unreachable
+    const stored = await storage.getItem(ONBOARDING_COMPLETE_KEY);
+    return stored === userId;
+  } catch (error) {
+    try {
+      const stored = await storage.getItem(ONBOARDING_COMPLETE_KEY);
+      return stored === userId;
+    } catch {
       return false;
     }
-
-    // Check based on user type
-    if (profile.user_type === 'parish_admin') {
-      // For parish admins, check if they have a parish
-      const { data: parish, error: parishError } = await supabase
-        .from('parishes')
-        .select('id')
-        .eq('admin_user_id', userId)
-        .single();
-
-      if (parishError) {
-        return false;
-      }
-
-      return true;
-    } else if (profile.user_type === 'regular_user') {
-      // For regular users, check if they have a parish connection
-      const { data: connection, error: connectionError } = await supabase
-        .from('user_parish_connections')
-        .select('parish_id')
-        .eq('user_id', userId)
-        .single();
-
-      if (connectionError) {
-        return false;
-      }
-
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    if (__DEV__) {
-      console.error('Error checking onboarding status:', error);
-    }
-    return false;
   }
 };
 

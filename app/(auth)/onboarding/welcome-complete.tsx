@@ -2,7 +2,7 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -40,9 +40,11 @@ export default function WelcomeCompleteScreen() {
       await setOnboardingComplete(user.id);
       console.log('Onboarding marked as complete in storage');
       
-      // Navigate to main app
       console.log('Navigating to main app');
-      router.replace('/');
+      while (router.canGoBack()) {
+        router.back();
+      }
+      router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Error completing onboarding:', error);
       Alert.alert('Error', 'Failed to complete onboarding. Please try again.');
@@ -50,7 +52,7 @@ export default function WelcomeCompleteScreen() {
   };
 
   return (
-    <View className="flex-1 bg-black relative overflow-hidden">
+    <View className="flex-1 bg-gray-50 dark:bg-black relative overflow-hidden">
       {/* Gradient Background with Pattern */}
       <View className="absolute inset-0 bg-gradient-to-b from-blue-900 to-black" />
       
@@ -60,20 +62,20 @@ export default function WelcomeCompleteScreen() {
           <Ionicons name="checkmark" size={40} color="white" />
         </View>
         
-        <Text className="text-white text-3xl font-bold mb-4 text-center">
+        <Text className="text-gray-900 dark:text-white text-3xl font-bold mb-4 text-center">
           Welcome, {data.fullName?.split(' ')[0] || 'User'}!
         </Text>
         
-        <Text className="text-white opacity-80 text-center mb-12 px-4">
+        <Text className="text-gray-900 dark:text-white opacity-80 text-center mb-12 px-4">
           Your account has been created successfully. You're now ready to connect with your faith community.
         </Text>
         
-        <TouchableOpacity
-          className="w-full py-4 rounded-xl text-white font-medium bg-red-600 shadow-lg"
+        <Pressable
+          className="w-full py-4 rounded-xl text-white font-medium bg-red-600 shadow-lg active:opacity-70"
           onPress={handleGetStarted}
         >
           <Text className="text-white font-medium text-center">Get Started</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </View>
   );

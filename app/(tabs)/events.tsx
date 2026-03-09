@@ -1,6 +1,7 @@
-import { Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Switch } from "react-native";
+import { Text, View, ScrollView, Pressable, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
+import { useColorScheme } from "nativewind";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../config/supabase";
 import { getUserProfile } from "../../services/onboardingService";
@@ -14,6 +15,8 @@ type TabType = 'confession' | 'bulletin';
 
 export default function Events() {
   const { user, session } = useAuth();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [activeTab, setActiveTab] = useState<TabType>('bulletin');
   const [loading, setLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
@@ -668,9 +671,9 @@ export default function Events() {
         {/* Header */}
         <View className="mb-6">
           <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-white text-lg font-semibold">Confession {parish?.priest_name ? `with ${parish.priest_name}` : `Schedule`}</Text>
+            <Text className="text-gray-900 dark:text-white text-lg font-semibold">Confession {parish?.priest_name ? `with ${parish.priest_name}` : `Schedule`}</Text>
           </View>
-          <Text className="text-white opacity-70 text-sm">
+          <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
             {isParishAdmin 
               ? 'Tap slots to enable/disable availability'
               : `Select a time slot to schedule your confession`
@@ -690,29 +693,29 @@ export default function Events() {
               const isToday = daySchedule.date.toDateString() === new Date().toDateString();
               
               return (
-                <TouchableOpacity
+                <Pressable
                   key={index}
-                  className={`px-1.5 py-1 rounded-xl border m-1 ${
+                  className={`px-1.5 py-1 rounded-xl border m-1 active:opacity-70 ${
                     isSelected 
                       ? 'bg-red-600 border-red-500' 
-                      : 'bg-gray-800 border-gray-700'
+                      : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                   }`}
                   onPress={() => setSelectedDay(daySchedule.date)}
                 >
                   <Text className={`text-center font-medium ${
-                    isSelected ? 'text-white' : 'text-white opacity-70'
+                    isSelected ? 'text-white' : 'text-gray-900 dark:text-white opacity-70'
                   }`}>
                     {daySchedule.dayName}
                   </Text>
                   <Text className={`text-center text-xs mt-1 ${
-                    isSelected ? 'text-white' : 'text-white opacity-50'
+                    isSelected ? 'text-white' : 'text-gray-900 dark:text-white opacity-50'
                   }`}>
                     {daySchedule.dateString}
                   </Text>
                   {isToday && (
                     <View className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
                   )}
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
           </View>
@@ -720,7 +723,7 @@ export default function Events() {
 
         {/* Time Slots */}
         <View className="space-y-4">
-          <Text className="text-white font-medium mb-3">
+          <Text className="text-gray-900 dark:text-white font-medium mb-3">
             {isParishAdmin ? 'Manage' : 'Available'} Times for {selectedDay.toLocaleDateString('en-US', { 
               weekday: 'long', 
               month: 'long', 
@@ -739,16 +742,16 @@ export default function Events() {
                 const showAsPassed = isPassed && !isReservedByCurrentUser;
 
                 return (
-                <TouchableOpacity
+                <Pressable
                   key={timeSlot.id}
-                  className={`w-[48%] p-3 rounded-xl border mb-3 ${
+                  className={`w-[48%] p-3 rounded-xl border mb-3 active:opacity-70 ${
                       showAsPassed
-                        ? 'bg-gray-900 border-gray-800 opacity-50'
+                        ? 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-50'
                         : slotStatus === 'reserved' || (isPassed && isReservedByCurrentUser)
-                        ? 'bg-gray-700 border-gray-600'
+                        ? 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
                         : slotStatus === 'available'
-                        ? 'bg-gray-800 border-gray-700'
-                        : 'bg-gray-800 border-gray-700 opacity-70'
+                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                        : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70'
                   }`}
                   onPress={() => handleTimeSlotPress(
                     selectedDaySchedule,
@@ -768,7 +771,7 @@ export default function Events() {
                           color={showAsPassed ? "#6B7280" : slotStatus === 'available' ? "#10B981" : "#9CA3AF"} 
                       />
                       <Text className={`ml-2 font-medium text-sm ${
-                          showAsPassed ? 'text-gray-500' : slotStatus === 'available' ? 'text-white' : 'text-gray-300'
+                          showAsPassed ? 'text-gray-500' : slotStatus === 'available' ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'
                       }`}>
                         {timeSlot.displayTime}
                       </Text>
@@ -800,12 +803,12 @@ export default function Events() {
                         </Text>
                       </View>
                     ) : (
-                      <Text className="text-gray-400 text-xs">
+                      <Text className="text-gray-500 dark:text-gray-400 text-xs">
                           {isParishAdmin ? 'Tap to enable' : 'Closed'}
                       </Text>
                     )}
                   </View>
-                </TouchableOpacity>
+                </Pressable>
                 );
               })}
           </View>
@@ -831,8 +834,8 @@ export default function Events() {
         <View className="p-6">
           {/* Header */}
           <View className="mb-6">
-            <Text className="text-white text-lg font-semibold mb-1">Parish Bulletin Board</Text>
-            <Text className="text-white opacity-70 text-sm">
+            <Text className="text-gray-900 dark:text-white text-lg font-semibold mb-1">Parish Bulletin Board</Text>
+            <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
               Latest announcements and opportunities at your parish
             </Text>
           </View>
@@ -840,23 +843,23 @@ export default function Events() {
           {/* Events List */}
           {loadingBulletin ? (
             <View className="items-center py-8">
-              <ActivityIndicator size="large" color="white" />
-              <Text className="text-white mt-4">Loading events...</Text>
+              <ActivityIndicator size="large" color={isDark ? "white" : "#374151"} />
+              <Text className="text-gray-900 dark:text-white mt-4">Loading events...</Text>
             </View>
           ) : bulletinEvents.length === 0 ? (
             <View className="items-center py-8">
               <Ionicons name="document-text-outline" size={48} color="#6B7280" />
-              <Text className="text-white mt-4 text-center">No events posted yet</Text>
-              <Text className="text-gray-400 text-sm text-center mt-2">
+              <Text className="text-gray-900 dark:text-white mt-4 text-center">No events posted yet</Text>
+              <Text className="text-gray-500 dark:text-gray-400 text-sm text-center mt-2">
                 {isParishAdmin ? 'Create the first event to get started!' : 'Check back later for announcements'}
               </Text>
             </View>
           ) : (
             <View className="space-y-4">
               {bulletinEvents.map((event) => (
-                <TouchableOpacity
+                <Pressable
                   key={event.id}
-                  className="bg-gray-900 rounded-xl p-4 border border-gray-700 mb-2"
+                  className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700 mb-2 active:opacity-70"
                   onPress={() => {
                     setSelectedEvent(event);
                     setShowEventDetailsModal(true);
@@ -888,12 +891,12 @@ export default function Events() {
                         )}
                       </View>
                       
-                      <Text className="text-white font-semibold text-lg mb-1">
+                      <Text className="text-gray-900 dark:text-white font-semibold text-lg mb-1">
                         {event.title}
                       </Text>
                       
                       {event.description && (
-                        <Text className="text-gray-300 text-sm mb-2" numberOfLines={2}>
+                        <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2" numberOfLines={2}>
                           {event.description}
                         </Text>
                       )}
@@ -902,7 +905,7 @@ export default function Events() {
                         {(event.event_type === 'volunteer' || event.event_type === 'event') && event.event_date && (
                           <View className="flex-row items-center mr-2">
                             <Ionicons name="calendar-outline" size={14} color="#9CA3AF" />
-                            <Text className="text-gray-400 text-xs ml-1">
+                            <Text className="text-gray-500 dark:text-gray-400 text-xs ml-1">
                           {(() => {
                             // Parse date as local date to avoid timezone issues
                             const [year, month, day] = event.event_date?.split('-').map(Number) || [];
@@ -920,7 +923,7 @@ export default function Events() {
                         {(event.event_type === 'volunteer' || event.event_type === 'event') && event.event_time && (
                           <View className="flex-row items-center mr-2">
                             <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-                            <Text className="text-gray-400 text-xs ml-1">
+                            <Text className="text-gray-500 dark:text-gray-400 text-xs ml-1">
                               {formatEventTime(event.event_time)}
                             </Text>
                           </View>
@@ -929,7 +932,7 @@ export default function Events() {
                         {(event.event_type === 'volunteer' || event.event_type === 'event') && event.location && (
                           <View className="flex-row items-center mr-2">
                             <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                            <Text className="text-gray-400 text-xs ml-1">
+                            <Text className="text-gray-500 dark:text-gray-400 text-xs ml-1">
                               {event.location}
                             </Text>
                           </View>
@@ -966,7 +969,7 @@ export default function Events() {
                     
 
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           )}
@@ -976,8 +979,8 @@ export default function Events() {
       {/* Floating Action Button for Parish Admins */}
       {isParishAdmin && (
       <View className="absolute bottom-6 right-6 z-50">
-        <TouchableOpacity
-        className="bg-red-600 rounded-full p-4 shadow-lg"
+        <Pressable
+        className="bg-red-600 rounded-full p-4 shadow-lg active:opacity-70"
         onPress={() => setShowCreateEventModal(true)}
         style={{
           shadowColor: '#000',
@@ -991,7 +994,7 @@ export default function Events() {
         }}
       >
           <Ionicons name="add" size={30} color="white" />
-        </TouchableOpacity>
+        </Pressable>
         </View>
       )}
     </View>
@@ -999,42 +1002,42 @@ export default function Events() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-black pt-0">
-        <View className="p-6 bg-gradient-to-b from-gray-900 to-gray-800 border-b border-gray-800">
+      <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
+        <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
           <View className="flex-row justify-between items-center pt-4">
             <View>
-              <Text className="text-3xl font-bold text-white">Events</Text>
-              <Text className="text-sm text-white opacity-70">Parish events and announcements</Text>
+              <Text className="text-3xl font-bold text-gray-900 dark:text-white">Events</Text>
+              <Text className="text-sm text-gray-900 dark:text-white opacity-70">Parish events and announcements</Text>
             </View>
           </View>
         </View>
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="white" />
-          <Text className="text-white mt-4">Loading events...</Text>
+          <ActivityIndicator size="large" color={isDark ? "white" : "#374151"} />
+          <Text className="text-gray-900 dark:text-white mt-4">Loading events...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-black pt-0">
+    <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
       {/* Header */}
-      <View className="p-6 bg-gradient-to-b from-gray-900 to-gray-800 border-b border-gray-800">
+      <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
         <View className="flex-row justify-between items-center pt-4">
           <View>
-            <Text className="text-3xl font-bold text-white">Events</Text>
-            <Text className="text-sm text-white opacity-70">Parish events and announcements</Text>
+            <Text className="text-3xl font-bold text-gray-900 dark:text-white">Events</Text>
+            <Text className="text-sm text-gray-900 dark:text-white opacity-70">Parish events and announcements</Text>
           </View>
           <View className="h-10 w-10 rounded-full bg-transparent flex items-center justify-center">
-              <Ionicons name="notifications" size={25} color="white" />
+              <Ionicons name="notifications" size={25} color={isDark ? 'white' : '#374151'} />
           </View>
         </View>
       </View>
 
       {/* Tab Navigation */}
-      <View className="flex-row border-b border-gray-700">
-        <TouchableOpacity
-          className={`flex-1 py-4 px-6 ${
+      <View className="flex-row border-b border-gray-200 dark:border-gray-700">
+        <Pressable
+          className={`flex-1 py-4 px-6 active:opacity-70 ${
             activeTab === 'bulletin' 
               ? 'border-b-2 border-red-500' 
               : ''
@@ -1048,15 +1051,15 @@ export default function Events() {
               color={activeTab === 'bulletin' ? '#EF4444' : '#9CA3AF'} 
             />
             <Text className={`ml-2 font-medium ${
-              activeTab === 'bulletin' ? 'text-red-500' : 'text-gray-400'
+              activeTab === 'bulletin' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
             }`}>
               Bulletin Board
             </Text>
           </View>
-        </TouchableOpacity>
+        </Pressable>
 
-        <TouchableOpacity
-          className={`flex-1 py-4 px-6 ${
+        <Pressable
+          className={`flex-1 py-4 px-6 active:opacity-70 ${
             activeTab === 'confession' 
               ? 'border-b-2 border-red-500' 
               : ''
@@ -1070,12 +1073,12 @@ export default function Events() {
               color={activeTab === 'confession' ? '#EF4444' : '#9CA3AF'} 
             />
             <Text className={`ml-2 font-medium ${
-              activeTab === 'confession' ? 'text-red-500' : 'text-gray-400'
+              activeTab === 'confession' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
             }`}>
               Confession
             </Text>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {/* Tab Content */}
@@ -1090,20 +1093,20 @@ export default function Events() {
         transparent={true}
         onRequestClose={() => setShowReservationModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/80 px-4">
-          <View className="bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-700">
+        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
+          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
             <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-xl text-white font-bold">Make Reservation</Text>
-              <TouchableOpacity onPress={() => setShowReservationModal(false)}>
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
+              <Text className="text-xl text-gray-900 dark:text-white font-bold">Make Reservation</Text>
+              <Pressable className="active:opacity-70" onPress={() => setShowReservationModal(false)}>
+                <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
+              </Pressable>
             </View>
 
             <View className="mb-6">
-              <Text className="text-white text-lg">
+              <Text className="text-gray-900 dark:text-white text-lg">
                 {selectedTimeSlot?.time}
               </Text>
-              <Text className="text-white opacity-70 text-sm">
+              <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
                 {selectedDay.toLocaleDateString('en-US', { 
                   weekday: 'long', 
                   month: 'long', 
@@ -1113,9 +1116,9 @@ export default function Events() {
             </View>
 
             <View className="mb-6">
-              <Text className="text-gray-300 text-xs mb-2">Notes (Optional)</Text>
+              <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Notes (Optional)</Text>
               <TextInput
-                className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                 value={reservationNotes}
                 onChangeText={setReservationNotes}
                 placeholder="Any special requests or notes..."
@@ -1128,16 +1131,16 @@ export default function Events() {
             </View>
 
             <View className="flex-row space-x-3">
-              <TouchableOpacity
-                className="flex-1 bg-gray-700 rounded-lg py-3 mr-2"
+              <Pressable
+                className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
                 onPress={() => setShowReservationModal(false)}
                 disabled={reservationLoading}
               >
-                <Text className="text-white text-center font-medium">Cancel</Text>
-              </TouchableOpacity>
+                <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
+              </Pressable>
               
-              <TouchableOpacity
-                className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center"
+              <Pressable
+                className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
                 onPress={handleMakeReservation}
                 disabled={reservationLoading}
               >
@@ -1149,7 +1152,7 @@ export default function Events() {
                 <Text className="text-white text-center font-medium ml-2">
                   {reservationLoading ? 'Confirming...' : 'Confirm'}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -1162,27 +1165,27 @@ export default function Events() {
         transparent={true}
         onRequestClose={() => setShowReservationDetailsModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/80 px-4">
-          <View className="bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-700">
+        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
+          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
             <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-xl text-white font-bold">Reservation Details</Text>
-              <TouchableOpacity onPress={() => setShowReservationDetailsModal(false)}>
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
+              <Text className="text-xl text-gray-900 dark:text-white font-bold">Reservation Details</Text>
+              <Pressable className="active:opacity-70" onPress={() => setShowReservationDetailsModal(false)}>
+                <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
+              </Pressable>
             </View>
 
             {loadingReservationDetails ? (
               <View className="items-center py-8">
-                <ActivityIndicator size="large" color="white" />
-                <Text className="text-white mt-4">Loading details...</Text>
+                <ActivityIndicator size="large" color={isDark ? "white" : "#374151"} />
+                <Text className="text-gray-900 dark:text-white mt-4">Loading details...</Text>
               </View>
             ) : reservationDetails ? (
               <View className="space-y-4">
-                <View className="bg-gray-800 rounded-lg p-4 mb-2">
-                  <Text className="text-white font-semibold text-lg mb-2">
+                <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
+                  <Text className="text-gray-900 dark:text-white font-semibold text-lg mb-2">
                     {selectedTimeSlot?.time}
                   </Text>
-                  <Text className="text-white opacity-70 text-sm">
+                  <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
                     {selectedDay.toLocaleDateString('en-US', { 
                       weekday: 'long', 
                       month: 'long', 
@@ -1191,33 +1194,33 @@ export default function Events() {
                   </Text>
                 </View>
 
-                <View className="bg-gray-800 rounded-lg p-4 mb-2">
-                  <Text className="text-gray-300 text-xs mb-2">Reserved By</Text>
-                  <Text className="text-white font-medium">
+                <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
+                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Reserved By</Text>
+                  <Text className="text-gray-900 dark:text-white font-medium">
                     {reservationDetails.user_profiles?.full_name || 'Unknown User'}
                   </Text>
-                  <Text className="text-white opacity-70 text-sm mt-1">
+                  <Text className="text-gray-900 dark:text-white opacity-70 text-sm mt-1">
                     {reservationDetails.user_profiles?.email || 'No email provided'}
                   </Text>
                   {reservationDetails.user_profiles?.phone_number && (
-                    <Text className="text-white opacity-70 text-sm mt-1">
+                    <Text className="text-gray-900 dark:text-white opacity-70 text-sm mt-1">
                       {formatPhoneNumber(reservationDetails.user_profiles.phone_number)}
                     </Text>
                   )}
                 </View>
 
                 {reservationDetails.notes && (
-                  <View className="bg-gray-800 rounded-lg p-4 mb-2">
-                    <Text className="text-gray-300 text-xs mb-2">Notes</Text>
-                    <Text className="text-white">
+                  <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
+                    <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Notes</Text>
+                    <Text className="text-gray-900 dark:text-white">
                       {reservationDetails.notes}
                     </Text>
                   </View>
                 )}
 
-                <View className="bg-gray-800 rounded-lg p-4 mb-2">
-                  <Text className="text-gray-300 text-xs mb-2">Reservation Date</Text>
-                  <Text className="text-white">
+                <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
+                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Reservation Date</Text>
+                  <Text className="text-gray-900 dark:text-white">
                     {new Date(reservationDetails.created_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -1231,17 +1234,17 @@ export default function Events() {
             ) : (
               <View className="items-center py-8">
                 <Ionicons name="alert-circle" size={48} color="#6B7280" />
-                <Text className="text-white mt-4 text-center">Failed to load reservation details</Text>
+                <Text className="text-gray-900 dark:text-white mt-4 text-center">Failed to load reservation details</Text>
               </View>
             )}
 
             <View className="mt-6">
-              <TouchableOpacity
-                className="w-full bg-gray-700 rounded-lg py-3"
+              <Pressable
+                className="w-full bg-gray-200 dark:bg-gray-700 rounded-lg py-3 active:opacity-70"
                 onPress={() => setShowReservationDetailsModal(false)}
               >
-                <Text className="text-white text-center font-medium">Close</Text>
-              </TouchableOpacity>
+                <Text className="text-gray-900 dark:text-white text-center font-medium">Close</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -1254,27 +1257,27 @@ export default function Events() {
         transparent={true}
         onRequestClose={() => setShowCreateEventModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/80 px-4">
-          <View className="bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-700 max-h-[90%]">
+        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
+          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700 max-h-[90%]">
             <ScrollView showsVerticalScrollIndicator={false}>
               <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-xl text-white font-bold">{editingEventId ? 'Edit Post' : 'Create New Post'}</Text>
-                <TouchableOpacity onPress={() => setShowCreateEventModal(false)}>
-                  <Ionicons name="close" size={24} color="white" />
-                </TouchableOpacity>
+                <Text className="text-xl text-gray-900 dark:text-white font-bold">{editingEventId ? 'Edit Post' : 'Create New Post'}</Text>
+                <Pressable className="active:opacity-70" onPress={() => setShowCreateEventModal(false)}>
+                  <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
+                </Pressable>
               </View>
 
               <View className="space-y-4">
                 {/* Event Type */}
                 {!editingEventId && (
                   <View className="mb-2">
-                    <Text className="text-gray-300 text-sm mb-2">Type</Text>
+                    <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Type</Text>
                     <View className="flex-row space-x-2 mb-2">
-                      <TouchableOpacity
-                        className={`flex-1 pt-2 pb-2 rounded-lg border mr-1 ${
+                      <Pressable
+                        className={`flex-1 pt-2 pb-2 rounded-lg border mr-1 active:opacity-70 ${
                           createEventData.event_type === 'announcement'
                             ? 'bg-blue-600 border-blue-500'
-                            : 'bg-gray-800 border-gray-600'
+                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                         }`}
                         onPress={() => setCreateEventData({
                           ...createEventData, 
@@ -1285,39 +1288,39 @@ export default function Events() {
                         })}
                       >
                         <Text className={`text-center text-xs ${
-                          createEventData.event_type === 'announcement' ? 'text-white' : 'text-gray-400'
+                          createEventData.event_type === 'announcement' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
                         }`}>
                           Announcement
                         </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        className={`flex-1 pt-2 pb-2 rounded-lg border mr-1 ${
+                      </Pressable>
+                      <Pressable
+                        className={`flex-1 pt-2 pb-2 rounded-lg border mr-1 active:opacity-70 ${
                           createEventData.event_type === 'event'
                             ? 'bg-purple-600 border-purple-500'
-                            : 'bg-gray-800 border-gray-600'
+                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                         }`}
                         onPress={() => setCreateEventData({...createEventData, event_type: 'event'})}
                       >
                         <Text className={`text-center text-xs ${
-                          createEventData.event_type === 'event' ? 'text-white' : 'text-gray-400'
+                          createEventData.event_type === 'event' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
                         }`}>
                           Event
                         </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        className={`flex-1 pt-2 pb-2 rounded-lg border ${
+                      </Pressable>
+                      <Pressable
+                        className={`flex-1 pt-2 pb-2 rounded-lg border active:opacity-70 ${
                           createEventData.event_type === 'volunteer'
                             ? 'bg-green-600 border-green-500'
-                            : 'bg-gray-800 border-gray-600'
+                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                         }`}
                         onPress={() => setCreateEventData({...createEventData, event_type: 'volunteer'})}
                       >
                         <Text className={`text-center text-xs ${
-                          createEventData.event_type === 'volunteer' ? 'text-white' : 'text-gray-400'
+                          createEventData.event_type === 'volunteer' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
                         }`}>
                           Volunteer
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                       
                     </View>
                   </View>
@@ -1327,9 +1330,9 @@ export default function Events() {
 
                 {/* Title */}
                 <View className="mb-2">
-                  <Text className="text-gray-300 text-sm mb-2">Title *</Text>
+                  <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Title *</Text>
                   <TextInput
-                    className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                     value={createEventData.title}
                     onChangeText={(text) => setCreateEventData({...createEventData, title: text})}
                     placeholder={createEventData.event_type === 'announcement' ? 'Announcement title...' : 'Event title...'}
@@ -1341,9 +1344,9 @@ export default function Events() {
                 
                 {/* Description */}
                 <View className="mb-2">
-                  <Text className="text-gray-300 text-sm mb-2">Description</Text>
+                  <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Description</Text>
                   <TextInput
-                    className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                     value={createEventData.description}
                     onChangeText={(text) => setCreateEventData({...createEventData, description: text})}
                     placeholder={createEventData.event_type === 'announcement' ? 'Announcement description...' : 'Event description...'}
@@ -1358,9 +1361,9 @@ export default function Events() {
                 {/* Volunteers Needed */}
                 {createEventData.event_type === 'volunteer' && (
                   <View className="mb-2">
-                    <Text className="text-gray-300 text-sm mb-2">Volunteers Needed *</Text>
+                    <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Volunteers Needed *</Text>
                     <TextInput
-                      className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                      className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                       value={createEventData.volunteers_needed?.toString() || ''}
                       onChangeText={(text) => {
                         const num = parseInt(text) || undefined;
@@ -1404,9 +1407,9 @@ export default function Events() {
                 {/* Location - Only show for volunteer and event types */}
                 {(createEventData.event_type === 'volunteer' || createEventData.event_type === 'event') && (
                   <View className="mb-2">
-                    <Text className="text-gray-300 text-sm mb-2">Location</Text>
+                    <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Location</Text>
                     <TextInput
-                      className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                      className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                       value={createEventData.location}
                       onChangeText={(text) => setCreateEventData({...createEventData, location: text})}
                       placeholder="Event location..."
@@ -1420,9 +1423,9 @@ export default function Events() {
                 {/* Contact Info */}
                 {(createEventData.event_type === 'volunteer' || createEventData.event_type === 'event') && (
                 <View className="mb-2">
-                  <Text className="text-gray-300 text-sm mb-2">Contact Information</Text>
+                  <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Contact Information</Text>
                   <TextInput
-                    className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                     value={createEventData.contact_info}
                     onChangeText={(text) => setCreateEventData({...createEventData, contact_info: text})}
                     placeholder="Contact details..."
@@ -1437,7 +1440,7 @@ export default function Events() {
                 
                 {/* Notify Parishioners */}
                 <View className="flex-row items-center mb-2 mt-2">
-                  <Text className="text-gray-300 text-md">Notify Parishioners?</Text>
+                  <Text className="text-gray-600 dark:text-gray-300 text-md">Notify Parishioners?</Text>
                   <Switch
                     value={notifyParishioners}
                     onValueChange={setNotifyParishioners}
@@ -1449,16 +1452,16 @@ export default function Events() {
               </View>
 
               <View className="flex-row space-x-3 mt-6">
-                <TouchableOpacity
-                  className="flex-1 bg-gray-700 rounded-lg py-3 mr-2"
+                <Pressable
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
                   onPress={() => { setShowCreateEventModal(false); setEditingEventId(null); }}
                   disabled={creatingEvent}
                 >
-                  <Text className="text-white text-center font-medium">Cancel</Text>
-                </TouchableOpacity>
+                  <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
+                </Pressable>
                 
-                <TouchableOpacity
-                  className={`flex-1 rounded-lg py-3 flex-row items-center justify-center ${
+                <Pressable
+                  className={`flex-1 rounded-lg py-3 flex-row items-center justify-center active:opacity-70 ${
                     creatingEvent || !createEventData.title.trim() || (createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed)
                       ? 'bg-gray-600 opacity-50'
                       : 'bg-red-600'
@@ -1478,7 +1481,7 @@ export default function Events() {
                   }`}>
                     {creatingEvent ? (editingEventId ? 'Saving...' : 'Creating...') : (editingEventId ? 'Save Changes' : 'Create Event')}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </ScrollView>
           </View>
@@ -1492,14 +1495,14 @@ export default function Events() {
         transparent={true}
         onRequestClose={() => setShowEventDetailsModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/80 px-4">
-          <View className="bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-700 max-h-[90%]">
+        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
+          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700 max-h-[90%]">
             <ScrollView showsVerticalScrollIndicator={false}>
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-xl text-white font-bold">Post Details</Text>
-                <TouchableOpacity onPress={() => setShowEventDetailsModal(false)}>
-                  <Ionicons name="close" size={24} color="white" />
-                </TouchableOpacity>
+                <Text className="text-xl text-gray-900 dark:text-white font-bold">Post Details</Text>
+                <Pressable className="active:opacity-70" onPress={() => setShowEventDetailsModal(false)}>
+                  <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
+                </Pressable>
               </View>
 
               {selectedEvent && (
@@ -1524,12 +1527,12 @@ export default function Events() {
                     )}
                   </View>
 
-                  <Text className="text-white font-semibold text-xl">
+                  <Text className="text-gray-900 dark:text-white font-semibold text-xl">
                     {selectedEvent.title}
                   </Text>
 
                   {selectedEvent.description && (
-                    <Text className="text-gray-300 text-base">
+                    <Text className="text-gray-600 dark:text-gray-300 text-base">
                       {selectedEvent.description}
                     </Text>
                   )}
@@ -1538,7 +1541,7 @@ export default function Events() {
                     {(selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event') && selectedEvent.event_date && (
                       <View className="flex-row items-center mb-1">
                         <Ionicons name="calendar-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-400 text-sm ml-2">
+                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
                           {(() => {
                             // Parse date as local date to avoid timezone issues
                             const [year, month, day] = selectedEvent.event_date.split('-').map(Number);
@@ -1557,7 +1560,7 @@ export default function Events() {
                     {(selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event') && selectedEvent.event_time && (
                       <View className="flex-row items-center mb-1">
                         <Ionicons name="time-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-400 text-sm ml-2">
+                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
                           {formatEventTime(selectedEvent.event_time)}
                         </Text>
                       </View>
@@ -1566,7 +1569,7 @@ export default function Events() {
                     {(selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event') && selectedEvent.location && (
                       <View className="flex-row items-center mb-1">
                         <Ionicons name="location-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-400 text-sm ml-2">
+                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
                           {selectedEvent.location}
                         </Text>
                       </View>
@@ -1575,14 +1578,14 @@ export default function Events() {
                     {selectedEvent.contact_info && (
                       <View className="flex-row items-center mb-1">
                         <Ionicons name="call-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-400 text-sm ml-2">
+                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
                           {selectedEvent.contact_info}
                         </Text>
                       </View>
                     )}
                   </View>
 
-                  <View className="border-t border-gray-700 pt-2">
+                  <View className="border-t border-gray-200 dark:border-gray-700 pt-2">
                     <Text className="text-gray-500 text-sm">{"Posted on "}
                       {new Date(selectedEvent.created_at).toLocaleDateString('en-US', {
                         year: 'numeric',
@@ -1609,71 +1612,71 @@ export default function Events() {
                             </Text>
                           </View>
                           {selectedEvent.user_response.notes && (
-                            <Text className="text-gray-300 text-sm">
+                            <Text className="text-gray-600 dark:text-gray-300 text-sm">
                               Your notes: "{selectedEvent.user_response.notes}"
                             </Text>
                           )}
-                          <TouchableOpacity
-                            className="bg-red-600 rounded-lg py-3 mt-4"
+                          <Pressable
+                            className="bg-red-600 rounded-lg py-3 mt-4 active:opacity-70"
                             onPress={() => handleRemoveResponse(selectedEvent.id)}
                           >
                             <Text className="text-white text-center font-medium">Remove Response</Text>
-                          </TouchableOpacity>
+                          </Pressable>
                         </View>
                       ) : (
                         <View className="space-y-4">
-                          <Text className="text-white font-medium mb-2">RSVP for this event:</Text>
+                          <Text className="text-gray-900 dark:text-white font-medium mb-2">RSVP for this event:</Text>
                           
                           <View className="flex-row space-x-2 mb-2">
-                          <TouchableOpacity
-                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 ${
+                          <Pressable
+                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 active:opacity-70 ${
                                 responseData.response_type === 'unavailable'
                                   ? 'bg-red-600 border-red-500'
-                                  : 'bg-gray-800 border-gray-600'
+                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                               }`}
                               onPress={() => setResponseData({...responseData, response_type: 'unavailable'})}
                             >
                               <Text className={`text-center text-sm ${
-                                responseData.response_type === 'unavailable' ? 'text-white' : 'text-gray-400'
+                                responseData.response_type === 'unavailable' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
                               }`}>
                                 Unavailable
                               </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 ${
+                            </Pressable>
+                            <Pressable
+                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 active:opacity-70 ${
                                 responseData.response_type === 'interested'
                                   ? 'bg-blue-600 border-blue-500'
-                                  : 'bg-gray-800 border-gray-600'
+                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                               }`}
                               onPress={() => setResponseData({...responseData, response_type: 'interested'})}
                             >
                               <Text className={`text-center text-sm ${
-                                responseData.response_type === 'interested' ? 'text-white' : 'text-gray-400'
+                                responseData.response_type === 'interested' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
                               }`}>
                                 Interested
                               </Text>
-                            </TouchableOpacity>
+                            </Pressable>
                             
-                            <TouchableOpacity
-                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 ${
+                            <Pressable
+                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 active:opacity-70 ${
                                 responseData.response_type === 'attending'
                                   ? 'bg-green-600 border-green-500'
-                                  : 'bg-gray-800 border-gray-600'
+                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                               }`}
                               onPress={() => setResponseData({...responseData, response_type: 'attending'})}
                             >
                               <Text className={`text-center text-sm ${
-                                responseData.response_type === 'attending' ? 'text-white' : 'text-gray-400'
+                                responseData.response_type === 'attending' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
                               }`}>
                                 Attending
                               </Text>
-                            </TouchableOpacity>
+                            </Pressable>
                           </View>
 
                           <View className="mb-4">
-                            <Text className="text-gray-300 text-sm mb-2">Notes (Optional)</Text>
+                            <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Notes (Optional)</Text>
                             <TextInput
-                              className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                              className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                               value={responseData.notes}
                               onChangeText={(text) => setResponseData({...responseData, notes: text})}
                               placeholder="Any additional notes..."
@@ -1685,8 +1688,8 @@ export default function Events() {
                             />
                           </View>
 
-                          <TouchableOpacity
-                            className="bg-red-600 rounded-lg py-3 flex-row items-center justify-center"
+                          <Pressable
+                            className="bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
                             onPress={handleRespondToEvent}
                             disabled={respondingToEvent}
                           >
@@ -1698,7 +1701,7 @@ export default function Events() {
                             <Text className="text-white text-center font-medium ml-2">
                               {respondingToEvent ? 'Submitting...' : 'Submit Response'}
                             </Text>
-                          </TouchableOpacity>
+                          </Pressable>
                         </View>
                       )}
                     </View>
@@ -1708,13 +1711,13 @@ export default function Events() {
                   {!isParishAdmin && selectedEvent.event_type === 'volunteer' && (
                     <View className="pt-4">
                       {/* Volunteer Count Display */}
-                      <View className="bg-gray-800 rounded-lg p-3 mb-4 border border-gray-700">
-                        <Text className="text-white font-medium mb-2">Volunteer Progress</Text>
+                      <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
+                        <Text className="text-gray-900 dark:text-white font-medium mb-2">Volunteer Progress</Text>
                         <View className="flex-row items-center justify-between">
-                          <Text className="text-gray-300 text-sm">
+                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
                             {selectedEvent.volunteer_count || 0} of {selectedEvent.volunteers_needed || 0} volunteers
                           </Text>
-                          <View className="bg-gray-700 rounded-full h-2 flex-1 mx-3">
+                          <View className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 flex-1 mx-3">
                             <View 
                               className="bg-green-500 rounded-full h-2" 
                               style={{ 
@@ -1722,11 +1725,11 @@ export default function Events() {
                               }}
                             />
                           </View>
-                          <Text className="text-gray-300 text-sm">
+                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
                             {Math.round(((selectedEvent.volunteer_count || 0) / (selectedEvent.volunteers_needed || 1)) * 100)}%
                           </Text>
                         </View>
-                        <Text className="text-gray-400 text-xs mt-2">
+                        <Text className="text-gray-500 dark:text-gray-400 text-xs mt-2">
                           {selectedEvent.volunteers_needed && selectedEvent.volunteer_count && 
                            selectedEvent.volunteer_count >= selectedEvent.volunteers_needed 
                            ? 'Volunteer goal reached! 🎉' 
@@ -1743,27 +1746,27 @@ export default function Events() {
                             </Text>
                           </View>
                           {selectedEvent.user_response.notes && (
-                            <Text className="text-gray-300 text-sm">
+                            <Text className="text-gray-600 dark:text-gray-300 text-sm">
                               Your notes: "{selectedEvent.user_response.notes}"
                             </Text>
                           )}
-                          <TouchableOpacity
-                            className="bg-red-600 rounded-lg py-3 mt-4"
+                          <Pressable
+                            className="bg-red-600 rounded-lg py-3 mt-4 active:opacity-70"
                             onPress={() => handleRemoveResponse(selectedEvent.id)}
                           >
                             <Text className="text-white text-center font-medium">Remove Response</Text>
-                          </TouchableOpacity>
+                          </Pressable>
                         </View>
                       ) : (
                         <View className="space-y-4">
-                          <Text className="text-white font-medium mb-2">Volunteer for this event:</Text>
+                          <Text className="text-gray-900 dark:text-white font-medium mb-2">Volunteer for this event:</Text>
                           
                           <View className="flex-row space-x-2 mb-2">
-                            <TouchableOpacity
-                              className={`flex-1 py-2 px-3 rounded-lg border ${
+                            <Pressable
+                              className={`flex-1 py-2 px-3 rounded-lg border active:opacity-70 ${
                                 responseData.response_type === 'volunteer'
                                   ? 'bg-green-600 border-green-500'
-                                  : 'bg-gray-800 border-gray-600'
+                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                               }`}
                               onPress={() => setResponseData({
                                 ...responseData, 
@@ -1777,18 +1780,18 @@ export default function Events() {
                                   color={responseData.response_type === 'volunteer' ? 'white' : '#9CA3AF'} 
                                 />
                                 <Text className={`text-center text-sm ml-2 font-medium py-1 ${
-                                  responseData.response_type === 'volunteer' ? 'text-white' : 'text-gray-400'
+                                  responseData.response_type === 'volunteer' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
                                 }`}>
                                   I'll Volunteer
                                 </Text>
                               </View>
-                            </TouchableOpacity>
+                            </Pressable>
                           </View>
 
                           <View className="mb-4">
-                            <Text className="text-gray-300 text-sm mb-2">Notes (Optional)</Text>
+                            <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Notes (Optional)</Text>
                             <TextInput
-                              className="bg-gray-800 text-white p-3 rounded-lg border border-gray-600"
+                              className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
                               value={responseData.notes}
                               onChangeText={(text) => setResponseData({...responseData, notes: text})}
                               placeholder="Any additional notes..."
@@ -1800,8 +1803,8 @@ export default function Events() {
                             />
                           </View>
 
-                          <TouchableOpacity
-                            className={`rounded-lg py-3 flex-row items-center justify-center ${
+                          <Pressable
+                            className={`rounded-lg py-3 flex-row items-center justify-center active:opacity-70 ${
                               responseData.response_type === 'volunteer' && !respondingToEvent
                                 ? 'bg-red-600'
                                 : 'bg-gray-600'
@@ -1817,7 +1820,7 @@ export default function Events() {
                             <Text className="text-white text-center font-medium ml-2">
                               {respondingToEvent ? 'Submitting...' : 'Submit Response'}
                             </Text>
-                          </TouchableOpacity>
+                          </Pressable>
                         </View>
                       )}
                     </View>
@@ -1828,38 +1831,38 @@ export default function Events() {
                     <View className="pt-2">
                       <View className="flex-row items-center justify-between mb-4">
                         {loadingResponses && (
-                          <ActivityIndicator size="small" color="white" />
+                          <ActivityIndicator size="small" color={isDark ? "white" : "#374151"} />
                         )}
                       </View>
 
                       {/* Response Count Summary */}
                       {!loadingResponses && eventResponses.length > 0 && (
-                        <View className="bg-gray-800 rounded-lg p-3 mb-4 border border-gray-700">
-                          <Text className="text-white font-medium mb-2">RSVP Response Summary</Text>
+                        <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
+                          <Text className="text-gray-900 dark:text-white font-medium mb-2">RSVP Response Summary</Text>
                           <View className="flex-row justify-between">
                             <View className="items-center">
                               <Text className="text-green-400 text-lg font-bold">
                                 {eventResponses.filter(r => r.response_type === 'attending').length}
                               </Text>
-                              <Text className="text-gray-400 text-xs">Attending</Text>
+                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Attending</Text>
                             </View>
                             <View className="items-center">
                               <Text className="text-blue-400 text-lg font-bold">
                                 {eventResponses.filter(r => r.response_type === 'interested').length}
                               </Text>
-                              <Text className="text-gray-400 text-xs">Interested</Text>
+                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Interested</Text>
                             </View>
                             <View className="items-center">
                               <Text className="text-red-400 text-lg font-bold">
                                 {eventResponses.filter(r => r.response_type === 'unavailable').length}
                               </Text>
-                              <Text className="text-gray-400 text-xs">Unavailable</Text>
+                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Unavailable</Text>
                             </View>
                             <View className="items-center">
-                              <Text className="text-white text-lg font-bold">
+                              <Text className="text-gray-900 dark:text-white text-lg font-bold">
                                 {eventResponses.length}
                               </Text>
-                              <Text className="text-gray-400 text-xs">Total</Text>
+                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Total</Text>
                             </View>
                           </View>
                         </View>
@@ -1868,14 +1871,14 @@ export default function Events() {
                       {eventResponses.length === 0 ? (
                         <View className="items-center py-4">
                           <Ionicons name="people-outline" size={32} color="#6B7280" />
-                          <Text className="text-gray-400 text-sm mt-2">No responses yet</Text>
+                          <Text className="text-gray-500 dark:text-gray-400 text-sm mt-2">No responses yet</Text>
                         </View>
                       ) : (
                         <View className="space-y-3">
                           {eventResponses.map((response, index) => (
-                            <View key={index} className="bg-gray-800 rounded-lg p-3 border border-gray-700 mb-2">
+                            <View key={index} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-2">
                               <View className="flex-row items-center justify-between mb-2">
-                                <Text className="text-white font-medium">
+                                <Text className="text-gray-900 dark:text-white font-medium">
                                   {response.user_profile?.full_name || 'Unknown User'}
                                 </Text>
                                 <View className={`px-2 py-1 rounded-full ${
@@ -1890,7 +1893,7 @@ export default function Events() {
                               </View>
                               
                               {response.notes && (
-                                <Text className="text-gray-300 text-sm mt-1">
+                                <Text className="text-gray-600 dark:text-gray-300 text-sm mt-1">
                                   "{response.notes}"
                                 </Text>
                               )}
@@ -1915,18 +1918,18 @@ export default function Events() {
                     <View className="pt-2">
                       <View className="flex-row items-center justify-between mb-4">
                         {loadingResponses && (
-                          <ActivityIndicator size="small" color="white" />
+                          <ActivityIndicator size="small" color={isDark ? "white" : "#374151"} />
                         )}
                       </View>
 
                       {/* Volunteer Progress Summary */}
-                      <View className="bg-gray-800 rounded-lg p-3 mb-4 border border-gray-700">
-                        <Text className="text-white font-medium mb-2">Volunteer Progress</Text>
+                      <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
+                        <Text className="text-gray-900 dark:text-white font-medium mb-2">Volunteer Progress</Text>
                         <View className="flex-row items-center justify-between mb-2">
-                          <Text className="text-gray-300 text-sm">
+                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
                             {selectedEvent.volunteer_count || 0} of {selectedEvent.volunteers_needed || 0} volunteers
                           </Text>
-                          <View className="bg-gray-700 rounded-full h-2 flex-1 mx-3">
+                          <View className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 flex-1 mx-3">
                             <View 
                               className="bg-green-500 rounded-full h-2" 
                               style={{ 
@@ -1934,11 +1937,11 @@ export default function Events() {
                               }}
                             />
                           </View>
-                          <Text className="text-gray-300 text-sm">
+                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
                             {Math.round(((selectedEvent.volunteer_count || 0) / (selectedEvent.volunteers_needed || 1)) * 100)}%
                           </Text>
                         </View>
-                        <Text className="text-gray-400 text-xs">
+                        <Text className="text-gray-500 dark:text-gray-400 text-xs">
                           {selectedEvent.volunteers_needed && selectedEvent.volunteer_count && 
                            selectedEvent.volunteer_count >= selectedEvent.volunteers_needed 
                            ? 'Volunteer goal reached! 🎉' 
@@ -1950,14 +1953,14 @@ export default function Events() {
                       {eventResponses.length === 0 ? (
                         <View className="items-center py-4">
                           <Ionicons name="people-outline" size={32} color="#6B7280" />
-                          <Text className="text-gray-400 text-sm mt-2">No volunteers yet</Text>
+                          <Text className="text-gray-500 dark:text-gray-400 text-sm mt-2">No volunteers yet</Text>
                         </View>
                       ) : (
                         <View className="space-y-3">
                           {eventResponses.map((response, index) => (
-                            <View key={index} className="bg-gray-800 rounded-lg p-3 border border-gray-700 mb-2">
+                            <View key={index} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-2">
                               <View className="flex-row items-center justify-between mb-2">
-                                <Text className="text-white font-medium">
+                                <Text className="text-gray-900 dark:text-white font-medium">
                                   {response.user_profile?.full_name || 'Unknown User'}
                                 </Text>
                                 <View className="px-2 py-1 rounded-full bg-green-600">
@@ -1968,7 +1971,7 @@ export default function Events() {
                               </View>
                               
                               {response.notes && (
-                                <Text className="text-gray-300 text-sm">
+                                <Text className="text-gray-600 dark:text-gray-300 text-sm">
                                   Notes: "{response.notes}"
                                 </Text>
                               )}
@@ -1991,18 +1994,18 @@ export default function Events() {
               )}
 
               <View className="mt-2 space-y-3">
-                <TouchableOpacity
-                  className="w-full bg-gray-700 rounded-lg py-3 mb-2"
+                <Pressable
+                  className="w-full bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mb-2 active:opacity-70"
                   onPress={() => setShowEventDetailsModal(false)}
                 >
-                  <Text className="text-white text-center font-medium">Close</Text>
-                </TouchableOpacity>
+                  <Text className="text-gray-900 dark:text-white text-center font-medium">Close</Text>
+                </Pressable>
                 
                 {/* Edit/Delete Buttons for Parish Admins */}
                 {isParishAdmin && selectedEvent?.created_by === user?.id && (
                   <View className="flex-row space-x-3">
-                    <TouchableOpacity
-                      className="flex-1 bg-blue-600 rounded-lg py-3 flex-row items-center justify-center mr-2"
+                    <Pressable
+                      className="flex-1 bg-blue-600 rounded-lg py-3 flex-row items-center justify-center mr-2 active:opacity-70"
                       onPress={() => {
                         if (!selectedEvent) return;
                         setCreateEventData({
@@ -2023,14 +2026,14 @@ export default function Events() {
                     >
                       <Ionicons name="pencil" size={16} color="white" />
                       <Text className="text-white text-center font-medium ml-2">Edit Post</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center"
+                    </Pressable>
+                    <Pressable
+                      className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
                       onPress={() => handleDeleteEvent(selectedEvent!.id)}
                     >
                       <Ionicons name="trash-outline" size={16} color="white" />
                       <Text className="text-white text-center font-medium ml-2">Delete Post</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   </View>
                 )}
               </View>

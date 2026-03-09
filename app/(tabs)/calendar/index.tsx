@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { useColorScheme } from "nativewind";
 import ParishCalendarSetup from "../../../components/ParishCalendarSetup";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useNotifications } from "../../../contexts/NotificationContext";
@@ -12,6 +13,8 @@ import { getUserProfile } from "../../../services/onboardingService";
 import { getParishByAdminId, getParishByUserId } from "../../../services/parishService";
 
 export default function Calendar() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [calendarData, setCalendarData] = useState<OrthodoxCalendarData | null>(null);
@@ -231,13 +234,13 @@ export default function Calendar() {
     setEventNotificationStates(states);
   };
 
-  // Handle notification toggle for an event
   const handleNotificationToggle = async (eventId: string) => {
     try {
       setTogglingEvent(eventId);
       const currentState = eventNotificationStates[eventId];
-      const newEnabledState = !currentState; // toggle
-      await setParishEventNotificationEnabled(eventId, newEnabledState);
+      const newEnabledState = !currentState;
+      const eventData = parishEvents.find(e => e.id === eventId);
+      await setParishEventNotificationEnabled(eventId, newEnabledState, eventData);
       setEventNotificationStates(prev => ({ ...prev, [eventId]: newEnabledState }));
     } catch (error) {
       console.error('Error toggling notification for event:', error);
@@ -426,15 +429,15 @@ export default function Calendar() {
   };
 
   return (
-    <View className="flex-1 bg-black pt-0">
+    <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
       <ScrollView 
         className="flex-1"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="white"
-            colors={["white"]}
+            tintColor={isDark ? 'white' : '#374151'}
+            colors={[isDark ? 'white' : '#374151']}
           />
         }
       >
@@ -442,39 +445,39 @@ export default function Calendar() {
         <View className="p-6">
           <View className="flex-row justify-between items-center pt-4">
             <View>
-              <Text className="text-3xl font-bold text-white">Calendar</Text>
-              <TouchableOpacity className="rounded-lg flex-row items-center">
-                <Text className="text-sm text-white opacity-70">{parishName || 'Loading...'}</Text>
+              <Text className="text-3xl font-bold text-gray-900 dark:text-white">Calendar</Text>
+              <Pressable className="rounded-lg flex-row items-center active:opacity-70">
+                <Text className="text-sm text-gray-900 dark:text-white opacity-70">{parishName || 'Loading...'}</Text>
                 {/* <Ionicons name="chevron-down" size={10} color="white" className="ml-1 opacity-70" /> */}
-              </TouchableOpacity>
+              </Pressable>
             </View>
             <View className="h-10 w-10 rounded-full bg-transparent flex items-center justify-center">
-              <Ionicons name="calendar" size={25} color="white" />
+              <Ionicons name="calendar" size={25} color={isDark ? 'white' : '#374151'} />
             </View>
           </View>
           
           {/* Month Navigation */}
           <View className="flex-row justify-between items-center mt-6">
-            <TouchableOpacity 
-              className="h-8 w-8 rounded-full bg-transparent flex items-center justify-center"
+            <Pressable 
+              className="h-8 w-8 rounded-full bg-transparent flex items-center justify-center active:opacity-70"
               onPress={() => navigateMonth('prev')}
             >
-              <Ionicons name="chevron-back" size={16} color="white" />
-            </TouchableOpacity>
-            <Text className="text-white text-base font-semibold">{formatMonthYear(currentMonth)}</Text>
-            <TouchableOpacity 
-              className="h-8 w-8 rounded-full bg-transparent flex items-center justify-center"
+              <Ionicons name="chevron-back" size={16} color={isDark ? 'white' : '#374151'} />
+            </Pressable>
+            <Text className="text-gray-900 dark:text-white text-base font-semibold">{formatMonthYear(currentMonth)}</Text>
+            <Pressable 
+              className="h-8 w-8 rounded-full bg-transparent flex items-center justify-center active:opacity-70"
               onPress={() => navigateMonth('next')}
             >
-              <Ionicons name="chevron-forward" size={16} color="white" />
-            </TouchableOpacity>
+              <Ionicons name="chevron-forward" size={16} color={isDark ? 'white' : '#374151'} />
+            </Pressable>
           </View>
           
           {/* Days of Week */}
           <View className="flex-row mt-4">
             {daysOfWeek.map((day) => (
               <View key={day} className="flex-1 items-center">
-                <Text className="text-white text-xs font-medium">{day}</Text>
+                <Text className="text-gray-900 dark:text-white text-xs font-medium">{day}</Text>
               </View>
             ))}
           </View>
@@ -487,9 +490,9 @@ export default function Calendar() {
                 const fastingEmoji = getFastingEmoji(fastingData[dateKey] || '');
                 
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={index}
-                    className={`w-[14.28%] h-10 aspect-square items-center justify-center ${
+                    className={`w-[14.28%] h-10 aspect-square items-center justify-center active:opacity-70 ${
                       day.isSelected ? 'bg-red-600 rounded-3xl' : ''
                     }`}
                     onPress={() => setSelectedDate(day.date)}
@@ -500,8 +503,8 @@ export default function Calendar() {
                           day.isSelected 
                             ? 'text-white font-bold' 
                             : day.isCurrentMonth 
-                              ? 'text-white' 
-                              : 'text-white opacity-30'
+                              ? 'text-gray-900 dark:text-white' 
+                              : 'text-gray-900 dark:text-white opacity-30'
                         }`}
                       >
                         {day.date.getDate()}
@@ -517,7 +520,7 @@ export default function Calendar() {
                         </Text>
                       )}
                     </View>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </View>
@@ -525,15 +528,15 @@ export default function Calendar() {
         </View>
         
         {/* Selected Day Details */}
-        <View className="p-6 pb-8 bg-gradient-to-b from-gray-800 to-gray-900">
+        <View className="p-6 pb-8 bg-gradient-to-b from-gray-100 dark:from-gray-800 to-gray-200 dark:to-gray-900">
           <View className="flex-row justify-between items-start mb-8">
-            <Text className="text-white text-lg font-bold flex-shrink-0">{formatDate(selectedDate)}</Text>
+            <Text className="text-gray-900 dark:text-white text-lg font-bold flex-shrink-0">{formatDate(selectedDate)}</Text>
             {calendarData?.fasting && (
               <View className="flex-row items-center pt-1" style={{ maxWidth: '40%' }}>
                 {!calendarData.fasting.startsWith('No') && (
                   <View className="h-2 w-2 rounded-full bg-red-500 mr-1 flex-shrink-0"></View>
                 )}
-                <Text className="text-xs text-white leading-4 text-right">{calendarData.fasting}</Text>
+                <Text className="text-xs text-gray-900 dark:text-white leading-4 text-right">{calendarData.fasting}</Text>
               </View>
             )}
           </View>
@@ -541,12 +544,12 @@ export default function Calendar() {
           {/* Feast Days & Commemorations */}
           {calendarData?.saintsFull && calendarData.saintsFull.length > 0 && (
             <View className="mb-6">
-                <Text className="text-white text-sm font-semibold mb-4">Feast Days & Commemorations</Text>
+                <Text className="text-gray-900 dark:text-white text-sm font-semibold mb-4">Feast Days & Commemorations</Text>
                 <View className="space-y-2">
                     {calendarData.saintsFull.map((saint, index) => (
-                        <TouchableOpacity 
+                        <Pressable 
                             key={index} 
-                            className="bg-gray-800/50 rounded-xl shadow-md p-3 mb-2" 
+                            className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-md p-3 mb-2 active:opacity-70" 
                             onPress={() => {
                                 if (saint.story && saint.story.length > 0) {
                                     setSelectedSaint(saint);
@@ -557,16 +560,16 @@ export default function Calendar() {
                         >
                             <View className="flex-row justify-between items-start">
                                 <View className="flex-1">
-                                    <Text className="text-sm text-white font-semibold">{saint.title}</Text>
+                                    <Text className="text-sm text-gray-900 dark:text-white font-semibold">{saint.title}</Text>
                                 </View>
-                                <View className="h-8 w-8 rounded-lg bg-gray-700 flex items-center justify-center ml-3">
-                                    <Ionicons name="star" size={16} color="white" />
+                                <View className="h-8 w-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center ml-3">
+                                    <Ionicons name="star" size={16} color={isDark ? 'white' : '#374151'} />
                                 </View>
                             </View>
                             {saint.story && saint.story.length > 0 && (
-                                <Text className="text-xs text-white opacity-70 mt-1">{"tap to learn more..."}</Text>
+                                <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">{"tap to learn more..."}</Text>
                             )}
-                        </TouchableOpacity>
+                        </Pressable>
                     ))}
                 </View>
                 <Modal
@@ -575,19 +578,18 @@ export default function Calendar() {
                     transparent={true}
                     onRequestClose={() => setModalVisible(false)}
                 >
-                    <View className="flex-1 justify-center items-center bg-black/80 px-4">
+                    <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
                         <Pressable
                             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                             onPress={() => setModalVisible(false)}
                             pointerEvents="auto"
                         />
                         <View
-                            className="bg-black/80 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-700"
-                        // Prevent background press from closing modal when interacting with card
+                            className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-200 dark:border-gray-700"
                         >
-                            <Text className="text-xl text-white font-bold mb-6 text-center">{selectedSaint?.title}</Text>
+                            <Text className="text-xl text-gray-900 dark:text-white font-bold mb-6 text-center">{selectedSaint?.title}</Text>
                             <ScrollView className="max-h-96 mb-4">
-                                <Text className="text-white text-md leading-relaxed">{selectedSaint?.story}</Text>
+                                <Text className="text-gray-900 dark:text-white text-md leading-relaxed">{selectedSaint?.story}</Text>
                             </ScrollView>
                         </View>
                     </View>
@@ -598,18 +600,18 @@ export default function Calendar() {
           {/* Parish Schedule */}
           <View>
             <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-white text-sm font-semibold">Parish Schedule</Text>
-              <TouchableOpacity
+              <Text className="text-gray-900 dark:text-white text-sm font-semibold">Parish Schedule</Text>
+              <Pressable
                 onPress={() => router.push('/(tabs)/calendar/notification-settings')}
-                className="flex-row items-center rounded-lg px-3 py-1"
+                className="flex-row items-center rounded-lg px-3 py-1 active:opacity-70"
               >
                 <Ionicons 
                   name={preferences.enabled ? "notifications" : "notifications-off"} 
                   size={16} 
                   color={preferences.enabled ? "#10B981" : "#9CA3AF"} 
                 />
-                <Text className="text-white opacity-80 font-medium text-xs ml-1">Notifications</Text>
-              </TouchableOpacity>
+                <Text className="text-gray-900 dark:text-white opacity-80 font-medium text-xs ml-1">Notifications</Text>
+              </Pressable>
             </View>
             
             {/* Calendar Setup Prompt for Parish Admins */}
@@ -622,12 +624,12 @@ export default function Calendar() {
                     <Text className="text-blue-300 text-xs mt-1">
                       Connect your Google Calendar to display parish events in the app.
                     </Text>
-                    <TouchableOpacity
-                      className="bg-blue-600 rounded-lg px-4 py-2 mt-3 self-start"
+                    <Pressable
+                      className="bg-blue-600 rounded-lg px-4 py-2 mt-3 self-start active:opacity-70"
                       onPress={() => setShowCalendarSetup(true)}
                     >
                       <Text className="text-white text-xs font-medium">Set Up Calendar</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   </View>
                 </View>
               </View>
@@ -635,13 +637,13 @@ export default function Calendar() {
 
             {loading ? (
               <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color="white" size="small" />
-                <Text className="text-white text-sm ml-2">Loading events...</Text>
+                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
+                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading events...</Text>
               </View>
             ) : error ? (
               <View className="py-4">
                 <Text className="text-red-400 text-sm">Error loading events</Text>
-                <Text className="text-white text-xs opacity-70 mt-1">{error}</Text>
+                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
               </View>
             ) : parishEvents && parishEvents.length > 0 ? (
               <View className="space-y-3">
@@ -650,30 +652,30 @@ export default function Calendar() {
                   const isUpcoming = new Date(event.startTime) > new Date() && event.startTime.includes('T');
                   
                   return (
-                    <View key={event.id} className="bg-gray-800/50 rounded-xl shadow-sm p-3 mb-2">
+                    <View key={event.id} className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-3 mb-2">
                       <View className="flex-row justify-between items-start">
                         <View className="flex-1">
-                          <Text className="text-sm text-white font-semibold">{event.title}</Text>
-                          <Text className="text-xs text-white opacity-70 mt-1">
+                          <Text className="text-sm text-gray-900 dark:text-white font-semibold">{event.title}</Text>
+                          <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">
                             {formatEventTimeRange(event.startTime, event.endTime)}
                           </Text>
                           {/* {event.description && (
-                            <Text className="text-xs text-white mt-2">{event.description}</Text>
+                            <Text className="text-xs text-gray-900 dark:text-white mt-2">{event.description}</Text>
                           )} */}
                           {event.location && (
-                            <Text className="text-xs text-white opacity-80 mt-1">
+                            <Text className="text-xs text-gray-900 dark:text-white opacity-80 mt-1">
                               {event.location}
                             </Text>
                           )}
                         </View>
                         {isUpcoming && preferences.enabled && (
-                          <TouchableOpacity
+                          <Pressable
                             onPress={() => handleNotificationToggle(event.id)}
                             disabled={togglingEvent === event.id}
-                            className="ml-3 p-2 rounded-lg bg-gray-700/50"
+                            className="ml-3 p-2 rounded-lg bg-gray-200/50 dark:bg-gray-700/50 active:opacity-70"
                           >
                             {togglingEvent === event.id ? (
-                              <ActivityIndicator size="small" color="white" />
+                              <ActivityIndicator size="small" color={isDark ? 'white' : '#374151'} />
                             ) : (
                               <Ionicons 
                                 name={isNotificationEnabled ? "notifications" : "notifications-off"} 
@@ -681,7 +683,7 @@ export default function Calendar() {
                                 color={isNotificationEnabled ? "#10B981" : "#9CA3AF"} 
                               />
                             )}
-                          </TouchableOpacity>
+                          </Pressable>
                         )}
                       </View>
                     </View>
@@ -689,7 +691,7 @@ export default function Calendar() {
                 })}
               </View>
             ) : (
-              <Text className="text-xs text-white opacity-70">
+              <Text className="text-xs text-gray-900 dark:text-white opacity-70">
                 {!parishHasCalendar 
                   ? (isParishAdmin 
                       ? "Set up your parish calendar to see events here." 
@@ -700,16 +702,16 @@ export default function Calendar() {
           </View>
         </View>
         {/* Personal Schedule */}
-        <View className="p-6 bg-gradient-to-b from-gray-800 to-gray-900 pb-4">
+        <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-800 to-gray-200 dark:to-gray-900 pb-4">
           <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-white text-sm font-semibold">Personal Schedule</Text>
-            <TouchableOpacity
+            <Text className="text-gray-900 dark:text-white text-sm font-semibold">Personal Schedule</Text>
+            <Pressable
               onPress={() => router.push('/(tabs)/events')}
-              className="flex-row items-center rounded-lg px-3 py-1"
+              className="flex-row items-center rounded-lg px-3 py-1 active:opacity-70"
             >
               <Ionicons name="add-circle" size={16} color="#EF4444" />
-              <Text className="text-white opacity-80 font-medium text-xs ml-1">Schedule</Text>
-            </TouchableOpacity>
+              <Text className="text-gray-900 dark:text-white opacity-80 font-medium text-xs ml-1">Schedule</Text>
+            </Pressable>
           </View>
           
           {(personalConfessions && personalConfessions.length > 0) || (personalEvents && personalEvents.length > 0) ? (
@@ -854,12 +856,12 @@ export default function Calendar() {
                 });
 
                 return allEvents.map((event) => (
-                  <View key={event.id} className="bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2">
+                  <View key={event.id} className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2">
                     <View className="flex-row justify-between items-start">
                       <View className="flex-1">
-                        <Text className="text-sm text-white font-semibold">{event.title}</Text>
+                        <Text className="text-sm text-gray-900 dark:text-white font-semibold">{event.title}</Text>
                         {event.timeDisplay && (
-                          <Text className="text-xs text-white opacity-70 mt-1">
+                          <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">
                             {event.timeDisplay}
                           </Text>
                         )}
@@ -882,35 +884,35 @@ export default function Calendar() {
               })()}
             </View>
           ) : (
-            <Text className="text-xs text-white opacity-70">
+            <Text className="text-xs text-gray-900 dark:text-white opacity-70">
               No personal events scheduled for this day.
             </Text>
           )}
         </View>
         
         {/* Daily Scripture Readings */}
-        <View className="bg-gradient-to-b from-gray-900 to-black p-4 pb-8">
+        <View className="bg-gradient-to-b from-gray-200 dark:from-gray-900 to-gray-50 dark:to-black p-4 pb-8">
           <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-white text-sm font-semibold ml-2">Daily Readings</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-semibold ml-2">Daily Readings</Text>
           </View>
           <View className="rounded-xl p-2">
             {loading ? (
               <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color="white" size="small" />
-                <Text className="text-white text-sm ml-2">Loading readings...</Text>
+                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
+                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading readings...</Text>
               </View>
             ) : error ? (
               <View className="py-4">
                 <Text className="text-red-400 text-sm">Error loading readings</Text>
-                <Text className="text-white text-xs opacity-70 mt-1">{error}</Text>
+                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
               </View>
             ) : (
               <View className="space-y-2">
                 {calendarData?.readingsFull && calendarData.readingsFull.length > 0 ? (
                   calendarData.readingsFull.map((reading, idx) => (
-                    <TouchableOpacity
+                    <Pressable
                       key={idx}
-                      className="bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2"
+                      className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2 active:opacity-70"
                       onPress={() => {
                         setSelectedReading(reading);
                         setReadingModalVisible(true);
@@ -918,22 +920,22 @@ export default function Calendar() {
                     >
                       <View className="flex-row justify-between items-start">
                         <View className="flex-1">
-                          <Text className="text-sm text-gray-200 font-semibold">{reading.display}</Text>
-                          <Text className="text-xs text-white opacity-70">{"tap to read..."}</Text>
+                          <Text className="text-sm text-gray-700 dark:text-gray-200 font-semibold">{reading.display}</Text>
+                          <Text className="text-xs text-gray-900 dark:text-white opacity-70">{"tap to read..."}</Text>
                         </View>
-                        <View className="h-8 w-8 rounded-lg bg-gray-700 flex items-center justify-center">
-                          <Ionicons name="book" size={16} color="white" />
+                        <View className="h-8 w-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <Ionicons name="book" size={16} color={isDark ? 'white' : '#374151'} />
                         </View>
                       </View>
-                    </TouchableOpacity>
+                    </Pressable>
                   ))
                 ) : (
-                  <Text className="text-xs text-white opacity-70">No readings for today.</Text>
+                  <Text className="text-xs text-gray-900 dark:text-white opacity-70">No readings for today.</Text>
                 )}
                 {calendarData?.readingsLink && (
-                  <TouchableOpacity onPress={() => Linking.openURL(calendarData.readingsLink!)} className="mt-2">
+                  <Pressable onPress={() => Linking.openURL(calendarData.readingsLink!)} className="mt-2 active:opacity-70">
                     <Text className="text-lg text-blue-400 underline">Full readings</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </View>
             )}
@@ -945,19 +947,18 @@ export default function Calendar() {
             transparent={true}
             onRequestClose={() => setReadingModalVisible(false)}
           >
-            <View className="flex-1 justify-center items-center bg-black/80 px-4">
+            <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
               <Pressable
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                 onPress={() => setReadingModalVisible(false)}
                 pointerEvents="auto"
               />
               <View
-                className="bg-black/80 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-700"
-                // Prevent background press from closing modal when interacting with card
+                className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-200 dark:border-gray-700"
               >
-                <Text className="text-xl text-white font-bold mb-6 text-center">{selectedReading?.display + " (KJV)"}</Text>
+                <Text className="text-xl text-gray-900 dark:text-white font-bold mb-6 text-center">{selectedReading?.display + " (KJV)"}</Text>
                 <ScrollView className="max-h-96 mb-4">
-                  <Text className="text-white text-base leading-relaxed italic">"{selectedReading?.passage}"</Text>
+                  <Text className="text-gray-900 dark:text-white text-base leading-relaxed italic">"{selectedReading?.passage}"</Text>
                 </ScrollView>
               </View>
             </View>

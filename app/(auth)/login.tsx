@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useColorScheme } from 'nativewind';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  Pressable,
   TouchableWithoutFeedback,
-  Keyboard,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
-import { router, useLocalSearchParams } from 'expo-router';
 import { isOnboardingComplete } from '../../utils/onboardingStorage';
 
 export default function LoginScreen() {
@@ -24,6 +25,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, resetPassword, user } = useAuth();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   // Redirect to main app if user is authenticated and onboarding is complete
   useEffect(() => {
@@ -41,12 +44,6 @@ export default function LoginScreen() {
     return () => { isMounted = false; };
   }, [user]);
 
-  // Don't redirect to main app - let onboarding handle navigation
-  useEffect(() => {
-    if (user) {
-      console.log('User authenticated, but staying in auth flow');
-    }
-  }, [user]);
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -81,7 +78,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView 
-      className="flex-1 bg-black"
+      className="flex-1 bg-gray-50 dark:bg-black"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
@@ -95,13 +92,13 @@ export default function LoginScreen() {
           <View className="flex-1 px-6 pt-12 pb-8">
         {/* Back and Title */}
         <View className="flex-row items-center mb-6">
-          <TouchableOpacity 
-            className="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center"
+          <Pressable 
+            className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={16} color="white" />
-          </TouchableOpacity>
-          <Text className="ml-4 text-xl font-bold text-white">
+            <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
+          </Pressable>
+          <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">
             {isSignUp ? 'Create Account' : 'Sign In'}
           </Text>
         </View>
@@ -109,9 +106,9 @@ export default function LoginScreen() {
         {/* Sign In/Up Form */}
         <View className="mt-6">
           <View className="mb-5">
-            <Text className="text-white text-sm font-medium mb-2">Email</Text>
+            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Email</Text>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="your-email@example.com"
               placeholderTextColor="#9CA3AF"
               value={email}
@@ -124,15 +121,15 @@ export default function LoginScreen() {
           
           <View className="mb-6">
             <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-white text-sm font-medium">Password</Text>
+              <Text className="text-gray-900 dark:text-white text-sm font-medium">Password</Text>
               {!isSignUp && (
-                <TouchableOpacity onPress={handleResetPassword}>
+                <Pressable className="active:opacity-70" onPress={handleResetPassword}>
                   <Text className="text-blue-400 text-xs">Forgot Password?</Text>
-                </TouchableOpacity>
+                </Pressable>
               )}
             </View>
             <TextInput
-              className="w-full py-3 px-4 rounded-xl text-white font-medium bg-gray-800 border border-gray-700"
+              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
               placeholder="••••••••"
               placeholderTextColor="#9CA3AF"
               value={password}
@@ -143,8 +140,8 @@ export default function LoginScreen() {
           </View>
           
           {/* Sign In/Up Button */}
-          <TouchableOpacity
-            className={`w-full py-3.5 rounded-xl text-white font-medium shadow-md mt-4 flex-row items-center justify-center ${
+          <Pressable
+            className={`w-full py-3.5 rounded-xl text-white font-medium shadow-md mt-4 flex-row items-center justify-center active:opacity-70 ${
               loading 
                 ? 'bg-gray-600' 
                 : 'bg-red-600'
@@ -165,7 +162,7 @@ export default function LoginScreen() {
             <Text className="text-white font-medium">
               {loading ? 'Loading...' : isSignUp ? 'Create Account' : 'Sign In'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
           
           {/* Divider */}
           {/* <View className="flex-row items-center justify-center mt-8 mb-8">
@@ -187,17 +184,17 @@ export default function LoginScreen() {
         {/* Sign Up/Sign In Link */}
         <View className="absolute bottom-8 left-0 right-0 flex justify-center px-6">
           <View className="flex-row justify-center">
-            <Text className="text-white opacity-70 text-sm">
+            <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
               {isSignUp ? 'Already have an account?' : "Don't have an account?"}
             </Text>
-            <TouchableOpacity
-              className="ml-1"
+            <Pressable
+              className="ml-1 active:opacity-70"
               onPress={() => setIsSignUp(!isSignUp)}
             >
               <Text className="text-blue-400 text-sm">
                 {isSignUp ? 'Sign In' : 'Create One'}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
           </View>

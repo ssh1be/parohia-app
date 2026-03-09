@@ -3,13 +3,14 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   Modal,
   Alert,
   ActivityIndicator,
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import { updateParishCalendarId, getParishByAdminId } from '../services/parishService';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -20,6 +21,8 @@ interface ParishCalendarSetupProps {
 }
 
 export default function ParishCalendarSetup({ visible, onClose, onSuccess }: ParishCalendarSetupProps) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [calendarId, setCalendarId] = useState('');
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
@@ -84,23 +87,23 @@ export default function ParishCalendarSetup({ visible, onClose, onSuccess }: Par
       transparent={true}
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-center items-center bg-black/80 px-4">
-        <View className="bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-700">
+      <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
+        <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
           <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl text-white font-bold">Set Up Parish Calendar</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
+            <Text className="text-xl text-gray-900 dark:text-white font-bold">Set Up Parish Calendar</Text>
+            <Pressable className="active:opacity-70" onPress={onClose}>
+              <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
+            </Pressable>
           </View>
 
-          <Text className="text-white text-sm mb-4 leading-5">
+          <Text className="text-gray-900 dark:text-white text-sm mb-4 leading-5">
             To display your parish events, you need to provide your Google Calendar ID. 
             This should be the email address associated with your parish's Google Calendar.
           </Text>
 
-          <Text className="text-gray-300 text-xs mb-2">Google Calendar ID (email address)</Text>
+          <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Google Calendar ID (email address)</Text>
           <TextInput
-            className="bg-gray-800 text-white p-3 rounded-lg mb-4 border border-gray-600"
+            className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg mb-4 border border-gray-300 dark:border-gray-600"
             placeholder="e.g., parish@example.com"
             placeholderTextColor="#9CA3AF"
             value={calendarId}
@@ -110,31 +113,31 @@ export default function ParishCalendarSetup({ visible, onClose, onSuccess }: Par
             autoCorrect={false}
           />
 
-          <Text className="text-gray-400 text-xs mb-4 leading-4">
+          <Text className="text-gray-500 dark:text-gray-400 text-xs mb-4 leading-4">
             Make sure your Google Calendar is public or shared with the appropriate permissions.
           </Text>
 
-          <TouchableOpacity 
-            className="mb-6 flex-row items-center justify-center"
+          <Pressable 
+            className="mb-6 flex-row items-center justify-center active:opacity-70"
             onPress={openHelpArticle}
           >
             <Ionicons name="help-circle-outline" size={16} color="#3B82F6" />
             <Text className="text-blue-400 text-xs ml-2 underline">
               How to find your Google Calendar ID
             </Text>
-          </TouchableOpacity>
+          </Pressable>
 
           <View className="flex-row space-x-3">
-            <TouchableOpacity
-              className="flex-1 bg-gray-700 rounded-lg py-3 mr-2"
+            <Pressable
+              className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
               onPress={onClose}
               disabled={loading}
             >
-              <Text className="text-white text-center font-medium">Cancel</Text>
-            </TouchableOpacity>
+              <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
+            </Pressable>
             
-            <TouchableOpacity
-              className="flex-1 bg-blue-600 rounded-lg py-3 flex-row items-center justify-center"
+            <Pressable
+              className="flex-1 bg-blue-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
               onPress={handleSubmit}
               disabled={loading}
             >
@@ -146,7 +149,7 @@ export default function ParishCalendarSetup({ visible, onClose, onSuccess }: Par
               <Text className="text-white text-center font-medium ml-2">
                 {loading ? 'Saving...' : 'Save'}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       </View>

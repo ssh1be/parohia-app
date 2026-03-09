@@ -5,6 +5,7 @@ import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from "../contexts/AuthContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
+import { ThemeProvider } from "../contexts/ThemeContext";
 import "../global.css";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete
@@ -44,11 +45,13 @@ function InitialLoadingScreen() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <NotificationProvider>
-          <InitialLoadingScreen />
-        </NotificationProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <InitialLoadingScreen />
+          </NotificationProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

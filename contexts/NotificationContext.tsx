@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { InteractionManager } from 'react-native';
 import { NotificationEvent, NotificationPreferences, notificationService } from '../services/notificationService';
+import { ParishEvent } from '../services/calendarService';
 import { useAuth } from './AuthContext';
 
 interface NotificationContextType {
@@ -16,7 +17,7 @@ interface NotificationContextType {
   setEventNotificationDisabled: (eventId: string, disabled: boolean) => Promise<void>;
   isEventNotificationDisabled: (eventId: string) => Promise<boolean>;
   // Parish (Google Calendar) events: OFF by default, explicit enable
-  setParishEventNotificationEnabled: (eventId: string, enabled: boolean) => Promise<void>;
+  setParishEventNotificationEnabled: (eventId: string, enabled: boolean, eventData?: ParishEvent) => Promise<void>;
   isParishEventNotificationEnabled: (eventId: string) => Promise<boolean>;
 }
 
@@ -35,6 +36,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     enabled: true,
     reminderTime: 30,
     dailyDigest: true,
+    dailyDigestMode: 'day_of',
     dailyDigestTime: '08:00',
     soundEnabled: true,
     vibrationEnabled: true,
@@ -147,10 +149,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  // Parish (Google Calendar) events: explicit enable API
-  const setParishEventNotificationEnabled = async (eventId: string, enabled: boolean) => {
+  const setParishEventNotificationEnabled = async (eventId: string, enabled: boolean, eventData?: ParishEvent) => {
     try {
-      await notificationService.setParishEventNotificationEnabled(eventId, enabled);
+      await notificationService.setParishEventNotificationEnabled(eventId, enabled, eventData);
       // When enabling/disabling a parish event, refresh to apply scheduling changes
       if (user) {
         await refreshNotifications();

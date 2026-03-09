@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { useColorScheme } from "nativewind";
 import ParishCalendarSetup from '../../components/ParishCalendarSetup';
 import { useAuth } from "../../contexts/AuthContext";
 import { useOrthodoxCalendar } from "../../hooks/useOrthodoxCalendar";
@@ -10,6 +11,8 @@ import { getUserProfile } from '../../services/onboardingService';
 import { getParishByAdminId, getParishByUserId } from '../../services/parishService';
 
 export default function Index() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const { user, loading: authLoading } = useAuth();
   const { 
     calendarData, 
@@ -192,9 +195,9 @@ export default function Index() {
   // Show auth loading state
   if (authLoading) {
     return (
-      <View className="flex-1 bg-black justify-center items-center">
-        <ActivityIndicator size="large" color="white" />
-        <Text className="text-white mt-4">Authenticating...</Text>
+      <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
+        <ActivityIndicator size="large" color={isDark ? 'white' : '#374151'} />
+        <Text className="text-gray-900 dark:text-white mt-4">Authenticating...</Text>
       </View>
     );
   }
@@ -202,12 +205,12 @@ export default function Index() {
   // Show user state debug info in development
   if (__DEV__ && !user) {
     return (
-      <View className="flex-1 bg-black justify-center items-center p-6">
+      <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center p-6">
         <Text className="text-red-400 text-lg font-bold mb-4">DEBUG: No User Found</Text>
-        <Text className="text-white text-center">
+        <Text className="text-gray-900 dark:text-white text-center">
           The user is null, which means authentication failed or user is not logged in.
         </Text>
-        <Text className="text-gray-400 text-sm text-center mt-4">
+        <Text className="text-gray-500 dark:text-gray-400 text-sm text-center mt-4">
           This debug screen only shows in development builds.
         </Text>
       </View>
@@ -217,9 +220,9 @@ export default function Index() {
   // In production, if no user, show a generic error
   if (!user) {
     return (
-      <View className="flex-1 bg-black justify-center items-center p-6">
-        <Text className="text-white text-lg font-bold mb-4">Please log in</Text>
-        <Text className="text-gray-400 text-center">
+      <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center p-6">
+        <Text className="text-gray-900 dark:text-white text-lg font-bold mb-4">Please log in</Text>
+        <Text className="text-gray-500 dark:text-gray-400 text-center">
           You need to be logged in to view this content.
         </Text>
       </View>
@@ -227,60 +230,60 @@ export default function Index() {
   }
 
   return (
-    <View className="flex-1 bg-black pt-0">
+    <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
       <ScrollView 
         className="flex-1"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="white"
-            colors={["white"]}
+            tintColor={isDark ? 'white' : '#374151'}
+            colors={[isDark ? 'white' : '#374151']}
           />
         }
       >
         
-        <View className="p-6 bg-gradient-to-b from-gray-900 to-gray-800 border-b border-gray-800">
+        <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
           {/* Header */}
           <View className="flex-row justify-between items-center pt-4">
             <View>
-              <Text className="text-3xl font-bold text-white">Home</Text>
-              <Text className="text-sm text-white opacity-70">
+              <Text className="text-3xl font-bold text-gray-900 dark:text-white">Home</Text>
+              <Text className="text-sm text-gray-900 dark:text-white opacity-70">
                 {greeting}, <Text className="font-semibold">{profileName ? profileName + '!' : 'User!'}</Text>
               </Text>
             </View>
             <View className="h-10 w-10 rounded-full bg-transparent flex items-center justify-center">
-              <Ionicons name="home" size={25} color="white" />
+              <Ionicons name="home" size={25} color={isDark ? 'white' : '#374151'} />
             </View>
           </View>
           
           {/* Today's Card */}
-          <View className="mt-6 rounded-xl shadow-md p-4 bg-gray-800/50">
+          <View className="mt-6 rounded-xl shadow-md p-4 bg-gray-200/50 dark:bg-gray-800/50">
             {loading ? (
               <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color="white" size="small" />
-                <Text className="text-white text-sm ml-2">Loading calendar data...</Text>
+                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
+                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading calendar data...</Text>
               </View>
             ) : error ? (
               <View className="py-4">
                 <Text className="text-red-400 text-sm">Error loading calendar data</Text>
-                <Text className="text-white text-xs opacity-70 mt-1">{error}</Text>
+                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
               </View>
             ) : (
               <View>
                 <View className="flex-row justify-between items-center">
                   <View>
-                    <Text className="text-white text-xs">TODAY</Text>
-                    <Text className="text-white text-lg font-bold">{todayDate}</Text>
+                    <Text className="text-gray-900 dark:text-white text-xs">TODAY</Text>
+                    <Text className="text-gray-900 dark:text-white text-lg font-bold">{todayDate}</Text>
                     {calendarData?.title && (
-                      <Text className="text-white text-md font-light mt-1">{calendarData.title}</Text>
+                      <Text className="text-gray-900 dark:text-white text-md font-light mt-1">{calendarData.title}</Text>
                     )}
                   </View>
                 </View>
                 <View className="mt-1">
-                  <Text className="text-white text-sm">{calendarData?.fasting || ''}</Text>
+                  <Text className="text-gray-900 dark:text-white text-sm">{calendarData?.fasting || ''}</Text>
                   {calendarData?.saintsFeasts && (
-                    <Text className="text-white text-sm font-semibold mt-1">
+                    <Text className="text-gray-900 dark:text-white text-sm font-semibold mt-1">
                       {calendarData.saintsFeasts}
                     </Text>
                   )}
@@ -291,13 +294,13 @@ export default function Index() {
         </View>
         
         {/* Today's Schedule */}
-        <View className="bg-gradient-to-b from-gray-800 to-gray-900 p-6">
+        <View className="bg-gradient-to-b from-gray-100 dark:from-gray-800 to-gray-200 dark:to-gray-900 p-6">
           <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-white text-lg font-bold">Today's Schedule</Text>
-            <TouchableOpacity className=" bg-red-600 text-xs rounded-lg px-2 py-1 flex-row items-center">
+            <Text className="text-gray-900 dark:text-white text-lg font-bold">Today's Schedule</Text>
+            <Pressable className=" bg-red-600 text-xs rounded-lg px-2 py-1 flex-row items-center active:opacity-70">
               <Text className="text-xs text-white">{parishName || 'Loading...'}</Text>
               {/* <Ionicons name="chevron-down" size={10} color="white" className="ml-1" /> */}
-            </TouchableOpacity>
+            </Pressable>
           </View>
           
           {/* Calendar Setup Prompt for Parish Admins */}
@@ -310,12 +313,12 @@ export default function Index() {
                   <Text className="text-blue-300 text-xs mt-1">
                     Connect your Google Calendar to display parish events in the app.
                   </Text>
-                  <TouchableOpacity
-                    className="bg-blue-600 rounded-lg px-4 py-2 mt-3 self-start"
+                  <Pressable
+                    className="bg-blue-600 rounded-lg px-4 py-2 mt-3 self-start active:opacity-70"
                     onPress={() => setShowCalendarSetup(true)}
                   >
                     <Text className="text-white text-xs font-medium">Set Up Calendar</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               </View>
             </View>
@@ -325,13 +328,13 @@ export default function Index() {
           <View className="space-y-4">
             {loading ? (
               <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color="white" size="small" />
-                <Text className="text-white text-sm ml-2">Loading events...</Text>
+                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
+                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading events...</Text>
               </View>
             ) : error ? (
               <View className="py-4">
                 <Text className="text-red-400 text-sm">Error loading events</Text>
-                <Text className="text-white text-xs opacity-70 mt-1">{error}</Text>
+                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
               </View>
             ) : (
               (() => {
@@ -471,17 +474,17 @@ export default function Index() {
                           ? 'bg-green-900/20 border border-green-500/30'
                           : event.type === 'personal'
                           ? 'bg-purple-900/20 border border-purple-500/30'
-                          : 'bg-gray-800/50'
+                          : 'bg-gray-200/50 dark:bg-gray-800/50'
                       }`}
                     >
                       <View className="flex-row justify-between items-start">
                         <View className="flex-1">
-                          <Text className="text-sm text-white font-semibold pr-1">{event.title}</Text>
-                          <Text className="text-xs text-white opacity-70 mt-1">
+                          <Text className="text-sm text-gray-900 dark:text-white font-semibold pr-1">{event.title}</Text>
+                          <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">
                             {event.timeRange}
                           </Text>
                           {event.location && (
-                            <Text className="text-xs text-white opacity-80 mt-1">
+                            <Text className="text-xs text-gray-900 dark:text-white opacity-80 mt-1">
                               {event.location}
                             </Text>
                           )}
@@ -493,7 +496,7 @@ export default function Index() {
                             ? 'bg-green-600/20'
                             : event.type === 'personal'
                             ? 'bg-purple-600/20'
-                            : 'bg-gray-700'
+                            : 'bg-gray-200 dark:bg-gray-700'
                         }`}>
                           <Ionicons 
                             name={
@@ -506,7 +509,7 @@ export default function Index() {
                               event.type === 'confession' ? '#EF4444' : 
                               event.type === 'personal' && event.eventType === 'volunteer' ? '#10B981' : 
                               event.type === 'personal' ? '#A855F7' : 
-                              'white'
+                              isDark ? 'white' : '#374151'
                             } 
                           />
                         </View>
@@ -515,7 +518,7 @@ export default function Index() {
                   ));
                 } else {
                   return (
-                    <Text className="text-xs text-white opacity-70">
+                    <Text className="text-xs text-gray-900 dark:text-white opacity-70">
                       {!parishHasCalendar 
                         ? (isParishAdmin 
                             ? "Set up your parish calendar to see events here." 
@@ -530,28 +533,28 @@ export default function Index() {
         </View>
         
         {/* Daily Scripture Readings */}
-        <View className="bg-gradient-to-b from-gray-900 to-black p-4 pb-8">
+        <View className="bg-gradient-to-b from-gray-200 dark:from-gray-900 to-gray-50 dark:to-black p-4 pb-8">
           <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-white text-lg font-bold ml-2">Daily Readings</Text>
+            <Text className="text-gray-900 dark:text-white text-lg font-bold ml-2">Daily Readings</Text>
           </View>
           <View className="rounded-xl p-2">
             {loading ? (
               <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color="white" size="small" />
-                <Text className="text-white text-sm ml-2">Loading readings...</Text>
+                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
+                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading readings...</Text>
               </View>
             ) : error ? (
               <View className="py-4">
                 <Text className="text-red-400 text-sm">Error loading readings</Text>
-                <Text className="text-white text-xs opacity-70 mt-1">{error}</Text>
+                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
               </View>
             ) : (
               <View className="space-y-2">
                 {calendarData?.readingsFull && calendarData.readingsFull.length > 0 ? (
                   calendarData.readingsFull.map((reading, idx) => (
-                    <TouchableOpacity
+                    <Pressable
                       key={idx}
-                      className="bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2"
+                      className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2 active:opacity-70"
                       onPress={() => {
                         setSelectedReading(reading);
                         setModalVisible(true);
@@ -559,22 +562,22 @@ export default function Index() {
                     >
                       <View className="flex-row justify-between items-start">
                         <View className="flex-1">
-                          <Text className="text-sm text-gray-200 font-semibold">{reading.display}</Text>
-                          <Text className="text-xs text-white opacity-70">{"tap to read..."}</Text>
+                          <Text className="text-sm text-gray-700 dark:text-gray-200 font-semibold">{reading.display}</Text>
+                          <Text className="text-xs text-gray-900 dark:text-white opacity-70">{"tap to read..."}</Text>
                         </View>
-                        <View className="h-8 w-8 rounded-lg bg-gray-700 flex items-center justify-center">
-                          <Ionicons name="book" size={16} color="white" />
+                        <View className="h-8 w-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <Ionicons name="book" size={16} color={isDark ? 'white' : '#374151'} />
                         </View>
                       </View>
-                    </TouchableOpacity>
+                    </Pressable>
                   ))
                 ) : (
-                  <Text className="text-xs text-white opacity-70">No readings for today.</Text>
+                  <Text className="text-xs text-gray-900 dark:text-white opacity-70">No readings for today.</Text>
                 )}
                 {calendarData?.readingsLink && (
-                  <TouchableOpacity onPress={() => Linking.openURL(calendarData.readingsLink!)} className="mt-2">
+                  <Pressable onPress={() => Linking.openURL(calendarData.readingsLink!)} className="mt-2 active:opacity-70">
                     <Text className="text-lg text-blue-400 underline">Full readings</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </View>
             )}
@@ -586,19 +589,18 @@ export default function Index() {
             transparent={true}
             onRequestClose={() => setModalVisible(false)}
           >
-            <View className="flex-1 justify-center items-center bg-black/80 px-4">
+            <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
               <Pressable
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                 onPress={() => setModalVisible(false)}
                 pointerEvents="auto"
               />
               <View
-                className="bg-black/80 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-700"
-                // Prevent background press from closing modal when interacting with card
+                className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-200 dark:border-gray-700"
               >
-                <Text className="text-xl text-white font-bold mb-6 text-center">{selectedReading?.display + " (KJV)"}</Text>
+                <Text className="text-xl text-gray-900 dark:text-white font-bold mb-6 text-center">{selectedReading?.display + " (KJV)"}</Text>
                 <ScrollView className="max-h-96 mb-4">
-                  <Text className="text-white text-base leading-relaxed italic">"{selectedReading?.passage}"</Text>
+                  <Text className="text-gray-900 dark:text-white text-base leading-relaxed italic">"{selectedReading?.passage}"</Text>
                 </ScrollView>
               </View>
             </View>

@@ -26,10 +26,13 @@ Notifications.setNotificationHandler({
   },
 });
 
+export type DailyDigestMode = 'day_of' | 'day_before';
+
 export interface NotificationPreferences {
   enabled: boolean;
   reminderTime: number; // minutes before event
   dailyDigest: boolean;
+  dailyDigestMode: DailyDigestMode;
   dailyDigestTime: string; // HH:mm format, e.g., "08:00"
   soundEnabled: boolean;
   vibrationEnabled: boolean;
@@ -49,6 +52,7 @@ const SCHEDULED_NOTIFICATIONS_KEY = 'scheduled_notifications';
 const DISABLED_EVENT_NOTIFICATIONS_KEY = 'disabled_event_notifications';
 // Explicit allowlist for parish (Google Calendar) event reminders
 const ENABLED_PARISH_EVENT_NOTIFICATIONS_KEY = 'enabled_parish_event_notifications';
+const ENABLED_PARISH_EVENT_DATA_KEY = 'enabled_parish_event_data';
 
 export class NotificationService {
   private static instance: NotificationService;
@@ -180,10 +184,16 @@ export class NotificationService {
       const preferences = await AsyncStorage.getItem(NOTIFICATION_PREFERENCES_KEY);
       if (preferences) {
         const parsedPreferences = JSON.parse(preferences);
-        // Ensure backward compatibility for existing users
+        let needsSave = false;
         if (!parsedPreferences.dailyDigestTime) {
           parsedPreferences.dailyDigestTime = '08:00';
-          // Save the updated preferences
+          needsSave = true;
+        }
+        if (!parsedPreferences.dailyDigestMode) {
+          parsedPreferences.dailyDigestMode = 'day_of';
+          needsSave = true;
+        }
+        if (needsSave) {
           await AsyncStorage.setItem(NOTIFICATION_PREFERENCES_KEY, JSON.stringify(parsedPreferences));
         }
         return parsedPreferences;
@@ -192,11 +202,11 @@ export class NotificationService {
       console.error('Error loading notification preferences:', error);
     }
 
-    // Default preferences
     return {
       enabled: true,
-      reminderTime: 30, // 30 minutes before event
+      reminderTime: 30,
       dailyDigest: true,
+      dailyDigestMode: 'day_of' as DailyDigestMode,
       dailyDigestTime: '08:00',
       soundEnabled: true,
       vibrationEnabled: true,
@@ -347,25 +357,28 @@ export class NotificationService {
 
   // Remote-only for bulletin broadcasts; local immediate notifications removed
 
-  async scheduleDailyDigest(events: ParishEvent[], date: Date, parishName?: string): Promise<string | null> {
+  async scheduleDailyDigest(events: ParishEvent[], eventDate: Date, parishName?: string): Promise<string | null> {
     try {
       const preferences = await this.getNotificationPreferences();
       if (!preferences.enabled || !preferences.dailyDigest) return null;
 
-      const digestTime = new Date(date);
-      const dailyDigestTime = preferences.dailyDigestTime || '08:00'; // Fallback for existing users
+      const mode = preferences.dailyDigestMode || 'day_of';
+      const dailyDigestTime = preferences.dailyDigestTime || (mode === 'day_before' ? '20:00' : '08:00');
       const [hours, minutes] = dailyDigestTime.split(':').map(Number);
+
+      const digestTime = new Date(eventDate);
+      if (mode === 'day_before') {
+        digestTime.setDate(digestTime.getDate() - 1);
+      }
       digestTime.setHours(hours, minutes, 0, 0);
 
-      // Don't schedule if digest time is in the past
       if (digestTime <= new Date()) return null;
 
-      // Filter out events that have already started
       const now = new Date();
       const upcomingEvents = events.filter(event => new Date(event.startTime) > now);
       
       if (upcomingEvents.length === 0) {
-        console.log(`No upcoming events for daily digest on ${date.toDateString()}`);
+        console.log(`No upcoming events for daily digest on ${eventDate.toDateString()}`);
         return null;
       }
 
@@ -373,15 +386,17 @@ export class NotificationService {
       const eventTitles = upcomingEvents.slice(0, 3).map(e => e.title).join(', ');
       const moreText = upcomingEvents.length > 3 ? ` and ${upcomingEvents.length - 3} more` : '';
 
-      const digestTitle = parishName || 'Today\'s Parish Events';
-      const digestBody = `${eventCount} event${eventCount > 1 ? 's' : ''} today: ${eventTitles}${moreText}`;
+      const isDayBefore = mode === 'day_before';
+      const dayLabel = isDayBefore ? 'tomorrow' : 'today';
+      const digestTitle = isDayBefore
+        ? `Tomorrow at ${parishName || 'Your Parish'}`
+        : (parishName || 'Today\'s Parish Events');
+      const digestBody = `${eventCount} event${eventCount > 1 ? 's' : ''} ${dayLabel}: ${eventTitles}${moreText}`;
 
-      // Log the digest message for testing
-      console.log(`📅 DAILY DIGEST for ${date.toDateString()}:`);
+      console.log(`📅 DAILY DIGEST (${mode}) for ${eventDate.toDateString()}:`);
       console.log(`   Title: "${digestTitle}"`);
       console.log(`   Body: "${digestBody}"`);
-      console.log(`   Scheduled for: ${digestTime.toLocaleString()}`);
-      console.log(`   Events: ${upcomingEvents.map(e => e.title).join(', ')}`);
+      console.log(`   Notification scheduled for: ${digestTime.toLocaleString()}`);
 
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
@@ -389,7 +404,7 @@ export class NotificationService {
           body: digestBody,
           data: {
             type: 'daily-digest',
-            date: date.toISOString(),
+            date: eventDate.toISOString(),
             eventCount,
           },
           sound: preferences.soundEnabled ? 'default' : undefined,
@@ -400,7 +415,7 @@ export class NotificationService {
         },
       });
 
-      console.log(`✅ Scheduled daily digest for ${date.toDateString()} with ${eventCount} events`);
+      console.log(`✅ Scheduled daily digest for ${eventDate.toDateString()} (${mode}) with ${eventCount} events`);
       return notificationId;
     } catch (error) {
       console.error('Error scheduling daily digest:', error);
@@ -455,15 +470,18 @@ export class NotificationService {
     // Debounce the refresh to prevent multiple rapid calls
     this.refreshTimeout = setTimeout(async () => {
       try {
-        console.log('🔄 Starting notification refresh for the next 3 days...');
+        const preferences = await this.getNotificationPreferences();
+        const digestMode = preferences.dailyDigestMode || 'day_of';
+        const numDays = 3;
+        // Fetch an extra day when in day_before mode so we can send a digest tonight for day numDays+1
+        const fetchDays = digestMode === 'day_before' ? numDays + 1 : numDays;
+
+        console.log(`🔄 Starting notification refresh for the next ${fetchDays} days (digest mode: ${digestMode})...`);
         
-        // Cancel existing event notifications
         await this.cancelAllNotifications();
 
-        // Get events for the next 3 days (today + next 2 days)
         const today = new Date();
-        const numDays = 3;
-        const events = await fetchParishEventsForMultipleDays(today, numDays, userId);
+        const events = await fetchParishEventsForMultipleDays(today, fetchDays, userId);
 
         console.log(`Processing ${events.length} events for notification scheduling (next ${numDays} days)`);
 
@@ -495,8 +513,7 @@ export class NotificationService {
           }
         }
 
-        // For each of the next numDays days, schedule ONLY daily digest for parish events
-        for (let i = 0; i < numDays; i++) {
+        for (let i = 0; i < fetchDays; i++) {
           const day = new Date(today);
           day.setDate(day.getDate() + i);
           const key = day.toDateString();
@@ -506,14 +523,46 @@ export class NotificationService {
           if (digestId) scheduledCount++;
         }
 
-        // After digest, schedule parish events ONLY if explicitly enabled by the user
+        // Schedule parish events that the user explicitly enabled
         const enabledParishIds = await this.getEnabledParishEventNotifications();
+        const scheduledEventIds = new Set<string>();
+
+        // First, schedule any enabled events found in the 3-day fetch window
         if (enabledParishIds.length > 0) {
           for (const event of events) {
             if (enabledParishIds.includes(event.id)) {
               const notificationId = await this.scheduleEventNotification(event, userId, parishName);
               if (notificationId) scheduledCount++;
+              scheduledEventIds.add(event.id);
             }
+          }
+        }
+
+        // Then, schedule enabled events beyond the 3-day window using stored data
+        const storedEventData = await this.getStoredParishEventData();
+        const now = new Date();
+        const expiredIds: string[] = [];
+
+        for (const eventId of enabledParishIds) {
+          if (scheduledEventIds.has(eventId)) continue;
+          const eventData = storedEventData[eventId];
+          if (!eventData) continue;
+
+          if (new Date(eventData.startTime) <= now) {
+            expiredIds.push(eventId);
+            continue;
+          }
+
+          const notificationId = await this.scheduleEventNotification(eventData, userId, parishName);
+          if (notificationId) scheduledCount++;
+        }
+
+        // Clean up expired events from storage
+        if (expiredIds.length > 0) {
+          const cleanedIds = enabledParishIds.filter(id => !expiredIds.includes(id));
+          await AsyncStorage.setItem(ENABLED_PARISH_EVENT_NOTIFICATIONS_KEY, JSON.stringify(cleanedIds));
+          for (const id of expiredIds) {
+            await this.removeParishEventData(id);
           }
         }
 
@@ -657,7 +706,7 @@ export class NotificationService {
     }
   }
 
-  async setParishEventNotificationEnabled(eventId: string, enabled: boolean): Promise<void> {
+  async setParishEventNotificationEnabled(eventId: string, enabled: boolean, eventData?: ParishEvent): Promise<void> {
     try {
       const current = await this.getEnabledParishEventNotifications();
       let updated = current;
@@ -666,9 +715,12 @@ export class NotificationService {
         if (!current.includes(eventId)) {
           updated = [...current, eventId];
         }
+        if (eventData) {
+          await this.storeParishEventData(eventId, eventData);
+        }
       } else {
         updated = current.filter(id => id !== eventId);
-        // Cancel existing scheduled notification for this parish event
+        await this.removeParishEventData(eventId);
         const scheduled = await this.getScheduledNotifications();
         const match = scheduled.find(n => n.eventId === eventId);
         if (match) {
@@ -679,6 +731,40 @@ export class NotificationService {
       await AsyncStorage.setItem(ENABLED_PARISH_EVENT_NOTIFICATIONS_KEY, JSON.stringify(updated));
     } catch (error) {
       console.error('Error setting parish event notification enabled state:', error);
+    }
+  }
+
+  private async storeParishEventData(eventId: string, eventData: ParishEvent): Promise<void> {
+    try {
+      const existing = await AsyncStorage.getItem(ENABLED_PARISH_EVENT_DATA_KEY);
+      const stored: Record<string, ParishEvent> = existing ? JSON.parse(existing) : {};
+      stored[eventId] = eventData;
+      await AsyncStorage.setItem(ENABLED_PARISH_EVENT_DATA_KEY, JSON.stringify(stored));
+    } catch (error) {
+      console.error('Error storing parish event data:', error);
+    }
+  }
+
+  private async removeParishEventData(eventId: string): Promise<void> {
+    try {
+      const existing = await AsyncStorage.getItem(ENABLED_PARISH_EVENT_DATA_KEY);
+      if (existing) {
+        const stored: Record<string, ParishEvent> = JSON.parse(existing);
+        delete stored[eventId];
+        await AsyncStorage.setItem(ENABLED_PARISH_EVENT_DATA_KEY, JSON.stringify(stored));
+      }
+    } catch (error) {
+      console.error('Error removing parish event data:', error);
+    }
+  }
+
+  async getStoredParishEventData(): Promise<Record<string, ParishEvent>> {
+    try {
+      const existing = await AsyncStorage.getItem(ENABLED_PARISH_EVENT_DATA_KEY);
+      return existing ? JSON.parse(existing) : {};
+    } catch (error) {
+      console.error('Error getting stored parish event data:', error);
+      return {};
     }
   }
 

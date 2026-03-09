@@ -131,6 +131,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({
   const previousStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      router.back();
     }
   };
   
