@@ -33,7 +33,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 EXPO_PUBLIC_GOOGLE_CALENDAR_API_KEY=<your-google-calendar-api-key>
 ```
 
-> **Note:** Contact the project administrator to request these API keys before you can run the app.
+> **Note:** Contact the project administrator (support@parohia.app) to request these API keys before you can run the app.
 
 4. **Start the app**
 
@@ -41,4 +41,4 @@ EXPO_PUBLIC_GOOGLE_CALENDAR_API_KEY=<your-google-calendar-api-key>
 npx expo start
 ```
 
-Scan the QR code with Expo Go (Android/iOS) or press `a` / `i` to open in an emulator.
+Scan the QR code with the Expo Go app (Android/iOS) or press `a` / `i` to open in an emulator.
