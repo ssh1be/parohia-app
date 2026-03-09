@@ -13,7 +13,7 @@ A mobile app for Orthodox parishes, built with React Native and Expo.
 
 ```bash
 git clone https://github.com/ssh1be/parohia-app.git
-cd Parohia
+cd parohia-app
 ```
 
 2. **Install dependencies**
