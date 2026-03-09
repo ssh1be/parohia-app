@@ -41,10 +41,8 @@ export default function WelcomeCompleteScreen() {
       console.log('Onboarding marked as complete in storage');
       
       console.log('Navigating to main app');
-      while (router.canGoBack()) {
-        router.back();
-      }
-      router.replace('/(tabs)');
+      router.dismissAll();
+      router.replace('/');
     } catch (error: any) {
       console.error('Error completing onboarding:', error);
       Alert.alert('Error', 'Failed to complete onboarding. Please try again.');
