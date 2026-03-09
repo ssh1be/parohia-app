@@ -1,6 +1,6 @@
 # Parohia
 
-A mobile app for the Orthodox parish community, built with React Native and Expo.
+A mobile app for Orthodox parishes, built with React Native and Expo.
 
 ## Prerequisites
 
