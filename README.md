@@ -1,19 +1,18 @@
 # Parohia
 
-A mobile app for the Orthodox parish community, built with React Native and Expo.
+A mobile app for Orthodox parishes, built with React Native and Expo.
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (LTS recommended)
-- [Expo CLI](https://docs.expo.dev/get-started/installation/)
 - [Expo Go](https://expo.dev/go) on your phone, or an Android/iOS emulator
 
-## Getting Started
+## Contributing
 
 1. **Clone the repo**
 
 ```bash
-git clone https://github.com/your-org/Parohia.git
+git clone https://github.com/ssh1be/parohia-app.git
 cd Parohia
 ```
 
@@ -33,7 +32,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 EXPO_PUBLIC_GOOGLE_CALENDAR_API_KEY=<your-google-calendar-api-key>
 ```
 
-> **Note:** Contact the project administrator to request these API keys before you can run the app.
+> **Note:** Contact the project administrator (support@parohia.app) to request these API keys before you can run the app.
 
 4. **Start the app**
 
@@ -41,4 +40,4 @@ EXPO_PUBLIC_GOOGLE_CALENDAR_API_KEY=<your-google-calendar-api-key>
 npx expo start
 ```
 
-Scan the QR code with Expo Go (Android/iOS) or press `a` / `i` to open in an emulator.
+Scan the QR code with the Expo Go app (Android/iOS) or press `a` / `i` to open in an emulator.
