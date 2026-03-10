@@ -1,16 +1,15 @@
-import { Text, View, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Alert, Linking, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
-import { faDiamondTurnRight } from '@fortawesome/free-solid-svg-icons/faDiamondTurnRight'
-import React, { useState, useEffect } from "react";
+import { faDiamondTurnRight } from '@fortawesome/free-solid-svg-icons/faDiamondTurnRight';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { useColorScheme } from "nativewind";
-import { useAuth } from "../../contexts/AuthContext";
-import { getUserProfile } from "../../services/onboardingService";
-import { getParishByAdminId, getParishByUserId, updateParishCalendarId, updateParishPriestInfo, updateParishDonationSettings } from "../../services/parishService";
-import { getParishes } from "../../services/onboardingService";
-import { supabase } from "../../config/supabase";
-import { PayPalService } from "../../services/paypalService";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableWithoutFeedback, View } from "react-native";
 import GeneralSettings from "../../components/GeneralSettings";
+import { supabase } from "../../config/supabase";
+import { useAuth } from "../../contexts/AuthContext";
+import { getParishes, getUserProfile } from "../../services/onboardingService";
+import { getParishByAdminId, getParishByUserId, updateParishDonationSettings, updateParishPriestInfo } from "../../services/parishService";
+import { PayPalService } from "../../services/paypalService";
 
 interface Parish {
   id: string;
@@ -464,8 +463,8 @@ export default function Parish() {
                     className="flex-row items-center mb-1 active:opacity-70"
                     onPress={() => handleAddress(parish.address, parish.city, parish.state, parish.zip_code)}
                   >
-                    <Ionicons name="location" size={12} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                    <Text className="text-xs text-blue-400">
+                    <Ionicons name="location" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
+                    <Text className="text-sm text-blue-400">
                       {parish.address}, {parish.city}, {parish.state} {parish.zip_code}
                     </Text>
                   </Pressable>
@@ -475,8 +474,8 @@ export default function Parish() {
                       className="flex-row items-center mb-1 active:opacity-70"
                       onPress={() => handleCall(parish.phone_number!)}
                     >
-                      <Ionicons name="call" size={12} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                      <Text className="text-xs text-blue-400">{formatPhoneNumber(parish.phone_number)}</Text>
+                      <Ionicons name="call" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
+                      <Text className="text-sm text-blue-400">{formatPhoneNumber(parish.phone_number)}</Text>
                     </Pressable>
                   )}
                   
@@ -485,8 +484,8 @@ export default function Parish() {
                       className="flex-row items-center mb-1 active:opacity-70"
                       onPress={() => handleWebsite(parish.website!)}
                     >
-                      <Ionicons name="globe" size={12} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                      <Text className="text-xs text-blue-400">{parish.website}</Text>
+                      <Ionicons name="globe" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
+                      <Text className="text-sm text-blue-400">{parish.website}</Text>
                     </Pressable>
                   )}
                   
@@ -495,8 +494,8 @@ export default function Parish() {
                       className="flex-row items-center mb-1 active:opacity-70"
                       onPress={() => handleEmail(parish.email!)}
                     >
-                      <Ionicons name="mail" size={12} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                      <Text className="text-xs text-blue-400">{parish.email}</Text>
+                      <Ionicons name="mail" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
+                      <Text className="text-sm text-blue-400">{parish.email}</Text>
                     </Pressable>
                   )}
                 </View>

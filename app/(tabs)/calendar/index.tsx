@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useColorScheme } from "nativewind";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
-import { useColorScheme } from "nativewind";
 import ParishCalendarSetup from "../../../components/ParishCalendarSetup";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useNotifications } from "../../../contexts/NotificationContext";
@@ -616,7 +616,7 @@ export default function Calendar() {
             
             {/* Calendar Setup Prompt for Parish Admins */}
             {isParishAdmin && !parishHasCalendar && (
-              <View className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-4">
+              <View className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-500/30 rounded-xl p-4 mb-4">
                 <View className="flex-row items-start">
                   <Ionicons name="calendar-outline" size={20} color="#3B82F6" className="mt-0.5" />
                   <View className="flex-1 ml-3">
