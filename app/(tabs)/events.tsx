@@ -1,19 +1,21 @@
-import { Text, View, ScrollView, Pressable, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
 import { useColorScheme } from "nativewind";
-import { useAuth } from "../../contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import CustomDateTimePicker from "../../components/DateTimePicker";
 import { supabase } from "../../config/supabase";
+import { useAuth } from "../../contexts/AuthContext";
+import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "../../services/bulletinService";
+import { ConfessionService, DaySchedule, TimeSlot } from "../../services/confessionService";
+import { notificationService } from "../../services/notificationService";
 import { getUserProfile } from "../../services/onboardingService";
 import { getParishByAdminId, getParishByUserId } from "../../services/parishService";
-import { ConfessionService, DaySchedule, TimeSlot } from "../../services/confessionService";
-import { BulletinService, BulletinEvent, CreateEventData, EventResponse } from "../../services/bulletinService";
-import CustomDateTimePicker from "../../components/DateTimePicker";
-import { notificationService } from "../../services/notificationService";
 
 type TabType = 'confession' | 'bulletin';
 
 export default function Events() {
+  const insets = useSafeAreaInsets();
   const { user, session } = useAuth();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -655,8 +657,9 @@ export default function Events() {
   };
 
   const renderConfessionTab = () => (
-    <ScrollView 
-      className="flex-1" 
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -819,8 +822,9 @@ export default function Events() {
 
   const renderBulletinTab = () => (
     <View className="flex-1">
-      <ScrollView 
-        className="flex-1" 
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -1002,9 +1006,9 @@ export default function Events() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
+      <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
         <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-          <View className="flex-row justify-between items-center pt-4">
+          <View className="flex-row justify-between items-center pt-0">
             <View>
               <Text className="text-3xl font-bold text-gray-900 dark:text-white">Events</Text>
               <Text className="text-sm text-gray-900 dark:text-white opacity-70">Parish events and announcements</Text>
@@ -1020,10 +1024,10 @@ export default function Events() {
   }
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
+    <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
       {/* Header */}
       <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-        <View className="flex-row justify-between items-center pt-4">
+        <View className="flex-row justify-between items-center pt-0">
           <View>
             <Text className="text-3xl font-bold text-gray-900 dark:text-white">Events</Text>
             <Text className="text-sm text-gray-900 dark:text-white opacity-70">Parish events and announcements</Text>

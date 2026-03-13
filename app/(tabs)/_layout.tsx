@@ -1,8 +1,10 @@
 import { Tabs, usePathname } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -15,8 +17,8 @@ export default function TabsLayout() {
           borderTopColor: isDark ? '#1e1e1e' : '#e5e7eb',
           borderTopWidth: 1,
           paddingHorizontal: 16,
-          paddingVertical: 16,
-          height: 60,
+          paddingBottom: Math.max(insets.bottom, 16),
+          height: 60 + insets.bottom,
         },
         tabBarActiveTintColor: isDark ? 'white' : 'black',
         tabBarInactiveTintColor: isDark ? 'gray' : '#9CA3AF',

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ParishCalendarSetup from '../../components/ParishCalendarSetup';
 import { useAuth } from "../../contexts/AuthContext";
 import { useOrthodoxCalendar } from "../../hooks/useOrthodoxCalendar";
@@ -11,6 +12,7 @@ import { getUserProfile } from '../../services/onboardingService';
 import { getParishByAdminId, getParishByUserId } from '../../services/parishService';
 
 export default function Index() {
+  const insets = useSafeAreaInsets();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { user, loading: authLoading } = useAuth();
@@ -230,9 +232,10 @@ export default function Index() {
   }
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
+    <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
       <ScrollView 
         className="flex-1"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -245,7 +248,7 @@ export default function Index() {
         
         <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
           {/* Header */}
-          <View className="flex-row justify-between items-center pt-4">
+          <View className="flex-row justify-between items-center pt-0">
             <View>
               <Text className="text-3xl font-bold text-gray-900 dark:text-white">Home</Text>
               <Text className="text-sm text-gray-900 dark:text-white opacity-70">

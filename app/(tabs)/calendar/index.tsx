@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useColorScheme } from "nativewind";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ParishCalendarSetup from "../../../components/ParishCalendarSetup";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useNotifications } from "../../../contexts/NotificationContext";
@@ -13,6 +14,7 @@ import { getUserProfile } from "../../../services/onboardingService";
 import { getParishByAdminId, getParishByUserId } from "../../../services/parishService";
 
 export default function Calendar() {
+  const insets = useSafeAreaInsets();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -429,9 +431,10 @@ export default function Calendar() {
   };
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
+    <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
       <ScrollView 
         className="flex-1"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -443,7 +446,7 @@ export default function Calendar() {
       >
         {/* Header */}
         <View className="p-6">
-          <View className="flex-row justify-between items-center pt-4">
+          <View className="flex-row justify-between items-center pt-0">
             <View>
               <Text className="text-3xl font-bold text-gray-900 dark:text-white">Calendar</Text>
               <Pressable className="rounded-lg flex-row items-center active:opacity-70">

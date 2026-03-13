@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { useColorScheme } from "nativewind";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableWithoutFeedback, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import GeneralSettings from "../../components/GeneralSettings";
 import { supabase } from "../../config/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -45,6 +46,7 @@ interface ParishListItem {
 }
 
 export default function Parish() {
+  const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -388,7 +390,7 @@ export default function Parish() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-50 dark:bg-black pt-0">
+      <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
         <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
           <View className="flex-row justify-between items-center pt-4">
             <View>
@@ -414,13 +416,13 @@ export default function Parish() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView 
           className="flex-1"
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top, paddingBottom: insets.bottom + 80 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
           <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-            <View className="flex-row justify-between items-center pt-4">
+            <View className="flex-row justify-between items-center pt-0">
               <View>
                 <Text className="text-3xl font-bold text-gray-900 dark:text-white">Parish</Text>
                 <Text className="text-sm text-gray-900 dark:text-white opacity-70">
