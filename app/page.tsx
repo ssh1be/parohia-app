@@ -88,8 +88,7 @@ export default function LandingPage() {
               <h1 className="mt-8 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] animate-fade-in-up">
                 A Modern Companion
                 <br />
-                for an{" "}
-                <span className="text-brand-gradient">Ancient Faith</span>.
+                for an Ancient Faith.
               </h1>
 
               <p
