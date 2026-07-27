@@ -37,7 +37,7 @@ export default function NotifyPage() {
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
               Get notified about Parohia!
             </h1>
-            <p className="mt-6 text-lg text-zinc-400 leading-relaxed">
+            <p className="mt-6 text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
               Parohia is still in development. Leave us your email and
               we&apos;ll let you know about updates, beta tests, and the public
               release.
@@ -61,7 +61,7 @@ export default function NotifyPage() {
                 autoComplete="email"
                 required
                 placeholder="you@example.com"
-                className="w-full sm:w-auto flex-1 rounded-xl bg-white/[0.04] px-4 py-3.5 text-sm text-white placeholder-zinc-600 outline-none border border-white/[0.08] focus:border-white/20 focus:bg-white/[0.06] transition-colors"
+                className="w-full sm:w-auto flex-1 rounded-xl bg-zinc-50 dark:bg-white/[0.04] px-4 py-3.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 outline-none border border-zinc-200 dark:border-white/[0.08] focus:border-zinc-400 dark:focus:border-white/20 focus:bg-zinc-100 dark:focus:bg-white/[0.06] transition-colors"
               />
               <button
                 type="submit"
@@ -74,7 +74,7 @@ export default function NotifyPage() {
             <div className="mt-10">
               <a
                 href="/"
-                className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors"
+                className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to home

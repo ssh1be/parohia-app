@@ -47,11 +47,11 @@ function FeatureBlock({
               </div>
             </>
           ) : (
-            <div className="relative rounded-2xl border border-dashed border-white/20 bg-white/[0.02] p-4 w-full max-w-5xl">
-              <div className="flex h-64 md:h-96 w-full items-center justify-center rounded-xl bg-white/[0.02]">
+            <div className="relative rounded-2xl border border-dashed border-zinc-300 dark:border-white/20 bg-zinc-50 dark:bg-white/[0.02] p-4 w-full max-w-5xl">
+              <div className="flex h-64 md:h-96 w-full items-center justify-center rounded-xl bg-zinc-100 dark:bg-white/[0.02]">
                 <div className="text-center text-zinc-500">
                   <div className="text-sm">Whiteboard placeholder</div>
-                  <div className="mt-1 text-xs text-zinc-600">
+                  <div className="mt-1 text-xs text-zinc-400 dark:text-zinc-600">
                     {placeholderLabel}
                   </div>
                 </div>
@@ -70,10 +70,10 @@ export default function FeaturesPage() {
       {/* Ambient background */}
       <div className="pointer-events-none fixed inset-0 ambient-glow" aria-hidden />
 
-      <PageHeader />
+      <PageHeader showThemeToggle={false} />
 
       {/* Hero */}
-      <section className="relative z-10 border-b border-white/[0.06]">
+      <section className="relative z-10 border-b border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 pt-16 md:pt-20 pb-16 md:pb-20">
           <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
             Features
@@ -81,7 +81,7 @@ export default function FeaturesPage() {
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
             Explore Parohia
           </h1>
-          <p className="mt-6 max-w-2xl text-lg text-zinc-400 leading-relaxed">
+          <p className="mt-6 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
             Parohia replaces scattered chats, emails, flyers, and PDFs with one
             home for your parish info. Orthodox calendar, parish schedules,
             announcements, events, volunteering and confession scheduling — all
@@ -92,7 +92,7 @@ export default function FeaturesPage() {
       </section>
 
       {/* Feature images */}
-      <div className="divide-y divide-white/[0.06]">
+      <div className="divide-y divide-zinc-200 dark:divide-white/[0.06]">
         <FeatureBlock
           id="calendar-schedule"
           placeholderLabel=""
@@ -130,17 +130,17 @@ export default function FeaturesPage() {
       {/* CTA */}
       <section className="relative z-10">
         <div className="mx-auto max-w-4xl px-6 lg:px-8 py-16 md:py-24">
-          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-transparent p-8 md:p-14 text-center">
+          <div className="relative overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-gradient-to-br from-zinc-50 dark:from-white/[0.06] to-transparent p-8 md:p-14 text-center">
             {/* Decorative glow */}
             <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-40 w-80 rounded-full bg-brand-red/20 blur-[80px]"
+              className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-40 w-80 rounded-full bg-brand-red/10 dark:bg-brand-red/20 blur-[80px]"
               aria-hidden
             />
             <div className="relative">
               <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
                 We Want to Hear From You
               </h2>
-              <p className="mt-4 text-zinc-400 leading-relaxed max-w-lg mx-auto">
+              <p className="mt-4 text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-lg mx-auto">
                 Feedback and suggestions from Orthodox clergy and parishioners
                 are invaluable. Share your thoughts and help shape the future of
                 Parohia.
@@ -149,7 +149,7 @@ export default function FeaturesPage() {
                 Reach us at{" "}
                 <a
                   href="mailto:support@parohia.app"
-                  className="text-white hover:text-brand-red transition-colors underline underline-offset-4 decoration-white/20 hover:decoration-brand-red/50"
+                  className="text-zinc-900 dark:text-white hover:text-brand-red transition-colors underline underline-offset-4 decoration-zinc-300 dark:decoration-white/20 hover:decoration-brand-red/50"
                 >
                   support@parohia.app
                 </a>
@@ -164,7 +164,7 @@ export default function FeaturesPage() {
                 </a>
                 <a
                   href="/about"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-6 py-3.5 text-sm text-zinc-300 transition-all hover:bg-white/[0.08] hover:text-white"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.04] px-6 py-3.5 text-sm text-zinc-700 dark:text-zinc-300 transition-all hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white"
                 >
                   About us
                 </a>

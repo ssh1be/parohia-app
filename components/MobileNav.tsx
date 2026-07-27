@@ -33,13 +33,13 @@ export default function MobileNav() {
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70"
+        className="absolute inset-0 bg-black/30 dark:bg-black/70"
         onClick={() => setIsOpen(false)}
       />
 
       {/* Slide-in panel */}
       <div
-        className={`absolute right-0 top-0 h-full w-[280px] bg-zinc-950 border-l border-white/10 p-6 shadow-2xl shadow-black transition-transform duration-300 ease-out ${
+        className={`absolute right-0 top-0 h-full w-[280px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-white/10 p-6 shadow-2xl shadow-zinc-300/50 dark:shadow-black transition-transform duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -47,7 +47,7 @@ export default function MobileNav() {
           <span className="text-lg font-semibold">Menu</span>
           <button
             onClick={() => setIsOpen(false)}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
             aria-label="Close navigation menu"
           >
             <X className="h-5 w-5" />
@@ -65,7 +65,7 @@ export default function MobileNav() {
               key={link.href}
               href={link.href}
               onClick={() => setIsOpen(false)}
-              className="flex items-center rounded-lg px-4 py-3 text-zinc-300 hover:bg-white/5 hover:text-white transition-colors"
+              className="flex items-center rounded-lg px-4 py-3 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white transition-colors"
             >
               {link.label}
             </a>
@@ -76,7 +76,7 @@ export default function MobileNav() {
           <a
             href="/features"
             onClick={() => setIsOpen(false)}
-            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 px-4 py-3 text-sm text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
           >
             Learn more
           </a>
@@ -96,7 +96,7 @@ export default function MobileNav() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="inline-flex md:hidden items-center justify-center h-10 w-10 rounded-lg border border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors"
+        className="inline-flex md:hidden items-center justify-center h-10 w-10 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
         aria-label="Open navigation menu"
       >
         <Menu className="h-5 w-5" />

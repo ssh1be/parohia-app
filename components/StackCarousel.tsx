@@ -105,7 +105,7 @@ export default function StackCarousel({
               aria-hidden={depth !== 0}
             >
               <div
-                className="relative h-full aspect-[9/19.5] rounded-2xl overflow-hidden shadow-2xl shadow-black/40"
+                className="relative h-full aspect-[9/19.5] rounded-2xl overflow-hidden bg-transparent"
                 style={{
                   transform: `translateY(${translateY}px) scale(${scale})`,
                   transition:
@@ -134,7 +134,7 @@ export default function StackCarousel({
               style={{ zIndex: 20 }}
             >
               <div
-                className="relative aspect-[9/19.5] rounded-2xl overflow-hidden shadow-xl"
+                className="relative aspect-[9/19.5] rounded-2xl overflow-hidden bg-transparent"
                 style={{
                   height: "86%",
                   transform: "translateY(36px) translateX(-28%) scale(0.9)",
@@ -149,7 +149,6 @@ export default function StackCarousel({
                   className="h-full w-full object-contain"
                   draggable={false}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-black/50" />
               </div>
             </div>
 
@@ -160,7 +159,7 @@ export default function StackCarousel({
               style={{ zIndex: 20 }}
             >
               <div
-                className="relative aspect-[9/19.5] rounded-2xl overflow-hidden shadow-xl"
+                className="relative aspect-[9/19.5] rounded-2xl overflow-hidden bg-transparent"
                 style={{
                   height: "86%",
                   transform: "translateY(36px) translateX(28%) scale(0.9)",
@@ -175,7 +174,6 @@ export default function StackCarousel({
                   className="h-full w-full object-contain"
                   draggable={false}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-black/50" />
               </div>
             </div>
           </>
@@ -185,7 +183,7 @@ export default function StackCarousel({
         <button
           type="button"
           onClick={retreat}
-          className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-white/80 backdrop-blur-md hover:bg-black/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-colors"
+          className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 bg-white/80 dark:bg-black/40 text-zinc-600 dark:text-white/80 backdrop-blur-md hover:bg-zinc-100 dark:hover:bg-black/60 hover:text-zinc-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-white/20 transition-colors"
           aria-label="Previous screenshot"
           style={{ zIndex: 60 }}
         >
@@ -194,7 +192,7 @@ export default function StackCarousel({
         <button
           type="button"
           onClick={advance}
-          className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-white/80 backdrop-blur-md hover:bg-black/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-colors"
+          className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 bg-white/80 dark:bg-black/40 text-zinc-600 dark:text-white/80 backdrop-blur-md hover:bg-zinc-100 dark:hover:bg-black/60 hover:text-zinc-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-zinc-300 dark:focus:ring-white/20 transition-colors"
           aria-label="Next screenshot"
           style={{ zIndex: 60 }}
         >
@@ -225,8 +223,8 @@ export default function StackCarousel({
               }}
               className={`h-2 rounded-full transition-all duration-300 ${
                 active
-                  ? "w-6 bg-white"
-                  : "w-2 bg-white/30 hover:bg-white/50"
+                  ? "w-6 bg-zinc-900 dark:bg-white"
+                  : "w-2 bg-zinc-300 dark:bg-white/30 hover:bg-zinc-400 dark:hover:bg-white/50"
               }`}
               aria-label={`Go to slide ${i + 1}`}
             />

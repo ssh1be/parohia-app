@@ -2,6 +2,7 @@ import { Users, CalendarDays, BellRing, ArrowRight, Mail, Heart } from "lucide-r
 import StackCarousel from "../components/StackCarousel";
 import MobileNav from "../components/MobileNav";
 import AnimateIn from "../components/AnimateIn";
+import ThemeToggle from "../components/ThemeToggle";
 
 export default function LandingPage() {
   return (
@@ -10,7 +11,7 @@ export default function LandingPage() {
       <div className="pointer-events-none fixed inset-0 ambient-glow" aria-hidden />
 
       {/* ─── HEADER ─── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#050505]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-zinc-200 dark:border-white/[0.06] bg-white/80 dark:bg-[#050505]/80 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
@@ -36,7 +37,7 @@ export default function LandingPage() {
                 <a
                   key={link.href}
                   href={link.href}
-                  className="rounded-lg px-4 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+                  className="rounded-lg px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
                 >
                   {link.label}
                 </a>
@@ -47,10 +48,11 @@ export default function LandingPage() {
             <div className="hidden md:flex items-center gap-3">
               <a
                 href="/features"
-                className="rounded-lg px-4 py-2 text-sm text-zinc-300 hover:text-white transition-colors"
+                className="rounded-lg px-4 py-2 text-sm text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 Learn more
               </a>
+              <ThemeToggle />
               <a
                 href="/notify"
                 className="rounded-xl bg-brand-gradient px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
@@ -59,8 +61,11 @@ export default function LandingPage() {
               </a>
             </div>
 
-            {/* Mobile hamburger */}
-            <MobileNav />
+            {/* Mobile */}
+            <div className="flex md:hidden items-center gap-2">
+              <ThemeToggle />
+              <MobileNav />
+            </div>
           </div>
         </div>
       </header>
@@ -72,7 +77,7 @@ export default function LandingPage() {
             {/* Left: Content */}
             <div className="max-w-2xl">
               {/* Status pill */}
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-sm text-zinc-400 animate-fade-in">
+              <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.04] px-4 py-1.5 text-sm text-zinc-500 dark:text-zinc-400 animate-fade-in">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
@@ -88,7 +93,7 @@ export default function LandingPage() {
               </h1>
 
               <p
-                className="mt-6 text-lg text-zinc-400 leading-relaxed max-w-xl animate-fade-in-up"
+                className="mt-6 text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-xl animate-fade-in-up"
                 style={{ animationDelay: "100ms" }}
               >
                 Parohia helps you connect with your Orthodox parish, follow the
@@ -109,7 +114,7 @@ export default function LandingPage() {
                 </a>
                 <a
                   href="/features"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-6 py-3.5 text-sm text-zinc-300 transition-all hover:bg-white/[0.08] hover:text-white hover:border-white/20"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.04] px-6 py-3.5 text-sm text-zinc-700 dark:text-zinc-300 transition-all hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-white/20"
                 >
                   Explore features
                 </a>
@@ -123,7 +128,7 @@ export default function LandingPage() {
                 className="absolute inset-0 flex items-center justify-center"
                 aria-hidden
               >
-                <div className="h-80 w-80 rounded-full bg-brand-red/15 blur-[100px]" />
+                <div className="h-80 w-80 rounded-full bg-brand-red/10 dark:bg-brand-red/15 blur-[100px]" />
               </div>
               <div className="relative animate-float">
                 <img
@@ -138,7 +143,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── FEATURES ─── */}
-      <section id="features" className="relative z-10 border-t border-white/[0.06]">
+      <section id="features" className="relative z-10 border-t border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 md:py-28">
           <AnimateIn className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
@@ -147,7 +152,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               Built for the Orthodox Community
             </h2>
-            <p className="mt-4 text-zinc-400 text-lg leading-relaxed">
+            <p className="mt-4 text-zinc-600 dark:text-zinc-400 text-lg leading-relaxed">
               Everything your parish needs to stay connected, informed, and
               spiritually engaged.
             </p>
@@ -180,7 +185,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── SCREENSHOTS ─── */}
-      <section id="screenshots" className="relative z-10 border-t border-white/[0.06]">
+      <section id="screenshots" className="relative z-10 border-t border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 md:py-28">
           <AnimateIn className="text-center max-w-2xl mx-auto mb-12">
             <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
@@ -189,7 +194,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
               See Parohia in Action
             </h2>
-            <p className="mt-4 text-zinc-400 text-lg">
+            <p className="mt-4 text-zinc-600 dark:text-zinc-400 text-lg">
               A glimpse into the experience we&apos;re crafting.
             </p>
           </AnimateIn>
@@ -213,10 +218,10 @@ export default function LandingPage() {
       <section className="relative z-10">
         <div className="mx-auto max-w-4xl px-6 lg:px-8 py-16 md:py-24">
           <AnimateIn>
-            <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-transparent p-8 md:p-14 text-center">
+            <div className="relative overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-gradient-to-br from-zinc-50 dark:from-white/[0.06] to-transparent p-8 md:p-14 text-center">
               {/* Decorative glow */}
               <div
-                className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-40 w-80 rounded-full bg-brand-red/20 blur-[80px]"
+                className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-40 w-80 rounded-full bg-brand-red/10 dark:bg-brand-red/20 blur-[80px]"
                 aria-hidden
               />
 
@@ -225,7 +230,7 @@ export default function LandingPage() {
                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
                   We Want to Hear From You
                 </h2>
-                <p className="mt-4 text-zinc-400 leading-relaxed max-w-lg mx-auto">
+                <p className="mt-4 text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-lg mx-auto">
                   Feedback and suggestions from Orthodox clergy and parishioners
                   are invaluable. Share your thoughts and help shape the future
                   of Parohia.
@@ -234,7 +239,7 @@ export default function LandingPage() {
                   Reach us at{" "}
                   <a
                     href="mailto:support@parohia.app"
-                    className="text-white hover:text-brand-red transition-colors underline underline-offset-4 decoration-white/20 hover:decoration-brand-red/50"
+                    className="text-zinc-900 dark:text-white hover:text-brand-red transition-colors underline underline-offset-4 decoration-zinc-300 dark:decoration-white/20 hover:decoration-brand-red/50"
                   >
                     support@parohia.app
                   </a>
@@ -249,7 +254,7 @@ export default function LandingPage() {
                   </a>
                   <a
                     href="/about"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-6 py-3.5 text-sm text-zinc-300 transition-all hover:bg-white/[0.08] hover:text-white"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.04] px-6 py-3.5 text-sm text-zinc-700 dark:text-zinc-300 transition-all hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white"
                   >
                     About us
                   </a>
@@ -261,7 +266,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── FOOTER ─── */}
-      <footer className="relative z-10 border-t border-white/[0.06]">
+      <footer className="relative z-10 border-t border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-12 md:py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {/* Brand */}
@@ -288,14 +293,14 @@ export default function LandingPage() {
 
             {/* Product */}
             <div>
-              <h4 className="text-sm font-semibold text-zinc-300 mb-4">
+              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
                 Product
               </h4>
               <ul className="space-y-3">
                 <li>
                   <a
                     href="/features"
-                    className="text-sm text-zinc-500 hover:text-white transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                   >
                     Features
                   </a>
@@ -303,7 +308,7 @@ export default function LandingPage() {
                 <li>
                   <a
                     href="/notify"
-                    className="text-sm text-zinc-500 hover:text-white transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                   >
                     Newsletter
                   </a>
@@ -311,7 +316,7 @@ export default function LandingPage() {
                 <li>
                   <a
                     href="/about"
-                    className="text-sm text-zinc-500 hover:text-white transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                   >
                     About
                   </a>
@@ -321,14 +326,14 @@ export default function LandingPage() {
 
             {/* Resources */}
             <div>
-              <h4 className="text-sm font-semibold text-zinc-300 mb-4">
+              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
                 Resources
               </h4>
               <ul className="space-y-3">
                 <li>
                   <a
                     href="mailto:support@parohia.app"
-                    className="text-sm text-zinc-500 hover:text-white transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                   >
                     Support
                   </a>
@@ -336,7 +341,7 @@ export default function LandingPage() {
                 <li>
                   <a
                     href="mailto:support@parohia.app"
-                    className="text-sm text-zinc-500 hover:text-white transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                   >
                     Contact
                   </a>
@@ -346,14 +351,14 @@ export default function LandingPage() {
 
             {/* Legal */}
             <div>
-              <h4 className="text-sm font-semibold text-zinc-300 mb-4">
+              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
                 Legal
               </h4>
               <ul className="space-y-3">
                 <li>
                   <a
                     href="/privacy"
-                    className="text-sm text-zinc-500 hover:text-white transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                   >
                     Privacy Policy
                   </a>
@@ -361,7 +366,7 @@ export default function LandingPage() {
                 <li>
                   <a
                     href="/terms"
-                    className="text-sm text-zinc-500 hover:text-white transition-colors"
+                    className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                   >
                     Terms of Service
                   </a>
@@ -371,11 +376,11 @@ export default function LandingPage() {
           </div>
 
           {/* Bottom bar */}
-          <div className="mt-12 pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-zinc-600">
+          <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-zinc-400 dark:text-zinc-600">
               &copy; {new Date().getFullYear()} Parohia. All rights reserved.
             </p>
-            <p className="text-sm text-zinc-600 flex items-center gap-1">Made with <Heart className="h-4 w-4 text-brand-red fill-brand-red" /> in Oregon, USA.</p>
+            <p className="text-sm text-zinc-400 dark:text-zinc-600 flex items-center gap-1">Made with <Heart className="h-4 w-4 text-brand-red fill-brand-red" /> in Oregon, USA.</p>
           </div>
         </div>
       </footer>
@@ -394,12 +399,12 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="group relative rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 md:p-8 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.12] hover:shadow-lg hover:shadow-brand-red/5">
+    <div className="group relative rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-50/50 dark:bg-white/[0.02] p-6 md:p-8 transition-all duration-300 hover:bg-zinc-100 dark:hover:bg-white/[0.04] hover:border-zinc-300 dark:hover:border-white/[0.12] hover:shadow-lg hover:shadow-brand-red/5">
       <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-lg shadow-brand-red/20">
         {icon}
       </div>
       <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-      <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
+      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
         {description}
       </p>
     </div>

@@ -26,9 +26,9 @@ export default function AboutPage() {
           <div className="mt-12 grid gap-10 md:grid-cols-2 items-start">
             <div className="order-1 md:order-1 mt-4 md:mt-8">
               <h2 className="text-xl font-semibold">Our Team</h2>
-              <p className="mt-4 text-zinc-400 leading-relaxed">
+              <p className="mt-4 text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 Parohia is currently being built and maintained by me,{" "}
-                <span className="text-white font-medium">Alexandru Perussi</span>,
+                <span className="text-zinc-900 dark:text-white font-medium">Alexandru Perussi</span>,
                 a Computer Science student from Oregon State University. I was
                 raised in the Orthodox Church and began Parohia as a personal
                 project to help parishes stay organized and connected. The
@@ -43,7 +43,7 @@ export default function AboutPage() {
                   src="/alexandru2.jpg"
                   alt="Alexandru Perussi"
                   fallbackSrc="/App_store_1024_1x.png"
-                  className="h-64 w-64 md:h-80 md:w-80 rounded-2xl object-cover shadow-lg shadow-black/40"
+                  className="h-64 w-64 md:h-80 md:w-80 rounded-2xl object-cover shadow-lg shadow-zinc-300/40 dark:shadow-black/40"
                 />
               </div>
             </div>

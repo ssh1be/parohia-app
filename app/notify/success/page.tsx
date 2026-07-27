@@ -17,14 +17,14 @@ export default function NotifySuccessPage() {
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
               You&apos;re on the list!
             </h1>
-            <p className="mt-6 text-lg text-zinc-400 leading-relaxed">
+            <p className="mt-6 text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
               Thanks for signing up! We&apos;ll email you when Parohia is ready.
             </p>
 
             <div className="mt-10">
               <a
                 href="/"
-                className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors"
+                className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to home

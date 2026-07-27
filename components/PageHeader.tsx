@@ -1,8 +1,13 @@
 import MobileNav from "./MobileNav";
+import ThemeToggle from "./ThemeToggle";
 
-export default function PageHeader() {
+export default function PageHeader({
+  showThemeToggle = true,
+}: {
+  showThemeToggle?: boolean;
+}) {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#050505]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-zinc-200 dark:border-white/[0.06] bg-white/80 dark:bg-[#050505]/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -22,20 +27,21 @@ export default function PageHeader() {
           <nav className="hidden md:flex items-center gap-1">
             <a
               href="/features"
-              className="rounded-lg px-4 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+              className="rounded-lg px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
             >
               Features
             </a>
             <a
               href="/about"
-              className="rounded-lg px-4 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+              className="rounded-lg px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
             >
               About
             </a>
           </nav>
 
-          {/* Desktop CTA */}
+          {/* Desktop CTA + Theme Toggle */}
           <div className="hidden md:flex items-center gap-3">
+            {showThemeToggle ? <ThemeToggle /> : null}
             <a
               href="/notify"
               className="rounded-xl bg-brand-gradient px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
@@ -45,7 +51,10 @@ export default function PageHeader() {
           </div>
 
           {/* Mobile */}
-          <MobileNav />
+          <div className="flex md:hidden items-center gap-2">
+            {showThemeToggle ? <ThemeToggle /> : null}
+            <MobileNav />
+          </div>
         </div>
       </div>
     </header>

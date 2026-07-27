@@ -34,6 +34,7 @@ declare namespace __next_route_internal_types__ {
   type StaticRoutes = 
     | `/`
     | `/about`
+    | `/api/notify`
     | `/features`
     | `/notify`
     | `/notify/success`
@@ -59,6 +60,8 @@ declare module 'next' {
 }
 
 declare module 'next/link' {
+  export { useLinkStatus } from 'next/dist/client/link.js'
+
   import type { LinkProps as OriginalLinkProps } from 'next/dist/client/link.js'
   import type { AnchorHTMLAttributes, DetailedHTMLProps } from 'react'
   import type { UrlObject } from 'url'
@@ -90,6 +93,8 @@ declare module 'next/navigation' {
   export * from 'next/dist/client/components/navigation.js'
 
   import type { NavigateOptions, AppRouterInstance as OriginalAppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime.js'
+  import type { RedirectType } from 'next/dist/client/components/redirect-error.js'
+  
   interface AppRouterInstance extends OriginalAppRouterInstance {
     /**
      * Navigate to the provided href.
@@ -108,6 +113,41 @@ declare module 'next/navigation' {
   }
 
   export function useRouter(): AppRouterInstance;
+  
+  /**
+   * This function allows you to redirect the user to another URL. It can be used in
+   * [Server Components](https://nextjs.org/docs/app/building-your-application/rendering/server-components),
+   * [Route Handlers](https://nextjs.org/docs/app/building-your-application/routing/route-handlers), and
+   * [Server Actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+   *
+   * - In a Server Component, this will insert a meta tag to redirect the user to the target page.
+   * - In a Route Handler or Server Action, it will serve a 307/303 to the caller.
+   * - In a Server Action, type defaults to 'push' and 'replace' elsewhere.
+   *
+   * Read more: [Next.js Docs: redirect](https://nextjs.org/docs/app/api-reference/functions/redirect)
+   */
+  export function redirect<RouteType>(
+    /** The URL to redirect to */
+    url: __next_route_internal_types__.RouteImpl<RouteType>,
+    type?: RedirectType
+  ): never;
+  
+  /**
+   * This function allows you to redirect the user to another URL. It can be used in
+   * [Server Components](https://nextjs.org/docs/app/building-your-application/rendering/server-components),
+   * [Route Handlers](https://nextjs.org/docs/app/building-your-application/routing/route-handlers), and
+   * [Server Actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations).
+   *
+   * - In a Server Component, this will insert a meta tag to redirect the user to the target page.
+   * - In a Route Handler or Server Action, it will serve a 308/303 to the caller.
+   *
+   * Read more: [Next.js Docs: redirect](https://nextjs.org/docs/app/api-reference/functions/redirect)
+   */
+  export function permanentRedirect<RouteType>(
+    /** The URL to redirect to */
+    url: __next_route_internal_types__.RouteImpl<RouteType>,
+    type?: RedirectType
+  ): never;
 }
 
 declare module 'next/form' {

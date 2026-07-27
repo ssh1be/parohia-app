@@ -17,31 +17,35 @@ html, body, #__next {
 }
 
 body {
-  background-color: #050505;
-  color: white;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Legacy glow (kept for other pages) ─── */
+/* ─── Legacy glow (dark mode only) ─── */
 .red-glow {
+  background: transparent;
+}
+
+html.dark .red-glow {
   background: radial-gradient(60% 50% at 20% 10%, rgba(250, 67, 63, 0.20), rgba(141, 3, 0, 0) 60%),
               radial-gradient(50% 40% at 80% 0%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%),
               radial-gradient(30% 40% at 30% 60%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%);
-  filter: none;
 }
 
 @media (max-width: 640px) {
-  .red-glow {
+  html.dark .red-glow {
     background:
               radial-gradient(100% 60% at 50% -10%, rgba(250, 67, 63, 0.2), rgba(141, 3, 0, 0) 60%),
               radial-gradient(90% 50% at 50% 110%, rgba(141, 3, 0, 0.2), rgba(141, 3, 0, 0) 60%);
-    filter: none;
   }
 }
 
-/* ─── Refined ambient glow for landing page ─── */
+/* ─── Refined ambient glow (dark mode only) ─── */
 .ambient-glow {
+  background: transparent;
+}
+
+html.dark .ambient-glow {
   background:
     radial-gradient(ellipse 60% 50% at 20% 10%, rgba(250, 67, 63, 0.12), transparent 60%),
     radial-gradient(ellipse 50% 40% at 80% 5%, rgba(141, 3, 0, 0.15), transparent 60%),
@@ -49,7 +53,7 @@ body {
 }
 
 @media (max-width: 640px) {
-  .ambient-glow {
+  html.dark .ambient-glow {
     background:
       radial-gradient(ellipse 100% 60% at 50% -10%, rgba(250, 67, 63, 0.15), transparent 60%),
       radial-gradient(ellipse 90% 50% at 50% 110%, rgba(141, 3, 0, 0.1), transparent 60%);
