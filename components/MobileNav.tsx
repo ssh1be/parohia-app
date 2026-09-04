@@ -39,7 +39,7 @@ export default function MobileNav() {
 
       {/* Slide-in panel */}
       <div
-        className={`absolute right-0 top-0 h-full w-[280px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-white/10 p-6 shadow-2xl shadow-zinc-300/50 dark:shadow-black transition-transform duration-300 ease-out ${
+        className={`absolute right-0 top-0 h-full w-[280px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-white/10 p-6 shadow-2xl shadow-zinc-300/50 dark:shadow-black transition-transform duration-300 ease-out font-sans ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -47,10 +47,10 @@ export default function MobileNav() {
           <span className="text-lg font-semibold">Menu</span>
           <button
             onClick={() => setIsOpen(false)}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+            className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white transition-colors"
             aria-label="Close navigation menu"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -96,10 +96,10 @@ export default function MobileNav() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="inline-flex md:hidden items-center justify-center h-10 w-10 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+        className="inline-flex md:hidden items-center justify-center h-9 w-9 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white transition-colors"
         aria-label="Open navigation menu"
       >
-        <Menu className="h-5 w-5" />
+        <Menu className="h-4 w-4" />
       </button>
 
       {mounted && createPortal(overlay, document.body)}

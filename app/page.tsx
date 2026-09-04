@@ -22,13 +22,13 @@ export default function LandingPage() {
                 className="h-10 w-10 rounded-xl shadow-lg shadow-brand-red/20 transition-transform group-hover:scale-105"
               />
               <div className="flex flex-col leading-tight">
-                <span className="text-lg font-semibold tracking-tight">Parohia</span>
-                <span className="text-[11px] text-zinc-500">App for Orthodox Parishes</span>
+                <span className="text-lg font-semibold">Parohia</span>
+                <span className="text-[11px] font-sans text-zinc-500">App for Orthodox Parishes</span>
               </div>
             </a>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex items-center gap-1 font-sans">
               {[
                 { href: "#features", label: "Features" },
                 { href: "#screenshots", label: "Screenshots" },
@@ -45,7 +45,7 @@ export default function LandingPage() {
             </nav>
 
             {/* Desktop CTA */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3 font-sans">
               <a
                 href="/features"
                 className="rounded-lg px-4 py-2 text-sm text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
@@ -77,7 +77,7 @@ export default function LandingPage() {
             {/* Left: Content */}
             <div className="max-w-2xl">
               {/* Status pill */}
-              <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.04] px-4 py-1.5 text-sm text-zinc-500 dark:text-zinc-400 animate-fade-in">
+              <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.04] px-4 py-1.5 font-sans text-sm text-zinc-500 dark:text-zinc-400 animate-fade-in">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
@@ -85,7 +85,7 @@ export default function LandingPage() {
                 Coming soon to iOS &amp; Android
               </div>
 
-              <h1 className="mt-8 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] animate-fade-in-up">
+              <h1 className="mt-8 text-4xl sm:text-5xl lg:text-6xl font-semibold leading-[1.22] animate-fade-in-up">
                 A Modern Companion
                 <br />
                 for an Ancient Faith.
@@ -101,7 +101,7 @@ export default function LandingPage() {
               </p>
 
               <div
-                className="mt-10 flex flex-col sm:flex-row gap-4 animate-fade-in-up"
+                className="mt-10 flex flex-col sm:flex-row gap-4 font-sans animate-fade-in-up"
                 style={{ animationDelay: "200ms" }}
               >
                 <a
@@ -133,7 +133,7 @@ export default function LandingPage() {
                 <img
                   src="/mockup1.png"
                   alt="Parohia app preview"
-                  className="relative w-full max-w-[350px] mx-auto drop-shadow-2xl"
+                  className="relative w-full max-w-[400px] mx-auto drop-shadow-2xl"
                 />
               </div>
             </div>
@@ -145,10 +145,10 @@ export default function LandingPage() {
       <section id="features" className="relative z-10 border-t border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 md:py-28">
           <AnimateIn className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
+            <p className="font-sans text-sm font-medium text-brand-red tracking-widest uppercase mb-4">
               Features
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-semibold">
               Built for the Orthodox Community
             </h2>
             <p className="mt-4 text-zinc-600 dark:text-zinc-400 text-lg leading-relaxed">
@@ -157,22 +157,22 @@ export default function LandingPage() {
             </p>
           </AnimateIn>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <AnimateIn delay={0}>
+          <div className="grid gap-6 md:grid-cols-3 md:items-stretch">
+            <AnimateIn delay={0} className="h-full">
               <FeatureCard
                 icon={<Users className="h-5 w-5" />}
                 title="Parish Connection"
                 description="Follow announcements, schedule confessions, volunteer, and stay actively involved in your community life."
               />
             </AnimateIn>
-            <AnimateIn delay={100}>
+            <AnimateIn delay={100} className="h-full">
               <FeatureCard
                 icon={<CalendarDays className="h-5 w-5" />}
                 title="Orthodox Calendar"
                 description="Fast days, feasts, and saints — beautifully presented alongside daily Scripture readings and troparia."
               />
             </AnimateIn>
-            <AnimateIn delay={200}>
+            <AnimateIn delay={200} className="h-full">
               <FeatureCard
                 icon={<BellRing className="h-5 w-5" />}
                 title="Smart Reminders"
@@ -187,10 +187,10 @@ export default function LandingPage() {
       <section id="screenshots" className="relative z-10 border-t border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 md:py-28">
           <AnimateIn className="text-center max-w-2xl mx-auto mb-12">
-            <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
+            <p className="font-sans text-sm font-medium text-brand-red tracking-widest uppercase mb-4">
               Preview
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-semibold">
               See Parohia in Action
             </h2>
             <p className="mt-4 text-zinc-600 dark:text-zinc-400 text-lg">
@@ -226,7 +226,7 @@ export default function LandingPage() {
 
               <div className="relative">
                 <Mail className="h-10 w-10 mx-auto mb-6 text-brand-red" />
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+                <h2 className="text-2xl md:text-3xl font-semibold">
                   We Want to Hear From You
                 </h2>
                 <p className="mt-4 text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-lg mx-auto">
@@ -243,7 +243,7 @@ export default function LandingPage() {
                     support@parohia.app
                   </a>
                 </p>
-                <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center font-sans">
                   <a
                     href="/notify"
                     className="group inline-flex items-center justify-center gap-2 rounded-xl bg-brand-gradient px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-red/25 transition-all hover:shadow-brand-red/40 hover:scale-[1.02] active:scale-[0.98]"
@@ -277,10 +277,10 @@ export default function LandingPage() {
                   className="h-10 w-10 rounded-xl"
                 />
                 <div className="flex flex-col leading-tight">
-                  <span className="text-lg font-semibold tracking-tight">
+                  <span className="text-lg font-semibold">
                     Parohia
                   </span>
-                  <span className="text-[11px] text-zinc-500">
+                  <span className="text-[11px] font-sans text-zinc-500">
                     App for Orthodox Parishes
                   </span>
                 </div>
@@ -292,10 +292,10 @@ export default function LandingPage() {
 
             {/* Product */}
             <div>
-              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
+              <h4 className="font-sans text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
                 Product
               </h4>
-              <ul className="space-y-3">
+              <ul className="space-y-3 font-sans">
                 <li>
                   <a
                     href="/features"
@@ -325,10 +325,10 @@ export default function LandingPage() {
 
             {/* Resources */}
             <div>
-              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
+              <h4 className="font-sans text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
                 Resources
               </h4>
-              <ul className="space-y-3">
+              <ul className="space-y-3 font-sans">
                 <li>
                   <a
                     href="mailto:support@parohia.app"
@@ -350,10 +350,10 @@ export default function LandingPage() {
 
             {/* Legal */}
             <div>
-              <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
+              <h4 className="font-sans text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
                 Legal
               </h4>
-              <ul className="space-y-3">
+              <ul className="space-y-3 font-sans">
                 <li>
                   <a
                     href="/privacy"
@@ -375,7 +375,7 @@ export default function LandingPage() {
           </div>
 
           {/* Bottom bar */}
-          <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-12 pt-8 border-t border-zinc-200 dark:border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 font-sans">
             <p className="text-sm text-zinc-400 dark:text-zinc-600">
               &copy; {new Date().getFullYear()} Parohia. All rights reserved.
             </p>
@@ -398,11 +398,11 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="group relative rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-50/50 dark:bg-white/[0.02] p-6 md:p-8 transition-all duration-300 hover:bg-zinc-100 dark:hover:bg-white/[0.04] hover:border-zinc-300 dark:hover:border-white/[0.12] hover:shadow-lg hover:shadow-brand-red/5">
+    <div className="group relative flex h-full flex-col rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-50/50 dark:bg-white/[0.02] p-6 md:p-8 transition-all duration-300 hover:bg-zinc-100 dark:hover:bg-white/[0.04] hover:border-zinc-300 dark:hover:border-white/[0.12] hover:shadow-lg hover:shadow-brand-red/5">
       <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-lg shadow-brand-red/20">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+      <h3 className="text-lg font-semibold">{title}</h3>
       <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
         {description}
       </p>

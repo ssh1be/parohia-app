@@ -75,10 +75,10 @@ export default function FeaturesPage() {
       {/* Hero */}
       <section className="relative z-10 border-b border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 pt-16 md:pt-20 pb-16 md:pb-20">
-          <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
+          <p className="font-sans text-sm font-medium text-brand-red tracking-widest uppercase mb-4">
             Features
           </p>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
+          <h1 className="text-4xl md:text-5xl font-semibold">
             Explore Parohia
           </h1>
           <p className="mt-6 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -137,7 +137,7 @@ export default function FeaturesPage() {
               aria-hidden
             />
             <div className="relative">
-              <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+              <h2 className="text-2xl md:text-3xl font-semibold">
                 We Want to Hear From You
               </h2>
               <p className="mt-4 text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-lg mx-auto">
@@ -154,7 +154,7 @@ export default function FeaturesPage() {
                   support@parohia.app
                 </a>
               </p>
-              <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center font-sans">
                 <a
                   href="/notify"
                   className="group inline-flex items-center justify-center gap-2 rounded-xl bg-brand-gradient px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-red/25 transition-all hover:shadow-brand-red/40 hover:scale-[1.02] active:scale-[0.98]"

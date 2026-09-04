@@ -11,7 +11,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', ...defaultTheme.fontFamily.sans],
+        sans: ['var(--font-source-sans)', ...defaultTheme.fontFamily.sans],
       },
       colors: {
         brand: {

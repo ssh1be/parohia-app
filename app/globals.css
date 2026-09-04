@@ -10,6 +10,9 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
+  font-optical-sizing: auto;
+  letter-spacing: 0.02em;
+  line-height: 1.7;
 }
 
 html, body, #__next {
@@ -19,6 +22,7 @@ html, body, #__next {
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1;
 }
 
 /* ─── Legacy glow (dark mode only) ─── */

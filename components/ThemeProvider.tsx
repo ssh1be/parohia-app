@@ -19,9 +19,11 @@ type Theme = "light" | "dark";
 const ThemeContext = createContext<{
   theme: Theme;
   toggleTheme: () => void;
+  ready: boolean;
 }>({
   theme: "light",
   toggleTheme: () => {},
+  ready: false,
 });
 
 export const useTheme = () => useContext(ThemeContext);
@@ -29,15 +31,20 @@ export const useTheme = () => useContext(ThemeContext);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const forceDark = isFeaturesPath(pathname);
-
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("theme") as Theme) ?? "light";
-    }
-    return "light";
-  });
+  const [theme, setTheme] = useState<Theme>("light");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    if (stored === "dark" || stored === "light") {
+      setTheme(stored);
+    }
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+
     const root = document.documentElement;
     if (forceDark || theme === "dark") {
       root.classList.add("dark");
@@ -47,14 +54,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!forceDark) {
       localStorage.setItem("theme", theme);
     }
-  }, [theme, forceDark]);
+  }, [theme, forceDark, ready]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider
+      value={{ theme: forceDark ? "dark" : theme, toggleTheme, ready }}
+    >
       {children}
     </ThemeContext.Provider>
   );

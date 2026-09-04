@@ -9,9 +9,9 @@ export default function PageFooter() {
               alt="Parohia icon"
               className="h-9 w-9 rounded-xl"
             />
-            <span className="text-lg font-semibold tracking-tight">Parohia</span>
+            <span className="text-lg font-semibold">Parohia</span>
           </a>
-          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-zinc-500">
+          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-sans text-sm text-zinc-500">
             <a href="/features" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Features</a>
             <a href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors">About</a>
             <a href="/privacy" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Privacy</a>
@@ -20,7 +20,7 @@ export default function PageFooter() {
           </nav>
         </div>
         <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-white/[0.06] text-center sm:text-left">
-          <p className="text-sm text-zinc-400 dark:text-zinc-600">
+          <p className="font-sans text-sm text-zinc-400 dark:text-zinc-600">
             &copy; {new Date().getFullYear()} Parohia. All rights reserved.
           </p>
         </div>

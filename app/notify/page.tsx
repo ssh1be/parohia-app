@@ -31,10 +31,10 @@ export default function NotifyPage() {
       <section className="relative z-10 flex-1">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 pt-16 md:pt-24 pb-20">
           <div className="max-w-2xl">
-            <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
+            <p className="font-sans text-sm font-medium text-brand-red tracking-widest uppercase mb-4">
               Stay Updated
             </p>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            <h1 className="text-4xl font-semibold sm:text-5xl">
               Get notified about Parohia!
             </h1>
             <p className="mt-6 text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -46,7 +46,7 @@ export default function NotifyPage() {
             <form
               name="notify"
               onSubmit={handleFormSubmit}
-              className="mt-10 flex flex-col sm:flex-row gap-3"
+              className="mt-10 flex flex-col sm:flex-row gap-3 font-sans"
             >
               <input type="hidden" name="form-name" value="notify" />
               <p className="hidden">

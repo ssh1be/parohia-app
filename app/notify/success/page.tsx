@@ -14,7 +14,7 @@ export default function NotifySuccessPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8 pt-16 md:pt-24 pb-20">
           <div className="max-w-2xl">
             <CheckCircle2 className="h-12 w-12 text-green-400 mb-6" />
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            <h1 className="text-4xl font-semibold sm:text-5xl">
               You&apos;re on the list!
             </h1>
             <p className="mt-6 text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">

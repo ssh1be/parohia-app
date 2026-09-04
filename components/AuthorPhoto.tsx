@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 
 type AuthorPhotoProps = {
   src: string
@@ -13,13 +14,17 @@ export default function AuthorPhoto({ src, alt, fallbackSrc, className }: Author
   const [currentSrc, setCurrentSrc] = useState(src)
 
   return (
-    <img
+    <Image
       src={currentSrc}
       alt={alt}
+      width={800}
+      height={800}
+      sizes="(min-width: 768px) 320px, 256px"
+      priority
       className={className}
-      onError={() => setCurrentSrc(fallbackSrc)}
+      onError={() => {
+        if (currentSrc !== fallbackSrc) setCurrentSrc(fallbackSrc)
+      }}
     />
   )
 }
-
-

@@ -14,10 +14,10 @@ export default function AboutPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8 pt-16 md:pt-24 pb-20">
           {/* Page title */}
           <div className="max-w-3xl">
-            <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
+            <p className="font-sans text-sm font-medium text-brand-red tracking-widest uppercase mb-4">
               Our Story
             </p>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            <h1 className="text-4xl font-semibold sm:text-5xl">
               About Parohia
             </h1>
           </div>
@@ -40,9 +40,9 @@ export default function AboutPage() {
             <div className="order-2 md:order-2 md:self-start">
               <div className="relative inline-block rounded-2xl p-3 mx-auto md:ml-auto md:sticky md:top-28">
                 <AuthorPhoto
-                  src="/alexandru2.jpg"
+                  src="/alexandru2.webp"
                   alt="Alexandru Perussi"
-                  fallbackSrc="/App_store_1024_1x.png"
+                  fallbackSrc="/alexandru2.jpg"
                   className="h-64 w-64 md:h-80 md:w-80 rounded-2xl object-cover shadow-lg shadow-zinc-300/40 dark:shadow-black/40"
                 />
               </div>

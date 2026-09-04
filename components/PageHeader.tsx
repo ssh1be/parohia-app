@@ -18,13 +18,13 @@ export default function PageHeader({
               className="h-10 w-10 rounded-xl shadow-lg shadow-brand-red/20 transition-transform group-hover:scale-105"
             />
             <div className="flex flex-col leading-tight">
-              <span className="text-lg font-semibold tracking-tight">Parohia</span>
-              <span className="text-[11px] text-zinc-500">App for Orthodox Parishes</span>
+              <span className="text-lg font-semibold">Parohia</span>
+              <span className="text-[11px] font-sans text-zinc-500">App for Orthodox Parishes</span>
             </div>
           </a>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1 font-sans">
             <a
               href="/features"
               className="rounded-lg px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
@@ -40,7 +40,7 @@ export default function PageHeader({
           </nav>
 
           {/* Desktop CTA + Theme Toggle */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3 font-sans">
             {showThemeToggle ? <ThemeToggle /> : null}
             <a
               href="/notify"

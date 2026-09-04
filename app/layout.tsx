@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Source_Sans_3 } from 'next/font/google'
 import { ThemeProvider } from '../components/ThemeProvider'
 import './globals.css'
 
-const inter = Inter({
-  subsets: ['latin'],
+const sourceSans = Source_Sans_3({
+  subsets: ['latin', 'latin-ext'],
   display: 'swap',
-  variable: '--font-inter',
+  variable: '--font-source-sans',
 })
 
 export const metadata: Metadata = {
@@ -23,7 +23,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={sourceSans.variable}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{
           __html: `(function(){try{var p=location.pathname;if(p==='/features'||p.indexOf('/features/')===0)document.documentElement.classList.add('dark');else if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}})();`

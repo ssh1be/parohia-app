@@ -16,10 +16,10 @@ export default function PrivacyPage() {
       <PageHeader />
 
       <div className="relative z-10 flex-1 mx-auto max-w-3xl px-6 lg:px-8 py-12 md:py-16">
-        <p className="text-sm font-medium text-brand-red tracking-wide uppercase mb-4">
+        <p className="font-sans text-sm font-medium text-brand-red tracking-widest uppercase mb-4">
           Legal
         </p>
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+        <h1 className="text-3xl font-semibold md:text-4xl">
           Privacy Policy
         </h1>
         <p className="mt-3 text-sm text-zinc-500">
