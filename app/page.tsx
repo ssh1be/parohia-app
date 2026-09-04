@@ -71,7 +71,8 @@ export default function LandingPage() {
       </header>
 
       {/* ─── HERO ─── */}
-      <section className="relative z-10">
+      <section className="relative z-10 overflow-hidden">
+        <div className="hero-grid pointer-events-none absolute inset-0" aria-hidden />
         <div className="mx-auto max-w-7xl px-6 lg:px-8 pt-16 pb-12 md:pt-28 md:pb-20">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left: Content */}
