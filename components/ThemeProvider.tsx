@@ -1,18 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
-
-function isFeaturesPath(pathname: string | null) {
-  return pathname === "/features" || pathname?.startsWith("/features/") === true;
-}
+import { MotionConfig } from "motion/react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 type Theme = "light" | "dark";
 
@@ -29,42 +18,26 @@ const ThemeContext = createContext<{
 export const useTheme = () => useContext(ThemeContext);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const forceDark = isFeaturesPath(pathname);
   const [theme, setTheme] = useState<Theme>("light");
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "dark" || stored === "light") {
-      setTheme(stored);
-    }
+    setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
     setReady(true);
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
-
-    const root = document.documentElement;
-    if (forceDark || theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    if (!forceDark) {
-      localStorage.setItem("theme", theme);
-    }
-  }, [theme, forceDark, ready]);
-
   const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      document.documentElement.classList.toggle("dark", next === "dark");
+      localStorage.setItem("theme", next);
+      return next;
+    });
   }, []);
 
   return (
-    <ThemeContext.Provider
-      value={{ theme: forceDark ? "dark" : theme, toggleTheme, ready }}
-    >
-      {children}
+    <ThemeContext.Provider value={{ theme, toggleTheme, ready }}>
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </ThemeContext.Provider>
   );
 }

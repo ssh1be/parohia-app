@@ -1,6 +1,7 @@
 "use client";
 
-import { Sun, Moon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Icon } from "./Icon";
 import { useTheme } from "./ThemeProvider";
 
 export default function ThemeToggle() {
@@ -8,22 +9,24 @@ export default function ThemeToggle() {
 
   return (
     <button
+      type="button"
       onClick={toggleTheme}
-      className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white transition-colors"
-      aria-label={
-        ready
-          ? `Switch to ${theme === "dark" ? "light" : "dark"} mode`
-          : "Toggle color theme"
-      }
+      aria-label={ready ? `Switch to ${theme === "dark" ? "light" : "dark"} mode` : "Toggle color theme"}
+      className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-zinc-600 transition-colors hover:bg-zinc-900/[0.05] hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
     >
-      {ready ? (
-        theme === "dark" ? (
-          <Sun className="h-4 w-4" />
-        ) : (
-          <Moon className="h-4 w-4" />
-        )
-      ) : (
-        <span className="h-4 w-4" aria-hidden />
+      {ready && (
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={theme}
+            initial={{ y: 14, rotate: -40, opacity: 0 }}
+            animate={{ y: 0, rotate: 0, opacity: 1 }}
+            exit={{ y: -14, rotate: 40, opacity: 0 }}
+            transition={{ type: "spring", damping: 18, stiffness: 260 }}
+            className="flex"
+          >
+            <Icon name={theme === "dark" ? "sunny" : "moon"} size={17} />
+          </motion.span>
+        </AnimatePresence>
       )}
     </button>
   );

@@ -1,0 +1,183 @@
+import type { CSSProperties } from "react";
+import {
+  add,
+  arrowBack,
+  arrowForward,
+  batteryFull,
+  book,
+  calendar,
+  calendarOutline,
+  call,
+  camera,
+  flashlight,
+  lockClosed,
+  callOutline,
+  cellular,
+  chatbubble,
+  checkmarkCircle,
+  chevronBack,
+  chevronDown,
+  chevronForward,
+  close,
+  closeCircleOutline,
+  fish,
+  globeOutline,
+  gridOutline,
+  handLeftOutline,
+  handRight,
+  heart,
+  home,
+  homeOutline,
+  informationCircleOutline,
+  leaf,
+  listOutline,
+  location,
+  locationOutline,
+  mail,
+  mailOutline,
+  megaphone,
+  menu,
+  moon,
+  moonOutline,
+  navigate,
+  newspaper,
+  newspaperOutline,
+  notifications,
+  notificationsOffOutline,
+  notificationsOutline,
+  openOutline,
+  people,
+  person,
+  phonePortraitOutline,
+  pin,
+  pinOutline,
+  removeCircleOutline,
+  send,
+  settingsOutline,
+  sparkles,
+  sunny,
+  sunnyOutline,
+  swapHorizontal,
+  time,
+  timeOutline,
+  todayOutline,
+  volumeHighOutline,
+  wifi,
+  wine,
+} from "ionicons/icons";
+
+/** Ionicons, the same set the mobile app uses, keyed by the app's kebab-case names. */
+const ICONS = {
+  add,
+  "arrow-back": arrowBack,
+  "arrow-forward": arrowForward,
+  "battery-full": batteryFull,
+  book,
+  calendar,
+  "calendar-outline": calendarOutline,
+  call,
+  "call-outline": callOutline,
+  camera,
+  cellular,
+  flashlight,
+  "lock-closed": lockClosed,
+  chatbubble,
+  "checkmark-circle": checkmarkCircle,
+  "chevron-back": chevronBack,
+  "chevron-down": chevronDown,
+  "chevron-forward": chevronForward,
+  close,
+  "close-circle-outline": closeCircleOutline,
+  fish,
+  "globe-outline": globeOutline,
+  "grid-outline": gridOutline,
+  "hand-left-outline": handLeftOutline,
+  "hand-right": handRight,
+  heart,
+  home,
+  "home-outline": homeOutline,
+  "information-circle-outline": informationCircleOutline,
+  leaf,
+  "list-outline": listOutline,
+  location,
+  "location-outline": locationOutline,
+  mail,
+  "mail-outline": mailOutline,
+  megaphone,
+  menu,
+  moon,
+  "moon-outline": moonOutline,
+  navigate,
+  newspaper,
+  "newspaper-outline": newspaperOutline,
+  notifications,
+  "notifications-off-outline": notificationsOffOutline,
+  "notifications-outline": notificationsOutline,
+  "open-outline": openOutline,
+  people,
+  person,
+  "phone-portrait-outline": phonePortraitOutline,
+  pin,
+  "pin-outline": pinOutline,
+  "remove-circle-outline": removeCircleOutline,
+  send,
+  "settings-outline": settingsOutline,
+  sparkles,
+  sunny,
+  "sunny-outline": sunnyOutline,
+  "swap-horizontal": swapHorizontal,
+  time,
+  "time-outline": timeOutline,
+  "today-outline": todayOutline,
+  "volume-high-outline": volumeHighOutline,
+  wifi,
+  wine,
+} as const;
+
+export type IconName = keyof typeof ICONS;
+
+// Ionicons style outline paths through classes that only exist inside <ion-icon>'s shadow DOM, so inline them.
+const SVG_STYLE = "<style>*{stroke:#000}.ionicon-fill-none{fill:none}.ionicon-stroke-width{stroke-width:32px}</style>";
+const masks = new Map<IconName, string>();
+
+function maskFor(name: IconName) {
+  let mask = masks.get(name);
+  if (!mask) {
+    const svg = ICONS[name].replace(/^data:image\/svg\+xml;utf8,/, "").replace(/(<svg[^>]*>)/, `$1${SVG_STYLE}`);
+    mask = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    masks.set(name, mask);
+  }
+  return mask;
+}
+
+interface IconProps {
+  name: IconName;
+  size?: number;
+  color?: string;
+  className?: string;
+  style?: CSSProperties;
+}
+
+export function Icon({ name, size = 16, color, className = "", style }: IconProps) {
+  const mask = maskFor(name);
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 ${className}`}
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: color ?? "currentColor",
+        WebkitMaskImage: mask,
+        maskImage: mask,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        ...style,
+      }}
+    />
+  );
+}

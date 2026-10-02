@@ -10,104 +10,114 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
-  font-optical-sizing: auto;
-  letter-spacing: 0.02em;
-  line-height: 1.7;
 }
 
-html, body, #__next {
-  height: 100%;
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "kern" 1, "liga" 1;
+  line-height: 1.6;
 }
 
-/* ─── Legacy glow (dark mode only) ─── */
-.red-glow {
-  background: transparent;
-}
-
-html.dark .red-glow {
-  background: radial-gradient(60% 50% at 20% 10%, rgba(250, 67, 63, 0.20), rgba(141, 3, 0, 0) 60%),
-              radial-gradient(50% 40% at 80% 0%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%),
-              radial-gradient(30% 40% at 30% 60%, rgba(141, 3, 0, 0.20), rgba(141, 3, 0, 0) 60%);
-}
-
-@media (max-width: 640px) {
-  html.dark .red-glow {
-    background:
-              radial-gradient(100% 60% at 50% -10%, rgba(250, 67, 63, 0.2), rgba(141, 3, 0, 0) 60%),
-              radial-gradient(90% 50% at 50% 110%, rgba(141, 3, 0, 0.2), rgba(141, 3, 0, 0) 60%);
-  }
-}
-
-/* ─── Refined ambient glow (dark mode only) ─── */
+/* Ambient brand glow behind the page; dark mode only so light mode stays clean. */
 .ambient-glow {
   background: transparent;
 }
 
 html.dark .ambient-glow {
   background:
-    radial-gradient(ellipse 60% 50% at 20% 10%, rgba(250, 67, 63, 0.12), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 80% 5%, rgba(141, 3, 0, 0.15), transparent 60%),
-    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(141, 3, 0, 0.06), transparent 60%);
+    radial-gradient(ellipse 60% 50% at 15% 0%, rgba(250, 67, 63, 0.11), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 0%, rgba(141, 3, 0, 0.14), transparent 60%);
 }
 
-@media (max-width: 640px) {
-  html.dark .ambient-glow {
-    background:
-      radial-gradient(ellipse 100% 60% at 50% -10%, rgba(250, 67, 63, 0.15), transparent 60%),
-      radial-gradient(ellipse 90% 50% at 50% 110%, rgba(141, 3, 0, 0.1), transparent 60%);
-  }
-}
-
-/* ─── Hero background grid ─── */
-.hero-grid {
-  background-image:
-    linear-gradient(to right, rgb(24 24 27 / 0.07) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(24 24 27 / 0.07) 1px, transparent 1px);
-  background-size: 128px 128px;
-  mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 15%, transparent 72%);
-  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 15%, transparent 72%);
-}
-
-html.dark .hero-grid {
-  background-image:
-    linear-gradient(to right, rgb(255 255 255 / 0.12) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.12) 1px, transparent 1px);
-}
-
-/* ─── Brand utilities ─── */
 @layer utilities {
   .bg-brand-gradient {
     background: linear-gradient(135deg, #FA433F 0%, #8D0300 100%);
   }
 
-  .text-brand-gradient {
-    background: linear-gradient(135deg, #FA433F 0%, #D4764E 50%, #D4A843 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* Type roles mirrored from the mobile app (Cormorant Garamond + Manrope). */
+  .font-display {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 600;
+  }
+  .font-display-bold {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 700;
+  }
+  .font-display-italic {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 600;
+    font-style: italic;
+  }
+  .font-serif {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 500;
+  }
+  .font-sans-medium {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 500;
+  }
+  .font-sans-semibold {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 600;
+  }
+  .font-sans-bold {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 700;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }
 
-/* ─── Scroll-triggered animations ─── */
-.animate-on-scroll {
+/* Immersive sections (the pinned app preview) slide the header out of the way. */
+.site-header {
+  transition:
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.4s ease;
+}
+
+html[data-immersive="true"] .site-header {
+  transform: translateY(-130%);
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
 }
 
-.animate-on-scroll.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+/* Phone screen copies render at the app's native point sizes, so match React Native's tighter text metrics. */
+.app-screen {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  line-height: 1.3;
+  letter-spacing: 0;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-/* ─── Container padding (shared across pages) ─── */
-.container-padding {
-  @apply px-6 sm:px-8 md:px-10 lg:px-12;
+/* Frosted glass, approximating the app's iOS blur material on the web. */
+.glass {
+  @apply backdrop-blur-xl backdrop-saturate-[1.8];
+  background: rgba(255, 255, 255, 0.72);
+}
+
+html.dark .glass {
+  background: rgba(24, 24, 27, 0.62);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    @apply backdrop-blur-none backdrop-saturate-100;
+    background: rgba(255, 255, 255, 0.97);
+  }
+  html.dark .glass {
+    background: rgba(24, 24, 27, 0.97);
+  }
 }

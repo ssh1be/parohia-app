@@ -1,14 +1,19 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
-import PageHeader from "../../components/PageHeader";
+import { useState } from "react";
+import { Icon } from "../../components/Icon";
 import PageFooter from "../../components/PageFooter";
+import PageHeader from "../../components/PageHeader";
+import { Reveal } from "../../components/Reveal";
 
 export default function NotifyPage() {
+  const [submitting, setSubmitting] = useState(false);
+
   async function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    setSubmitting(true);
     try {
       await fetch("/__forms.html", {
         method: "POST",
@@ -17,37 +22,24 @@ export default function NotifyPage() {
       });
       window.location.assign("/notify/success");
     } catch {
-      // Silent fail; optionally add client-side error UI later
+      setSubmitting(false);
     }
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col">
-      {/* Ambient background */}
-      <div className="pointer-events-none fixed inset-0 ambient-glow" aria-hidden />
-
+    <main className="relative flex min-h-[100dvh] flex-col">
+      <div className="ambient-glow pointer-events-none fixed inset-0" aria-hidden />
       <PageHeader />
 
-      <section className="relative z-10 flex-1">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8 pt-16 md:pt-24 pb-20">
-          <div className="max-w-2xl">
-            <p className="font-sans text-sm font-medium text-brand-red tracking-widest uppercase mb-4">
-              Stay Updated
-            </p>
-            <h1 className="text-4xl font-semibold sm:text-5xl">
-              Get notified about Parohia!
-            </h1>
-            <p className="mt-6 text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Parohia is still in development. Leave us your email and
-              we&apos;ll let you know about updates, beta tests, and the public
-              release.
+      <section className="relative z-10 flex flex-1 items-center">
+        <div className="mx-auto w-full max-w-7xl px-6 pb-24 pt-16 md:pt-24 lg:px-8">
+          <Reveal className="max-w-2xl">
+            <h1 className="font-display text-5xl leading-[1.04] tracking-[-0.015em] md:text-7xl">Join the waitlist</h1>
+            <p className="mt-6 max-w-[52ch] text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
+              Parohia is still in development. Leave us your email and we&apos;ll let you know about updates, beta tests, and the public release.
             </p>
 
-            <form
-              name="notify"
-              onSubmit={handleFormSubmit}
-              className="mt-10 flex flex-col sm:flex-row gap-3 font-sans"
-            >
+            <form name="notify" onSubmit={handleFormSubmit} className="mt-10">
               <input type="hidden" name="form-name" value="notify" />
               <p className="hidden">
                 <label>
@@ -55,32 +47,35 @@ export default function NotifyPage() {
                   <input name="bot-field" />
                 </label>
               </p>
-              <input
-                type="email"
-                name="email"
-                autoComplete="email"
-                required
-                placeholder="you@example.com"
-                className="w-full sm:w-auto flex-1 rounded-xl bg-zinc-50 dark:bg-white/[0.04] px-4 py-3.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 outline-none border border-zinc-200 dark:border-white/[0.08] focus:border-zinc-400 dark:focus:border-white/20 focus:bg-zinc-100 dark:focus:bg-white/[0.06] transition-colors"
-              />
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-xl bg-brand-gradient px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-red/25 transition-all hover:shadow-brand-red/40 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Notify me
-              </button>
+              <label htmlFor="notify-email" className="mb-2 block text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                Email address
+              </label>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  id="notify-email"
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  required
+                  placeholder="you@example.com"
+                  className="h-12 flex-1 rounded-full border border-zinc-200 bg-white px-5 text-[15px] text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-brand-red/60 focus:ring-4 focus:ring-brand-red/10 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-zinc-600"
+                />
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-gradient px-7 text-sm font-semibold text-white shadow-lg shadow-brand-red/25 transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-70"
+                >
+                  {submitting ? "Sending..." : "Notify me"}
+                </button>
+              </div>
+              <p className="mt-3 text-sm text-zinc-500">No spam. Only news about Parohia.</p>
             </form>
 
-            <div className="mt-10">
-              <a
-                href="/"
-                className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to home
-              </a>
-            </div>
-          </div>
+            <a href="/" className="mt-12 inline-flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-white">
+              <Icon name="arrow-back" size={15} />
+              Back to home
+            </a>
+          </Reveal>
         </div>
       </section>
 
