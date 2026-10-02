@@ -7,12 +7,20 @@ import { FastingBadge, LargeHeader, ReadingCards, Rise, ScreenScroll, SectionHea
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-export function HomeScreen({ day = AUGUST_30, onTab }: { day?: LiturgicalDay; onTab?: (tab: TabKey) => void }) {
+export function HomeScreen({
+  day = AUGUST_30,
+  onTab,
+  scrollable = true,
+}: {
+  day?: LiturgicalDay;
+  onTab?: (tab: TabKey) => void;
+  scrollable?: boolean;
+}) {
   const schedule = [...day.personal, ...day.parish];
 
   return (
     <>
-      <ScreenScroll>
+      <ScreenScroll scrollable={scrollable}>
         <LargeHeader
           eyebrow={`${day.weekday}, ${MONTHS[day.month]} ${day.day}`}
           title="Good morning, Alex"

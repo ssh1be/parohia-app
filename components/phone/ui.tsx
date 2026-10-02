@@ -412,9 +412,23 @@ export function EmptyState({ icon, title, message }: { icon: IconName; title: st
 }
 
 /** Scrollable screen body that clears the status bar and floating tab bar like the app's ScrollViews. */
-export function ScreenScroll({ children, tabBar = true, className = "" }: { children: ReactNode; tabBar?: boolean; className?: string }) {
+export function ScreenScroll({
+  children,
+  tabBar = true,
+  className = "",
+  scrollable = true,
+}: {
+  children: ReactNode;
+  tabBar?: boolean;
+  className?: string;
+  /** Decorative previews lock the screen so a swipe scrolls the page. */
+  scrollable?: boolean;
+}) {
   return (
-    <div data-scroll className={`no-scrollbar absolute inset-0 overflow-y-auto overscroll-contain ${className}`}>
+    <div
+      data-scroll
+      className={`no-scrollbar absolute inset-0 ${scrollable ? "overflow-y-auto overscroll-contain" : "overflow-hidden"} ${className}`}
+    >
       <div style={{ paddingTop: 59, paddingBottom: tabBar ? 34 + 64 + 12 + 32 : 48 }}>{children}</div>
     </div>
   );

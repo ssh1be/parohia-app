@@ -118,6 +118,8 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     sy: useMotionValue(0),
     /** 1 when the active note sits right of the phone, so the connector meets the hole's right edge. */
     side: useMotionValue(0),
+    /** 1 below the lg layout, where the note sits under the phone and the connector meets the ring's bottom edge. */
+    mobile: useMotionValue(0),
   };
   const hx = useSpring(raw.hx, FOLLOW);
   const hy = useSpring(raw.hy, FOLLOW);
@@ -125,9 +127,18 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const hh = useSpring(raw.hh, FOLLOW);
   const sx = useSpring(raw.sx, FOLLOW);
   const sy = useSpring(raw.sy, FOLLOW);
+  /** Tailwind `ring-[3px]` paints outside the box; the tip lands on that outer edge. */
+  const RING = 3;
+  /** Endpoint marker radius; kept outside the ring so only the tip touches. */
+  const MARKER = 4.5;
   // The connector ends on the hole's edge, derived from the same springs so it can never drift off the red outline.
-  const ex = useTransform([raw.ox, hx, hw, raw.side], ([o, x, w, side]: number[]) => o + x + (side ? w : 0));
-  const ey = useTransform([raw.oy, hy, hh], ([o, y, h]: number[]) => o + y + h / 2);
+  const ex = useTransform([raw.ox, hx, hw, raw.side, sx, raw.mobile], ([o, x, w, side, src, m]: number[]) => {
+    if (m) return Math.min(Math.max(src, o + x), o + x + w);
+    return o + x + (side ? w + RING : -RING);
+  });
+  const ey = useTransform([raw.oy, hy, hh, raw.mobile], ([o, y, h, m]: number[]) => o + y + (m ? h + RING : h / 2));
+  const markerX = useTransform([ex, raw.side, raw.mobile], ([x, side, m]: number[]) => (m ? x : x + (side ? MARKER : -MARKER)));
+  const markerY = useTransform([ey, raw.mobile], ([y, m]: number[]) => (m ? y + MARKER : y));
   const springs = [hx, hy, hw, hh, sx, sy];
   const [radius, setRadius] = useState(0);
   const belowY = useTransform([hy, hh], ([y, h]: number[]) => y + h);
@@ -138,7 +149,11 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const ringX = useTransform([raw.ox, hx], ([o, x]: number[]) => o + x);
   const ringY = useTransform([raw.oy, hy], ([o, y]: number[]) => o + y);
 
-  const path = useTransform([sx, sy, ex, ey], ([a, b, c, d]: number[]) => {
+  const path = useTransform([sx, sy, ex, ey, raw.mobile], ([a, b, c, d, m]: number[]) => {
+    if (m) {
+      const bend = (d - b) * 0.45;
+      return `M ${a} ${b} C ${a} ${b + bend}, ${c} ${d - bend}, ${c} ${d}`;
+    }
     const bend = (c - a) * 0.55;
     return `M ${a} ${b} C ${a + bend} ${b}, ${c - bend} ${d}, ${c} ${d}`;
   });
@@ -191,7 +206,10 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
       raw.side.set(current.side === "right" ? 1 : 0);
     }
 
-    const dot = dotRefs.current[activeRef.current];
+    raw.mobile.set(window.matchMedia("(max-width: 1023px)").matches ? 1 : 0);
+
+    const dots = container.querySelectorAll<HTMLElement>(`[data-note-dot="${activeRef.current}"]`);
+    const dot = [...dots].find((el) => el.getClientRects().length > 0) ?? dotRefs.current[activeRef.current];
     const d = dot?.getBoundingClientRect();
     if (d && d.width > 0) {
       raw.sx.set(d.left + d.width / 2 - c.left);
@@ -361,6 +379,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
             ref={(el) => {
               dotRefs.current[i] = el;
             }}
+            data-note-dot={i}
             className={`mt-[7px] h-3 w-3 shrink-0 rounded-full border-2 transition-all duration-500 ${
               isActive
                 ? "scale-110 border-brand-red bg-brand-red shadow-[0_0_0_5px_rgba(250,67,63,0.16)]"
@@ -411,7 +430,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
             label={`${title}: interactive preview`}
             screenRef={screenRef}
             statusTone={screens[screenIndex].statusTone}
-            className={pinned ? "" : "[--s:0.76] sm:[--s:0.8] lg:[--s:0.82]"}
+            className={pinned ? "" : "[--s:0.85] lg:[--s:0.82]"}
           >
             <AnimatePresence initial={false} custom={direction}>
               <motion.div
@@ -429,8 +448,76 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
           </PhoneFrame>
         </motion.div>
 
+        {!pinned && (
+          <div className="relative z-30 mt-5 w-full max-w-md lg:hidden">
+            <span
+              data-note-dot={active}
+              className="absolute left-1/2 top-0 z-10 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand-red shadow-[0_0_0_5px_rgba(250,67,63,0.18)] dark:border-zinc-950"
+            />
+            <div className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white/95 shadow-[0_16px_36px_-24px_rgba(9,9,11,0.35)] dark:border-white/10 dark:bg-zinc-950/95">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={active}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.28, ease: EASE }}
+                  className="px-4 pb-4 pt-5"
+                >
+                  <p className="font-display text-[24px] leading-[1.15] text-zinc-900 dark:text-white">{note.title}</p>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">{note.body}</p>
+                </motion.div>
+              </AnimatePresence>
+              <div className="h-0.5 w-full bg-zinc-100 dark:bg-white/[0.06]">
+                {playing && (
+                  <motion.span
+                    key={`${active}-progress`}
+                    className="block h-full w-full origin-left bg-brand-red"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: AUTOPLAY_MS / 1000, ease: "linear" }}
+                  />
+                )}
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => go((active + notes.length - 1) % notes.length)}
+                className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-800 outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/60 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-100"
+              >
+                <Icon name="chevron-back" size={16} />
+                Previous
+              </button>
+              <div className="flex items-center gap-1.5 px-1" role="tablist" aria-label={`${title} highlights`}>
+                {notes.map((n, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === active}
+                    aria-label={n.title}
+                    onClick={() => go(i)}
+                    className={`h-2.5 rounded-full outline-none transition-all focus-visible:ring-2 focus-visible:ring-brand-red/60 ${
+                      i === active ? "w-6 bg-brand-red" : "w-2.5 bg-zinc-300 dark:bg-white/25"
+                    }`}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => go((active + 1) % notes.length)}
+                className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#8D0300] text-sm font-semibold text-white outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/60"
+              >
+                Next
+                <Icon name="chevron-forward" size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {screens.length > 1 && !pinned && (
-          <div className="mt-8 flex rounded-full border border-zinc-200 bg-zinc-100/80 p-1 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mt-8 hidden rounded-full border border-zinc-200 bg-zinc-100/80 p-1 lg:flex dark:border-white/10 dark:bg-white/[0.04]">
             {screens.map((screen, i) => {
               const current = i === screenIndex;
               return (
@@ -439,7 +526,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                   type="button"
                   onClick={() => go(notes.findIndex((n) => n.screen === i))}
                   aria-pressed={current}
-                  className="relative rounded-full px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-red/60"
+                  className="relative rounded-full px-4 py-2.5 text-center text-sm font-semibold leading-tight outline-none focus-visible:ring-2 focus-visible:ring-brand-red/60"
                 >
                   {current && (
                     <motion.span
@@ -488,7 +575,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
 
       <motion.svg
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-20 hidden h-full w-full overflow-visible lg:block"
+        className="pointer-events-none absolute inset-0 z-20 h-full w-full overflow-visible"
         initial={false}
         animate={{ opacity: attached ? 1 : 0 }}
         transition={{ duration: 0.25 }}
@@ -507,9 +594,9 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                 transition={{ duration: reduce ? 0 : 0.75, ease: EASE, delay: reduce ? 0 : 0.18 }}
               />
               <motion.circle
-                cx={ex}
-                cy={ey}
-                r={4.5}
+                cx={markerX}
+                cy={markerY}
+                r={MARKER}
                 fill="#FA433F"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -519,64 +606,6 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
           )}
         </AnimatePresence>
       </motion.svg>
-    </div>
-  );
-
-  const stepper = (
-    <div className="mx-auto mt-10 max-w-md lg:hidden">
-      <div className="flex gap-1.5" role="tablist" aria-label={`${title} highlights`}>
-        {notes.map((n, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === active}
-            aria-label={n.title}
-            onClick={() => go(i)}
-            className="relative h-1 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10"
-          >
-            {i === active && (
-              <motion.span
-                key={`${active}-${playing}`}
-                className="absolute inset-0 origin-left rounded-full bg-brand-red"
-                initial={{ scaleX: playing ? 0 : 1 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: playing ? AUTOPLAY_MS / 1000 : 0, ease: "linear" }}
-              />
-            )}
-            {i < active && <span className="absolute inset-0 rounded-full bg-brand-red/40" />}
-          </button>
-        ))}
-      </div>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={active}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.3, ease: EASE }}
-          className="mt-6 flex min-h-[132px] items-start gap-4"
-        >
-          <span className="mt-[9px] h-3 w-3 shrink-0 rounded-full bg-brand-red shadow-[0_0_0_5px_rgba(250,67,63,0.16)]" />
-          <div className="flex-1">
-            <p className="font-display text-[26px] leading-[1.15] text-zinc-900 dark:text-white">{note.title}</p>
-            <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">{note.body}</p>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-      <div className="mt-2 flex justify-end gap-2">
-        {(["chevron-back", "chevron-forward"] as const).map((icon, i) => (
-          <button
-            key={icon}
-            type="button"
-            aria-label={i === 0 ? "Previous highlight" : "Next highlight"}
-            onClick={() => go((active + (i === 0 ? notes.length - 1 : 1)) % notes.length)}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 text-zinc-700 transition active:scale-95 dark:border-white/10 dark:text-zinc-200"
-          >
-            <Icon name={icon} size={18} />
-          </button>
-        ))}
-      </div>
     </div>
   );
 
@@ -607,7 +636,6 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
       ) : (
         <div ref={trackRef} className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           {grid}
-          {stepper}
         </div>
       )}
     </section>

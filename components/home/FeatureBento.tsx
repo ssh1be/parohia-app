@@ -328,7 +328,7 @@ export function FeatureBento() {
       <Tile className="md:col-span-2" delay={0.08} title="Scripture, in the app" body="The day's Epistle and Gospel, one tap away.">
         <ReadingsTile />
       </Tile>
-      <Tile className="md:col-span-2" title="Reminders that respect you" body="Pick how early you hear about services and events, or pause them entirely.">
+      <Tile className="max-md:order-last md:col-span-2" title="Reminders that respect you" body="Pick how early you hear about services and events, or pause them entirely.">
         <RemindersTile on={remindersOn} onToggle={setRemindersOn} lead={lead} onLead={setLead} booked={slot} />
       </Tile>
       <Tile

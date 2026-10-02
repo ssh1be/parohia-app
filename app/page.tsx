@@ -68,7 +68,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="screenshots" className="relative z-10 scroll-mt-20 border-t border-zinc-200 dark:border-white/[0.06]">
+      <section id="screenshots" className="relative z-10 scroll-mt-20 overflow-x-clip border-t border-zinc-200 dark:border-white/[0.06]">
         <div className="mx-auto max-w-6xl px-6 py-20 md:py-28 lg:px-8">
           <Reveal className="mb-12 max-w-2xl md:mb-16">
             <h2 className="font-display text-[44px] leading-[1.05] tracking-[-0.015em] md:text-6xl">See Parohia in action</h2>
