@@ -87,6 +87,23 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const [phoneScale, setPhoneScale] = useState(0.82);
   /** True once the pinned section starts scrolling away and the phone eases out. */
   const [leaving, setLeaving] = useState(false);
+  /** Clears touch/scroll engagement so the ring returns once interaction settles. */
+  const phoneIdle = useRef(0);
+  /** True while a fine pointer is hovering the phone, matching desktop ring hide. */
+  const stickyHover = useRef(false);
+
+  const engagePhone = (sticky: boolean) => {
+    setPhoneHover(true);
+    window.clearTimeout(phoneIdle.current);
+    if (sticky) {
+      stickyHover.current = true;
+      return;
+    }
+    if (stickyHover.current) return;
+    phoneIdle.current = window.setTimeout(() => setPhoneHover(false), 700);
+  };
+
+  useEffect(() => () => window.clearTimeout(phoneIdle.current), []);
 
   useEffect(() => {
     const query = window.matchMedia("(hover: hover) and (pointer: fine)");
@@ -282,6 +299,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     observer.observe(container);
     let pending = 0;
     const onScroll = () => {
+      engagePhone(false);
       if (pending) return;
       pending = requestAnimationFrame(() => {
         pending = 0;
@@ -420,9 +438,16 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
 
       <div className="flex flex-col items-center">
         <motion.div
-          onPointerEnter={(e) => e.pointerType === "mouse" && setPhoneHover(true)}
-          onPointerLeave={() => setPhoneHover(false)}
-          onPointerDown={() => setAutoplay(false)}
+          onPointerEnter={(e) => e.pointerType === "mouse" && engagePhone(true)}
+          onPointerLeave={() => {
+            stickyHover.current = false;
+            window.clearTimeout(phoneIdle.current);
+            setPhoneHover(false);
+          }}
+          onPointerDown={(e) => {
+            setAutoplay(false);
+            if (e.pointerType !== "mouse") engagePhone(false);
+          }}
           style={pinned ? ({ opacity: phoneOpacity, scale: phoneZoom, "--s": phoneScale } as unknown as MotionStyle) : undefined}
         >
           <PhoneFrame

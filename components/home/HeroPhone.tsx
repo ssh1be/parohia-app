@@ -37,8 +37,13 @@ export function HeroPhone() {
         <motion.div
           aria-hidden
           initial={reduce ? false : { opacity: 0, y: 24, scale: 0.94 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", damping: 22, stiffness: 160, delay: 1.1 }}
+          {...(mobile && !reduce
+            ? {
+                whileInView: { opacity: 1, y: 0, scale: 1 },
+                viewport: { once: true, amount: 0.7 },
+              }
+            : { animate: { opacity: 1, y: 0, scale: 1 } })}
+          transition={{ type: "spring", damping: 22, stiffness: 160, delay: mobile ? 0.08 : 1.1 }}
           className="app-screen glass absolute -left-6 top-[22%] w-[280px] rounded-[22px] border border-white/70 p-3.5 shadow-[0_24px_48px_-16px_rgba(9,9,11,0.35)] sm:-left-24 dark:border-white/[0.12]"
         >
           <div className="flex items-start gap-3">
@@ -62,8 +67,8 @@ export function HeroPhone() {
                 viewport: { once: true, amount: 0.7 },
               }
             : { animate: { opacity: 1, y: 0, scale: 1 } })}
-          transition={{ type: "spring", damping: 22, stiffness: 160, delay: mobile ? 0.12 : 1.45 }}
-          className="app-screen glass absolute bottom-[18%] -right-11 flex w-max items-center gap-2.5 whitespace-nowrap rounded-full border border-white/70 py-2 pl-2 pr-4 shadow-[0_24px_48px_-16px_rgba(9,9,11,0.35)] sm:-right-16 dark:border-white/[0.12]"
+          transition={{ type: "spring", damping: 22, stiffness: 160, delay: mobile ? 0.22 : 1.45 }}
+          className="app-screen glass absolute bottom-[18%] -right-8 flex w-max items-center gap-2.5 whitespace-nowrap rounded-full border border-white/70 py-2 pl-2 pr-4 shadow-[0_24px_48px_-16px_rgba(9,9,11,0.35)] sm:-right-16 dark:border-white/[0.12]"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15">
             <Icon name="checkmark-circle" size={17} color="#10B981" />
