@@ -1,11 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { faDiamondTurnRight } from '@fortawesome/free-solid-svg-icons/faDiamondTurnRight';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { useColorScheme } from "nativewind";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableWithoutFeedback, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { ReactNode, useEffect, useState } from "react";
+import { Alert, Linking, Modal, Platform, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import GeneralSettings from "../../components/GeneralSettings";
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { Field } from "../../components/ui/Field";
+import { PressableScale } from "../../components/ui/PressableScale";
+import { Reveal } from "../../components/ui/Reveal";
+import { CompactHeader, LargeHeader, useScrollHeader } from "../../components/ui/ScreenHeader";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { SettingsHeader } from "../../components/ui/Settings";
+import { Sheet } from "../../components/ui/Sheet";
+import { Skeleton } from "../../components/ui/Skeleton";
+import { useThemeColors } from "../../components/ui/useThemeColors";
+import { contentBottomPadding, entrance, palette } from "../../constants/theme";
 import { supabase } from "../../config/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { getParishes, getUserProfile } from "../../services/onboardingService";
@@ -47,11 +60,12 @@ interface ParishListItem {
 
 export default function Parish() {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const { scrollY, onScroll } = useScrollHeader();
   const { user, signOut } = useAuth();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const [parish, setParish] = useState<Parish | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isParishAdmin, setIsParishAdmin] = useState(false);
   const [showParishSelector, setShowParishSelector] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -60,6 +74,8 @@ export default function Parish() {
   
   // Parish selector state
   const [parishes, setParishes] = useState<ParishListItem[]>([]);
+  const [parishesLoading, setParishesLoading] = useState(false);
+  const [animateParishRows, setAnimateParishRows] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedParishId, setSelectedParishId] = useState('');
   
@@ -136,7 +152,14 @@ export default function Parish() {
     fetchParishData();
   }, [user]);
 
-
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchParishData();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleParishChange = async () => {
     if (!selectedParishId || !user) return;
@@ -242,17 +265,33 @@ export default function Parish() {
     }
   };
 
+  // Preloaded so the selector sheet can render its full list offscreen before sliding in.
+  useEffect(() => {
+    getParishes()
+      .then(setParishes)
+      .catch((error) => console.error('Error preloading parishes:', error));
+  }, []);
+
   const openParishSelector = async () => {
+    const hasList = parishes.length > 0;
+    setAnimateParishRows(!hasList);
+    setParishesLoading(!hasList);
+    setShowParishSelector(true);
     try {
-      console.log('Opening parish selector...');
-      console.log('Current user:', user?.id);
-      const parishesData = await getParishes();
-      console.log('Fetched parishes:', parishesData);
+      // Re-rendering the list mid-entrance makes the sheet stutter, so fresh results wait for the slide-up to settle.
+      const [parishesData] = await Promise.all([
+        getParishes(),
+        new Promise((resolve) => setTimeout(resolve, 520)),
+      ]);
       setParishes(parishesData);
-      setShowParishSelector(true);
     } catch (error) {
       console.error('Error fetching parishes:', error);
-      Alert.alert('Error', 'Failed to load parishes. Please try again.');
+      if (!hasList) {
+        setShowParishSelector(false);
+        Alert.alert('Error', 'Failed to load parishes. Please try again.');
+      }
+    } finally {
+      setParishesLoading(false);
     }
   };
 
@@ -330,7 +369,6 @@ export default function Parish() {
     `${p.city}, ${p.state}`.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  
   const handleCall = (phoneNumber: string) => {
     if (phoneNumber) {
       Linking.openURL(`tel:${phoneNumber}`);
@@ -388,835 +426,505 @@ export default function Parish() {
     return phoneNumber;
   };
 
-  if (loading) {
-    return (
-      <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-        <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-          <View className="flex-row justify-between items-center pt-4">
-            <View>
-              <Text className="text-3xl font-bold text-gray-900 dark:text-white">Parish</Text>
-              <Text className="text-sm text-gray-900 dark:text-white opacity-70">Parish information</Text>
-            </View>
-          </View>
-        </View>
-        <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color={isDark ? 'white' : '#374151'} />
-          <Text className="text-gray-900 dark:text-white mt-4">Loading parish information...</Text>
-        </View>
+  const initials = (name: string) =>
+    name
+      .replace(/^(Fr\.?|Father|Rev\.?|V\. Rev\.?|Very Rev\.?|Archpriest|Protopresbyter)\s+/i, '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('');
+
+  const quickActions: { key: string; label: string; icon: ReactNode; onPress: () => void }[] = parish
+    ? [
+        {
+          key: 'directions',
+          label: 'Directions',
+          icon: <FontAwesomeIcon icon={faDiamondTurnRight} size={18} color="white" />,
+          onPress: () => handleAddress(parish.address, parish.city, parish.state, parish.zip_code),
+        },
+        ...(parish.phone_number
+          ? [{ key: 'call', label: 'Call', icon: <Ionicons name="call" size={18} color={colors.icon} />, onPress: () => handleCall(parish.phone_number!) }]
+          : []),
+        ...(parish.website
+          ? [{ key: 'web', label: 'Website', icon: <Ionicons name="globe-outline" size={18} color={colors.icon} />, onPress: () => handleWebsite(parish.website!) }]
+          : []),
+        ...(parish.email
+          ? [{ key: 'email', label: 'Email', icon: <Ionicons name="mail-outline" size={18} color={colors.icon} />, onPress: () => handleEmail(parish.email!) }]
+          : []),
+      ]
+    : [];
+
+  const InfoRow = ({ icon, label, value, onPress, first }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; onPress: () => void; first?: boolean }) => (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="link"
+      className={`flex-row items-center px-4 py-3.5 active:bg-gray-50 dark:active:bg-white/5 ${first ? '' : 'border-t border-gray-100 dark:border-white/[0.06]'}`}
+    >
+      <View className="h-9 w-9 rounded-xl bg-gray-100 dark:bg-white/[0.06] items-center justify-center mr-3">
+        <Ionicons name={icon} size={16} color={colors.icon} />
       </View>
-    );
-  }
+      <View className="flex-1">
+        <Text className="font-sans-medium text-[11px] text-gray-500 dark:text-gray-400">{label}</Text>
+        <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white mt-0.5" numberOfLines={2}>{value}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+    </Pressable>
+  );
 
   return (
-    <KeyboardAvoidingView 
-      className="flex-1 bg-gray-50 dark:bg-black"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView 
-          className="flex-1"
-          contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top, paddingBottom: insets.bottom + 80 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-            <View className="flex-row justify-between items-center pt-0">
-              <View>
-                <Text className="text-3xl font-bold text-gray-900 dark:text-white">Parish</Text>
-                <Text className="text-sm text-gray-900 dark:text-white opacity-70">
-                  {parish?.name || 'No parish selected'}
-                </Text>
-              </View>
-              <View className="h-10 w-10 rounded-full bg-transparent flex items-center justify-center">
-                <Ionicons name="location" size={25} color={isDark ? 'white' : '#374151'} />
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <CompactHeader title={parish?.name || 'Parish'} scrollY={scrollY} />
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: contentBottomPadding(insets.bottom) }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.textMuted}
+            colors={[palette.accent]}
+            progressViewOffset={insets.top}
+          />
+        }
+      >
+        <LargeHeader scrollY={scrollY} title="Parish" subtitle={loading ? undefined : parish ? 'Your spiritual home' : 'No parish selected'} />
+
+        {loading ? (
+          <View className="px-5 mt-3">
+            <View className="rounded-[28px] p-6 bg-white dark:bg-white/[0.04]">
+              <Skeleton width="75%" height={30} />
+              <Skeleton width="45%" height={13} className="mt-3" />
+              <View className="flex-row mt-6">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} width={56} height={56} radius={18} className="mr-3" />)}
               </View>
             </View>
-            
-            {/* Parish Information Card */}
-            {parish && (
-              <View className="mt-6 rounded-xl shadow-md p-4 bg-gray-200/50 dark:bg-gray-800/50">
-                <View className="flex-row justify-between items-start mb-2">
-                  <View className="flex-1">
-                    <Text className="text-gray-900 dark:text-white text-lg font-bold">{parish.name}</Text>
-                    <Text className="text-gray-900 dark:text-white text-xs font-light opacity-70">{parish.jurisdiction}</Text>
-                  </View>
-                  {!isParishAdmin && (
-                    <Pressable
-                      className="bg-red-600 rounded-lg px-3 py-1 mt-0.5 active:opacity-70"
-                      onPress={openParishSelector}
-                    >
-                      <Text className="text-white text-xs font-medium">Change Parish</Text>
-                    </Pressable>
-                  )}
-                  {isParishAdmin && (
-                    <Pressable
-                      className="bg-red-600 rounded-lg px-3 py-1 active:opacity-70"
-                      onPress={() => setShowEditModal(true)}
-                    >
-                      <Text className="text-white text-xs font-medium">Edit</Text>
-                    </Pressable>
-                  )}
-                </View>
-                
-                <View className="space-y-2 mt-3">
-                  <Pressable 
-                    className="flex-row items-center mb-1 active:opacity-70"
-                    onPress={() => handleAddress(parish.address, parish.city, parish.state, parish.zip_code)}
-                  >
-                    <Ionicons name="location" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                    <Text className="text-sm text-blue-400">
-                      {parish.address}, {parish.city}, {parish.state} {parish.zip_code}
-                    </Text>
-                  </Pressable>
-                  
-                  {parish.phone_number && (
-                    <Pressable 
-                      className="flex-row items-center mb-1 active:opacity-70"
-                      onPress={() => handleCall(parish.phone_number!)}
-                    >
-                      <Ionicons name="call" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                      <Text className="text-sm text-blue-400">{formatPhoneNumber(parish.phone_number)}</Text>
-                    </Pressable>
-                  )}
-                  
-                  {parish.website && (
-                    <Pressable 
-                      className="flex-row items-center mb-1 active:opacity-70"
-                      onPress={() => handleWebsite(parish.website!)}
-                    >
-                      <Ionicons name="globe" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                      <Text className="text-sm text-blue-400">{parish.website}</Text>
-                    </Pressable>
-                  )}
-                  
-                  {parish.email && (
-                    <Pressable 
-                      className="flex-row items-center mb-1 active:opacity-70"
-                      onPress={() => handleEmail(parish.email!)}
-                    >
-                      <Ionicons name="mail" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.7, marginRight: 8 }} />
-                      <Text className="text-sm text-blue-400">{parish.email}</Text>
-                    </Pressable>
-                  )}
-                </View>
-                
-                {/* Calendar Status */}
-                <View className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-gray-900 dark:text-white text-xs opacity-70">Calendar Status</Text>
-                    <View className="flex-row items-center">
-                      {parish.parish_calendar_id ? (
-                        <>
-                          <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                          <Text className="text-green-400 text-xs ml-1">Connected</Text>
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons name="alert-circle" size={14} color="#F59E0B" />
-                          <Text className="text-yellow-400 text-xs ml-1">Not Set Up</Text>
-                        </>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </View>
-            )}
+            <Skeleton height={180} radius={24} className="mt-5" />
           </View>
-          
-          {/* Content Area */}
-          <View className="flex-1 p-6 bg-gradient-to-b from-gray-100 dark:from-gray-800 to-gray-200 dark:to-gray-900">
-            {!parish ? (
-              <View className="flex-col items-center justify-center py-12">
-                <View className="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-4">
-                  <Ionicons name="business" size={32} color={isDark ? 'white' : '#374151'} />
-                </View>
-                <Text className="text-gray-900 dark:text-white text-lg font-semibold mb-2 text-center">
-                  No Parish Selected
-                </Text>
-                <Text className="text-gray-900 dark:text-white opacity-70 text-center mb-6 px-4">
-                  Select a parish to view information and connect with your community.
-                </Text>
-                <Pressable
-                  className="bg-red-600 rounded-lg px-6 py-3 active:opacity-70"
-                  onPress={openParishSelector}
+        ) : !parish ? (
+          <View className="px-5 mt-6">
+            <EmptyState
+              icon="business-outline"
+              title="No parish selected"
+              message="Select a parish to view information and connect with your community."
+              action={<Button label="Select parish" icon="search" onPress={openParishSelector} />}
+            />
+          </View>
+        ) : (
+          <>
+            {/* Hero */}
+            <Reveal index={1} style={{ paddingHorizontal: 20, marginTop: 12 }}>
+              <View className="rounded-[28px] overflow-hidden border border-red-100 dark:border-red-500/15">
+                <LinearGradient
+                  colors={colors.isDark ? ['#1C0A0B', '#0A0A0D'] : ['#FFFFFF', '#FEF2F2']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ padding: 22 }}
                 >
-                  <Text className="text-white font-medium">Select Parish</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View>
-                {/* Priest Information Section */}
-                <View className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl p-4 mb-6">
-                  <View className="flex-row justify-between items-center mb-4">
-                    <View className="flex-row items-center">
-                      <Text className="text-gray-900 dark:text-white font-semibold">Priest Information</Text>
-                    </View>
-                    {isParishAdmin && (
-                      <Pressable
-                        className="bg-red-600 rounded-lg px-3 py-1 active:opacity-70"
-                        onPress={openPriestEditModal}
-                      >
-                        <Text className="text-white text-xs font-medium">Edit</Text>
-                      </Pressable>
+                  <View className="flex-row items-start justify-between">
+                    <Text className="flex-1 pr-3 font-display text-[32px] leading-[35px] text-gray-900 dark:text-white">{parish.name}</Text>
+                    <Button
+                      label={isParishAdmin ? 'Edit' : 'Change'}
+                      icon={isParishAdmin ? 'create-outline' : 'swap-horizontal'}
+                      variant="secondary"
+                      size="sm"
+                      onPress={isParishAdmin ? () => setShowEditModal(true) : openParishSelector}
+                    />
+                  </View>
+                  <View className="flex-row items-center mt-2">
+                    <Text className="flex-shrink font-sans-medium text-[13px] leading-[18px] text-gray-500 dark:text-gray-400">
+                      {parish.jurisdiction}
+                    </Text>
+                    {parish.is_verified && (
+                      <Ionicons name="checkmark-circle" size={14} color={palette.green} style={{ marginLeft: 8 }} />
                     )}
                   </View>
-                  
-                  {parish.priest_name ? (
-                    <View className="space-y-2">
-                      <View className="flex-row items-center">
-                        <Ionicons name="person" size={16} color={isDark ? 'white' : '#374151'} style={{ marginRight: 8 }} />
-                        <Text className="text-gray-900 dark:text-white font-normal flex-1">{parish.priest_name}</Text>
-                        <View className="flex-row items-center space-x-2">
-                          {parish.priest_phone_number && (
-                            <Pressable 
-                              className="bg-gray-300 dark:bg-gray-600 rounded-full p-2 mr-2 active:opacity-70"
-                              onPress={() => handleSMS(parish.priest_phone_number!)}
-                            >
-                              <Ionicons name="chatbubble" size={16} color={isDark ? 'white' : '#374151'} />
-                            </Pressable>
-                          )}
-                          
-                          {parish.priest_email && (
-                            <Pressable 
-                              className="bg-gray-300 dark:bg-gray-600 rounded-full p-2 active:opacity-70"
-                              onPress={() => handleEmail(parish.priest_email!)}
-                            >
-                              <Ionicons name="mail" size={16} color={isDark ? 'white' : '#374151'} />
-                            </Pressable>
-                          )}
+
+                  <View className="flex-row mt-6">
+                    {quickActions.map((action, i) => (
+                      <PressableScale
+                        key={action.key}
+                        onPress={action.onPress}
+                        scaleTo={0.92}
+                        haptic
+                        accessibilityRole="button"
+                        accessibilityLabel={action.label}
+                        style={{ marginRight: i < quickActions.length - 1 ? 14 : 0 }}
+                        className="items-center"
+                      >
+                        <View
+                          className={`h-14 w-14 rounded-[18px] items-center justify-center ${
+                            i === 0 ? 'bg-red-600' : 'bg-white dark:bg-white/10 border border-gray-100 dark:border-white/10'
+                          }`}
+                        >
+                          {action.icon}
                         </View>
-                      </View>
+                        <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300 mt-1.5">{action.label}</Text>
+                      </PressableScale>
+                    ))}
+                  </View>
+                </LinearGradient>
+              </View>
+            </Reveal>
+
+            {/* Contact details */}
+            <Reveal index={2} style={{ paddingHorizontal: 20, marginTop: 28 }}>
+              <SectionHeader title="Visit & contact" />
+              <View className="rounded-3xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden">
+                <InfoRow
+                  first
+                  icon="location-outline"
+                  label="Address"
+                  value={`${parish.address}, ${parish.city}, ${parish.state} ${parish.zip_code ?? ''}`.trim()}
+                  onPress={() => handleAddress(parish.address, parish.city, parish.state, parish.zip_code)}
+                />
+                {parish.phone_number && (
+                  <InfoRow icon="call-outline" label="Phone" value={formatPhoneNumber(parish.phone_number)} onPress={() => handleCall(parish.phone_number!)} />
+                )}
+                {parish.website && (
+                  <InfoRow icon="globe-outline" label="Website" value={parish.website} onPress={() => handleWebsite(parish.website!)} />
+                )}
+                {parish.email && (
+                  <InfoRow icon="mail-outline" label="Email" value={parish.email} onPress={() => handleEmail(parish.email!)} />
+                )}
+                <View className="flex-row items-center justify-between px-4 py-3.5 border-t border-gray-100 dark:border-white/[0.06]">
+                  <Text className="font-sans-medium text-[13px] text-gray-500 dark:text-gray-400">Parish calendar</Text>
+                  {parish.parish_calendar_id ? (
+                    <View className="flex-row items-center rounded-full px-2.5 py-1 bg-emerald-500/10">
+                      <Ionicons name="checkmark-circle" size={13} color={palette.green} />
+                      <Text className="font-sans-bold text-[11px] text-emerald-600 dark:text-emerald-400 ml-1">Connected</Text>
                     </View>
                   ) : (
-                    <View className="flex-col items-center justify-center py-4">
-                      <Ionicons name="person-outline" size={24} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.5, marginBottom: 8 }} />
-                      <Text className="text-gray-900 dark:text-white opacity-50 text-sm text-center">
-                        {isParishAdmin ? 'No priest information added yet' : 'No priest information available yet'}
-                      </Text>
-                      {isParishAdmin && (
-                        <Pressable
-                          className="bg-red-600 rounded-lg px-4 py-2 mt-3 active:opacity-70"
-                          onPress={openPriestEditModal}
-                        >
-                          <Text className="text-white text-xs font-medium">Add Priest Info</Text>
-                        </Pressable>
-                      )}
+                    <View className="flex-row items-center rounded-full px-2.5 py-1 bg-amber-500/10">
+                      <Ionicons name="alert-circle" size={13} color={palette.amber} />
+                      <Text className="font-sans-bold text-[11px] text-amber-600 dark:text-amber-400 ml-1">Not set up</Text>
                     </View>
                   )}
                 </View>
               </View>
-            )}
+            </Reveal>
 
-            {/* Donation Section */}
-            <View className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl p-4 mb-6">
-              <View className="flex-row justify-between items-center mb-4">
-                <View className="flex-row items-center">
-                  <Text className="text-gray-900 dark:text-white font-semibold">Support Our Parish</Text>
-                </View>
-                {isParishAdmin && (
-                  <Pressable
-                    className="bg-red-600 rounded-lg px-3 py-1 active:opacity-70"
-                    onPress={openDonationEditModal}
-                  >
-                    <Text className="text-white text-xs font-medium">Setup</Text>
-                  </Pressable>
-                )}
-              </View>
-              
-              {parish?.donation_enabled && parish?.paypal_donation_url ? (
-                <View className="space-y-3">
-                  <Text className="text-gray-900 dark:text-white text-sm opacity-80 mb-4">
-                    {parish.donation_message || 'Support our parish with a donation'}
-                  </Text>
-                  
-                  <Pressable
-                    className="bg-red-600 rounded-lg py-3 px-4 flex-row items-center justify-center mb-2 active:opacity-70"
-                    onPress={handleDonate}
-                  >
-                    <Ionicons name="heart" size={16} color="white" style={{ marginRight: 8 }} />
-                    <Text className="text-white font-medium">Donate Now</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <View className="flex-col items-center justify-center py-4">
-                  <Ionicons name="heart-outline" size={24} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.5, marginBottom: 8 }} />
-                  <Text className="text-gray-900 dark:text-white opacity-50 text-sm text-center">
-                    {isParishAdmin ? 'Donation feature not set up yet' : 'Donation feature not available yet'}
-                  </Text>
-                  {isParishAdmin && (
-                    <Pressable
-                      className="bg-red-600 rounded-lg px-4 py-2 mt-3 active:opacity-70"
-                      onPress={openDonationEditModal}
-                    >
-                      <Text className="text-white text-xs font-medium">Setup Donations</Text>
-                    </Pressable>
-                  )}
-                </View>
-              )}
-            </View>
-          </View>
-          
-          {/* General Settings Button */}
-          <View className="px-6 pt-6 bg-gray-50 dark:bg-black">
-            <Pressable
-              className="bg-gray-100 dark:bg-gray-800/50 rounded-xl py-4 px-6 flex-row items-center justify-center border border-gray-200 dark:border-gray-700 active:opacity-70"
-              onPress={() => setShowGeneralSettings(true)}
-            >
-              <Ionicons name="settings-outline" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
-              <Text className="text-gray-600 dark:text-gray-300 font-semibold ml-2">General Settings</Text>
-            </Pressable>
-          </View>
-
-          {/* Sign Out Button */}
-          <View className="p-6 bg-gray-50 dark:bg-black">
-            <Pressable
-              className="rounded-xl py-4 px-6 flex-row items-center justify-center active:opacity-70"
-              onPress={signOut}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-              <Text className="text-red-500 dark:text-red-400 font-semibold ml-2">Sign Out</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-
-      {/* Floating Directions Button */}
-      {parish && (
-        <View className="absolute bottom-6 right-6 z-50">
-          <Pressable
-            className="bg-red-600 rounded-full p-4 shadow-lg active:opacity-70"
-            onPress={() => handleAddress(parish.address, parish.city, parish.state, parish.zip_code)}
-            style={{
-              shadowColor: '#000',
-              shadowOffset: {
-                width: 0,
-                height: 4,
-              },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              elevation: 8,
-            }}
-          >
-            <FontAwesomeIcon icon={faDiamondTurnRight} size={30} color="white" />
-          </Pressable>
-        </View>
-      )}
-
-      {/* Parish Selector Modal */}
-      <Modal
-        visible={showParishSelector}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowParishSelector(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700" style={{ maxHeight: '80%' }}>
-            <View className="flex-row justify-between items-center mb-6">
-              <View>
-                <Text className="text-xl text-gray-900 dark:text-white font-bold">Select Parish</Text>
-                <Text className="text-xs text-gray-900 dark:text-white opacity-60">({filteredParishes.length} parishes)</Text>
-              </View>
-              <Pressable className="active:opacity-70" onPress={() => setShowParishSelector(false)}>
-                <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-              </Pressable>
-            </View>
-
-            {/* Search Bar */}
-            <View className="relative mb-6">
-              <Ionicons 
-                name="search" 
-                size={20} 
-                color={isDark ? 'white' : '#374151'} 
-                style={{ 
-                  position: 'absolute', 
-                  left: 12, 
-                  top: 14, 
-                  opacity: 0.5 
-                }} 
+            {/* Clergy */}
+            <Reveal index={3} style={{ paddingHorizontal: 20, marginTop: 28 }}>
+              <SectionHeader
+                title="Clergy"
+                actionLabel={isParishAdmin ? 'Edit' : undefined}
+                actionIcon={isParishAdmin ? 'create-outline' : undefined}
+                onAction={isParishAdmin ? openPriestEditModal : undefined}
               />
-              <TextInput
-                className="w-full py-3 pl-4 pr-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-                placeholder="Search by parish name or location"
-                placeholderTextColor="#9CA3AF"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-
-            {/* Parishes List */}
-            <ScrollView 
-              className="mb-6" 
-              style={{ maxHeight: 300 }}
-              showsVerticalScrollIndicator={true}
-            >
-              {filteredParishes.length === 0 ? (
-                <View className="flex-col items-center justify-center py-8">
-                  <Ionicons name="search" size={24} color={isDark ? 'white' : '#374151'} />
-                  <Text className="text-gray-900 dark:text-white text-base font-medium mb-2 text-center mt-3">
-                    No Results Found
-                  </Text>
-                  <Text className="text-gray-900 dark:text-white opacity-70 text-center text-sm">
-                    Try adjusting your search terms
-                  </Text>
-                </View>
-              ) : (
-                <View className="space-y-4">
-                  {filteredParishes.map((p) => (
-                    <Pressable
-                      key={p.id}
-                      className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 mb-2 active:opacity-70"
-                      onPress={() => setSelectedParishId(p.id)}
-                    >
-                      <View className="flex-row justify-between items-center">
-                        <View className="flex-1">
-                          <View className="flex-row items-center">
-                            <Text className="text-gray-900 dark:text-white font-medium">{p.name}</Text>
-                            {p.is_verified && (
-                              <View className="ml-2 flex-row items-center">
-                                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                                {/* <Text className="text-green-400 text-xs ml-1">Verified</Text> */}
-                              </View>
-                            )}
-                          </View>
-                          <Text className="text-gray-900 dark:text-white opacity-60 text-xs mt-1">
-                            {p.city}, {p.state}
-                          </Text>
-                          {!p.is_verified && (
-                            <Text className="text-yellow-400 text-xs mt-1">
-                              Pending verification
-                            </Text>
-                          )}
-                        </View>
-                        <View className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center">
-                          {selectedParishId === p.id && (
-                            <View className="h-3 w-3 rounded-full bg-red-500" />
-                          )}
-                        </View>
-                      </View>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Buttons */}
-            <View className="flex-row space-x-3">
-              <Pressable
-                className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
-                onPress={() => setShowParishSelector(false)}
-              >
-                <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
-              </Pressable>
-              
-              <Pressable
-                className={`flex-1 rounded-lg py-3 active:opacity-70 ${
-                  !selectedParishId
-                    ? 'bg-gray-300 dark:bg-gray-600 opacity-50'
-                    : 'bg-red-600'
-                }`}
-                onPress={handleParishChange}
-                disabled={!selectedParishId}
-              >
-                <Text className={`text-center font-medium ${
-                  !selectedParishId
-                    ? 'text-gray-500 dark:text-gray-400'
-                    : 'text-white'
-                }`}>
-                  {selectedParishId ? 'Change Parish' : 'Select Parish'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Edit Parish Modal */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowEditModal(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-            <ScrollView 
-              className="w-full max-w-md"
-              contentContainerStyle={{ paddingVertical: 20, paddingBottom: 150, paddingTop: 50 }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-            <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-xl text-gray-900 dark:text-white font-bold">Edit Parish</Text>
-                <Pressable className="active:opacity-70" onPress={() => setShowEditModal(false)}>
-                  <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-                </Pressable>
-              </View>
-
-              <View className="space-y-4">
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Parish Name *</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.name}
-                    onChangeText={(text) => setEditForm({...editForm, name: text})}
-                    placeholder="Parish name"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Jurisdiction *</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.jurisdiction}
-                    onChangeText={(text) => setEditForm({...editForm, jurisdiction: text})}
-                    placeholder="e.g., Orthodox Church in America"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Address *</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.address}
-                    onChangeText={(text) => setEditForm({...editForm, address: text})}
-                    placeholder="Street address"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-
-                <View className="flex-row space-x-2 mb-2">
-                  <View className="flex-1 mr-2">
-                    <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">City *</Text>
-                    <TextInput
-                      className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                      value={editForm.city}
-                      onChangeText={(text) => setEditForm({...editForm, city: text})}
-                      placeholder="City"
-                      placeholderTextColor="#9CA3AF"
-                    />
+              {parish.priest_name ? (
+                <View className="rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex-row items-center">
+                  <View className="h-14 w-14 rounded-full bg-red-600/10 items-center justify-center mr-4">
+                    <Text className="font-display text-[22px] text-red-600 dark:text-red-400">{initials(parish.priest_name) || 'Fr'}</Text>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">State *</Text>
-                    <TextInput
-                      className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                      value={editForm.state}
-                      onChangeText={(text) => setEditForm({...editForm, state: text})}
-                      placeholder="State"
-                      placeholderTextColor="#9CA3AF"
-                    />
+                    <Text className="font-display text-[22px] leading-[26px] text-gray-900 dark:text-white">{parish.priest_name}</Text>
+                    <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 mt-0.5">Parish priest</Text>
                   </View>
-                </View>
-
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">ZIP Code</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.zip_code}
-                    onChangeText={(text) => setEditForm({...editForm, zip_code: text})}
-                    placeholder="ZIP code"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Phone Number</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.phone_number}
-                    onChangeText={(text) => setEditForm({...editForm, phone_number: text})}
-                    placeholder="Phone number"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="phone-pad"
-                  />
-                </View>
-
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Website</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.website}
-                    onChangeText={(text) => setEditForm({...editForm, website: text})}
-                    placeholder="Website URL"
-                    placeholderTextColor="#9CA3AF"
-                    autoCapitalize="none"
-                  />
-                </View>
-
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Email</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.email}
-                    onChangeText={(text) => setEditForm({...editForm, email: text})}
-                    placeholder="Email address"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-
-                <View className="mb-6">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Google Calendar ID</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={editForm.parish_calendar_id}
-                    onChangeText={(text) => setEditForm({...editForm, parish_calendar_id: text})}
-                    placeholder="parish@example.com"
-                    placeholderTextColor="#9CA3AF"
-                    autoCapitalize="none"
-                  />
-                  <Text className="text-gray-500 dark:text-gray-400 text-xs mt-1">
-                    Email address associated with your parish's Google Calendar
-                  </Text>
-                </View>
-              </View>
-
-              <View className="flex-row space-x-3 mt-6">
-                <Pressable
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
-                  onPress={() => setShowEditModal(false)}
-                  disabled={editLoading}
-                >
-                  <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
-                </Pressable>
-                
-                <Pressable
-                  className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
-                  onPress={handleEditParish}
-                  disabled={editLoading}
-                >
-                  {editLoading ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Ionicons name="checkmark" size={20} color="white" />
+                  {parish.priest_phone_number && (
+                    <PressableScale
+                      onPress={() => handleSMS(parish.priest_phone_number!)}
+                      scaleTo={0.9}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Message ${parish.priest_name}`}
+                      style={{ marginLeft: 8 }}
+                      className="h-11 w-11 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center"
+                    >
+                      <Ionicons name="chatbubble" size={17} color={colors.icon} />
+                    </PressableScale>
                   )}
-                  <Text className="text-white text-center font-medium ml-2">
-                    {editLoading ? 'Saving...' : 'Save Changes'}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Edit Priest Modal */}
-      <Modal
-        visible={showPriestEditModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPriestEditModal(false)}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-            <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-xl text-gray-900 dark:text-white font-bold">Edit Priest Information</Text>
-                <Pressable className="active:opacity-70" onPress={() => setShowPriestEditModal(false)}>
-                  <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-                </Pressable>
-              </View>
-
-              <View className="space-y-4">
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Priest Name</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={priestForm.priest_name}
-                    onChangeText={(text) => setPriestForm({...priestForm, priest_name: text})}
-                    placeholder="Priest's full name"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Phone Number</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={priestForm.priest_phone_number}
-                    onChangeText={(text) => setPriestForm({...priestForm, priest_phone_number: text})}
-                    placeholder="Phone number"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="phone-pad"
-                  />
-                </View>
-
-                <View className="mb-6">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Email</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={priestForm.priest_email}
-                    onChangeText={(text) => setPriestForm({...priestForm, priest_email: text})}
-                    placeholder="Email address"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              <View className="flex-row space-x-3 mt-6">
-                <Pressable
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
-                  onPress={() => setShowPriestEditModal(false)}
-                  disabled={priestEditLoading}
-                >
-                  <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
-                </Pressable>
-                
-                <Pressable
-                  className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
-                  onPress={handleEditPriest}
-                  disabled={priestEditLoading}
-                >
-                  {priestEditLoading ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Ionicons name="checkmark" size={20} color="white" />
+                  {parish.priest_email && (
+                    <PressableScale
+                      onPress={() => handleEmail(parish.priest_email!)}
+                      scaleTo={0.9}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Email ${parish.priest_name}`}
+                      style={{ marginLeft: 8 }}
+                      className="h-11 w-11 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center"
+                    >
+                      <Ionicons name="mail" size={17} color={colors.icon} />
+                    </PressableScale>
                   )}
-                  <Text className="text-white text-center font-medium ml-2">
-                    {priestEditLoading ? 'Saving...' : 'Save Changes'}
+                </View>
+              ) : (
+                <EmptyState
+                  compact
+                  icon="person-outline"
+                  title={isParishAdmin ? 'No priest information added yet' : 'No priest information available yet'}
+                  action={isParishAdmin ? <Button label="Add priest info" size="sm" onPress={openPriestEditModal} /> : undefined}
+                />
+              )}
+            </Reveal>
+          </>
+        )}
+
+        {/* Donations */}
+        {!loading && (
+          <Reveal index={4} style={{ paddingHorizontal: 20, marginTop: 28 }}>
+            <SectionHeader
+              title="Support our parish"
+              actionLabel={isParishAdmin ? 'Setup' : undefined}
+              actionIcon={isParishAdmin ? 'settings-outline' : undefined}
+              onAction={isParishAdmin ? openDonationEditModal : undefined}
+            />
+            {parish?.donation_enabled && parish?.paypal_donation_url ? (
+              <View className="rounded-3xl overflow-hidden">
+                <LinearGradient colors={['#DC2626', '#991B1B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 22 }}>
+                  <Ionicons name="heart" size={22} color="rgba(255,255,255,0.9)" />
+                  <Text className="font-display text-[24px] leading-[29px] text-white mt-3">
+                    {parish.donation_message || 'Support our parish with a donation'}
                   </Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Donation Settings Modal */}
-      <Modal
-        visible={showDonationModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowDonationModal(false)}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-            <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-xl text-gray-900 dark:text-white font-bold">Setup Donations</Text>
-                <Pressable className="active:opacity-70" onPress={() => setShowDonationModal(false)}>
-                  <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-                </Pressable>
-              </View>
-
-              <View className="space-y-4">
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Enable Donations</Text>
-                  <Pressable
-                    className={`flex-row items-center p-3 rounded-lg border active:opacity-70 ${
-                      donationForm.donation_enabled 
-                        ? 'bg-red-600/20 border-red-500/50' 
-                        : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                    }`}
-                    onPress={() => setDonationForm({
-                      ...donationForm,
-                      donation_enabled: !donationForm.donation_enabled
-                    })}
+                  <PressableScale
+                    onPress={handleDonate}
+                    haptic
+                    accessibilityRole="button"
+                    style={{ marginTop: 18, alignSelf: 'flex-start' }}
+                    className="h-11 px-5 rounded-full bg-white flex-row items-center"
                   >
-                    <View className={`h-5 w-5 rounded border-2 mr-3 flex items-center justify-center ${
-                      donationForm.donation_enabled 
-                        ? 'border-red-500 bg-red-500' 
-                        : 'border-gray-400 dark:border-gray-500'
-                    }`}>
-                      {donationForm.donation_enabled && (
-                        <Ionicons name="checkmark" size={12} color="white" />
-                      )}
-                    </View>
-                    <Text className="text-gray-900 dark:text-white">Enable donations</Text>
-                  </Pressable>
-                </View>
-
-                {donationForm.donation_enabled && (
-                  <>
-                    <View className="mb-2">
-                      <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Donation URL *</Text>
-                      <TextInput
-                        className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                        value={donationForm.paypal_donation_url}
-                        onChangeText={(text) => setDonationForm({...donationForm, paypal_donation_url: text})}
-                        placeholder="e.g., https://www.paypal.com/donate/?token=..."
-                        placeholderTextColor="#9CA3AF"
-                        autoCapitalize="none"
-                      />
-                      <Text className="text-gray-500 dark:text-gray-400 text-xs mt-1">
-                        Your donation page URL
-                      </Text>
-                    </View>
-
-                    <View className="mb-6">
-                      <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Donation Message (Optional)</Text>
-                      <TextInput
-                        className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                        value={donationForm.donation_message}
-                        onChangeText={(text) => setDonationForm({...donationForm, donation_message: text})}
-                        placeholder="e.g., Thank you for supporting our parish"
-                        placeholderTextColor="#9CA3AF"
-                        multiline
-                        numberOfLines={3}
-                      />
-                      <Text className="text-gray-500 dark:text-gray-400 text-xs mt-1">
-                        This message will appear on the donation page
-                      </Text>
-                    </View>
-                  </>
-                )}
+                    <Text className="font-sans-bold text-[15px] text-red-700">Donate now</Text>
+                    <Ionicons name="arrow-forward" size={15} color={palette.accent} style={{ marginLeft: 6 }} />
+                  </PressableScale>
+                </LinearGradient>
               </View>
+            ) : (
+              <EmptyState
+                compact
+                icon="heart-outline"
+                title={isParishAdmin ? 'Donations not set up yet' : 'Donations not available yet'}
+                action={isParishAdmin ? <Button label="Set up donations" size="sm" onPress={openDonationEditModal} /> : undefined}
+              />
+            )}
+          </Reveal>
+        )}
 
-              <View className="flex-row space-x-3 mt-6">
-                <Pressable
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
-                  onPress={() => setShowDonationModal(false)}
-                  disabled={donationEditLoading}
-                >
-                  <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
-                </Pressable>
-                
-                <Pressable
-                  className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
-                  onPress={handleEditDonation}
-                  disabled={donationEditLoading}
-                >
-                  {donationEditLoading ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Ionicons name="checkmark" size={20} color="white" />
-                  )}
-                  <Text className="text-white text-center font-medium ml-2">
-                    {donationEditLoading ? 'Saving...' : 'Save Settings'}
-                  </Text>
-                </Pressable>
+        {/* Account */}
+        <View className="px-5 mt-10">
+          <View className="rounded-3xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden">
+            <Pressable
+              onPress={() => setShowGeneralSettings(true)}
+              accessibilityRole="button"
+              className="flex-row items-center px-4 py-4 active:bg-gray-50 dark:active:bg-white/5"
+            >
+              <View className="h-9 w-9 rounded-xl bg-gray-100 dark:bg-white/[0.06] items-center justify-center mr-3">
+                <Ionicons name="settings-outline" size={17} color={colors.icon} />
               </View>
-            </View>
+              <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white flex-1">General settings</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </Pressable>
+            <Pressable
+              onPress={signOut}
+              accessibilityRole="button"
+              className="flex-row items-center px-4 py-4 border-t border-gray-100 dark:border-white/[0.06] active:bg-gray-50 dark:active:bg-white/5"
+            >
+              <View className="h-9 w-9 rounded-xl bg-red-600/10 items-center justify-center mr-3">
+                <Ionicons name="log-out-outline" size={17} color={palette.accentSoft} />
+              </View>
+              <Text className="font-sans-semibold text-[15px] text-red-600 dark:text-red-400 flex-1">Sign out</Text>
+            </Pressable>
           </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        </View>
+      </Animated.ScrollView>
 
-      {/* General Settings Modal */}
+      {/* Parish selector */}
+      <Sheet
+        visible={showParishSelector}
+        onClose={() => setShowParishSelector(false)}
+        eyebrow="Find your parish"
+        title="Select parish"
+        subtitle={parishesLoading ? 'Loading parishes' : `${filteredParishes.length} parishes`}
+        footer={
+          <View className="flex-row">
+            <Button label="Cancel" variant="secondary" onPress={() => setShowParishSelector(false)} style={{ flex: 1, marginRight: 8 }} />
+            <Button
+              label={selectedParishId ? 'Change parish' : 'Select parish'}
+              disabled={!selectedParishId}
+              onPress={handleParishChange}
+              style={{ flex: 1 }}
+            />
+          </View>
+        }
+      >
+        <View className="flex-row items-center h-12 rounded-2xl px-4 mb-4 bg-gray-100 dark:bg-white/5">
+          <Ionicons name="search" size={17} color={palette.gray400} />
+          <TextInput
+            className="flex-1 font-sans text-[15px] text-gray-900 dark:text-white ml-2.5"
+            placeholder="Search by parish name or location"
+            placeholderTextColor={palette.gray400}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            accessibilityLabel="Search parishes"
+          />
+          {!!searchQuery && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+              <Ionicons name="close-circle" size={17} color={palette.gray400} />
+            </Pressable>
+          )}
+        </View>
+
+        {parishesLoading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <View key={i} style={{ marginBottom: 8 }}>
+              <Skeleton height={68} radius={16} />
+            </View>
+          ))
+        ) : filteredParishes.length === 0 ? (
+          <EmptyState compact icon="search" title="No results found" message="Try adjusting your search terms." />
+        ) : (
+          filteredParishes.map((p, i) => {
+            const active = selectedParishId === p.id;
+            return (
+              <Animated.View key={p.id} entering={animateParishRows && i < 12 ? entrance.card(i * 35) : undefined}>
+              <Pressable
+                onPress={() => setSelectedParishId(p.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                className={`flex-row items-center rounded-2xl p-4 mb-2 border ${
+                  active ? 'bg-red-600/[0.06] border-red-500/40' : 'bg-gray-50 dark:bg-white/[0.04] border-transparent'
+                }`}
+              >
+                <View className="flex-1">
+                  <View className="flex-row items-center">
+                    <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white flex-shrink">{p.name}</Text>
+                    {p.is_verified && <Ionicons name="checkmark-circle" size={14} color={palette.green} style={{ marginLeft: 6 }} />}
+                  </View>
+                  <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">{p.city}, {p.state}</Text>
+                  {!p.is_verified && (
+                    <Text className="font-sans-medium text-xs text-amber-600 dark:text-amber-400 mt-0.5">Pending verification</Text>
+                  )}
+                </View>
+                <View className={`h-5 w-5 rounded-full border-2 items-center justify-center ${active ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                  {active && <Animated.View entering={entrance.pop()} style={{ height: 10, width: 10, borderRadius: 5, backgroundColor: palette.accentSoft }} />}
+                </View>
+              </Pressable>
+              </Animated.View>
+            );
+          })
+        )}
+      </Sheet>
+
+      {/* Edit parish */}
+      <Sheet
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        eyebrow="Parish details"
+        title="Edit parish"
+        footer={
+          <View className="flex-row">
+            <Button label="Cancel" variant="secondary" onPress={() => setShowEditModal(false)} disabled={editLoading} style={{ flex: 1, marginRight: 8 }} />
+            <Button label={editLoading ? 'Saving…' : 'Save changes'} icon="checkmark" loading={editLoading} onPress={handleEditParish} style={{ flex: 1 }} />
+          </View>
+        }
+      >
+        <Field label="Parish name" required value={editForm.name} onChangeText={(text) => setEditForm({...editForm, name: text})} placeholder="Parish name" />
+        <Field label="Jurisdiction" required value={editForm.jurisdiction} onChangeText={(text) => setEditForm({...editForm, jurisdiction: text})} placeholder="e.g., Orthodox Church in America" />
+        <Field label="Address" required value={editForm.address} onChangeText={(text) => setEditForm({...editForm, address: text})} placeholder="Street address" />
+        <View className="flex-row">
+          <Field containerClassName="flex-1 mr-2" label="City" required value={editForm.city} onChangeText={(text) => setEditForm({...editForm, city: text})} placeholder="City" />
+          <Field containerClassName="flex-1" label="State" required value={editForm.state} onChangeText={(text) => setEditForm({...editForm, state: text})} placeholder="State" />
+        </View>
+        <Field label="ZIP code" value={editForm.zip_code} onChangeText={(text) => setEditForm({...editForm, zip_code: text})} placeholder="ZIP code" keyboardType="numeric" />
+        <Field label="Phone number" value={editForm.phone_number} onChangeText={(text) => setEditForm({...editForm, phone_number: text})} placeholder="Phone number" keyboardType="phone-pad" />
+        <Field label="Website" value={editForm.website} onChangeText={(text) => setEditForm({...editForm, website: text})} placeholder="Website URL" autoCapitalize="none" />
+        <Field label="Email" value={editForm.email} onChangeText={(text) => setEditForm({...editForm, email: text})} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" />
+        <Field
+          label="Google Calendar ID"
+          value={editForm.parish_calendar_id}
+          onChangeText={(text) => setEditForm({...editForm, parish_calendar_id: text})}
+          placeholder="parish@example.com"
+          autoCapitalize="none"
+          helper="Email address associated with your parish's Google Calendar"
+        />
+      </Sheet>
+
+      {/* Edit priest */}
+      <Sheet
+        visible={showPriestEditModal}
+        onClose={() => setShowPriestEditModal(false)}
+        eyebrow="Clergy"
+        title="Edit priest information"
+        footer={
+          <View className="flex-row">
+            <Button label="Cancel" variant="secondary" onPress={() => setShowPriestEditModal(false)} disabled={priestEditLoading} style={{ flex: 1, marginRight: 8 }} />
+            <Button label={priestEditLoading ? 'Saving…' : 'Save changes'} icon="checkmark" loading={priestEditLoading} onPress={handleEditPriest} style={{ flex: 1 }} />
+          </View>
+        }
+      >
+        <Field label="Priest name" value={priestForm.priest_name} onChangeText={(text) => setPriestForm({...priestForm, priest_name: text})} placeholder="Priest's full name" />
+        <Field label="Phone number" value={priestForm.priest_phone_number} onChangeText={(text) => setPriestForm({...priestForm, priest_phone_number: text})} placeholder="Phone number" keyboardType="phone-pad" />
+        <Field label="Email" value={priestForm.priest_email} onChangeText={(text) => setPriestForm({...priestForm, priest_email: text})} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" />
+      </Sheet>
+
+      {/* Donation settings */}
+      <Sheet
+        visible={showDonationModal}
+        onClose={() => setShowDonationModal(false)}
+        eyebrow="Giving"
+        title="Set up donations"
+        footer={
+          <View className="flex-row">
+            <Button label="Cancel" variant="secondary" onPress={() => setShowDonationModal(false)} disabled={donationEditLoading} style={{ flex: 1, marginRight: 8 }} />
+            <Button label={donationEditLoading ? 'Saving…' : 'Save settings'} icon="checkmark" loading={donationEditLoading} onPress={handleEditDonation} style={{ flex: 1 }} />
+          </View>
+        }
+      >
+        <Pressable
+          onPress={() => setDonationForm({ ...donationForm, donation_enabled: !donationForm.donation_enabled })}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: donationForm.donation_enabled }}
+          className={`flex-row items-center rounded-2xl p-4 mb-5 border ${
+            donationForm.donation_enabled ? 'bg-red-600/[0.06] border-red-500/40' : 'bg-gray-50 dark:bg-white/[0.04] border-transparent'
+          }`}
+        >
+          <View className={`h-6 w-6 rounded-lg border-2 mr-3 items-center justify-center ${
+            donationForm.donation_enabled ? 'border-red-500 bg-red-500' : 'border-gray-300 dark:border-gray-600'
+          }`}>
+            {donationForm.donation_enabled && <Ionicons name="checkmark" size={14} color="white" />}
+          </View>
+          <View className="flex-1">
+            <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Enable donations</Text>
+            <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">Show a donate button on your parish page</Text>
+          </View>
+        </Pressable>
+
+        {donationForm.donation_enabled && (
+          <Animated.View entering={FadeIn.duration(200)}>
+            <Field
+              label="Donation URL"
+              required
+              value={donationForm.paypal_donation_url}
+              onChangeText={(text) => setDonationForm({...donationForm, paypal_donation_url: text})}
+              placeholder="e.g., https://www.paypal.com/donate/?token=..."
+              autoCapitalize="none"
+              helper="Your donation page URL"
+            />
+            <Field
+              label="Donation message (optional)"
+              value={donationForm.donation_message}
+              onChangeText={(text) => setDonationForm({...donationForm, donation_message: text})}
+              placeholder="e.g., Thank you for supporting our parish"
+              multiline
+              numberOfLines={3}
+              helper="This message will appear on the donation page"
+            />
+          </Animated.View>
+        )}
+      </Sheet>
+
+      {/* General settings */}
       <Modal
         visible={showGeneralSettings}
         animationType="slide"
+        presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : undefined}
         onRequestClose={() => setShowGeneralSettings(false)}
       >
         <View className="flex-1 bg-gray-50 dark:bg-black">
-          <View className="flex-row items-center p-6 pt-14 bg-gray-50 dark:bg-black border-b border-gray-200 dark:border-gray-800">
-            <Pressable
-              className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
-              onPress={() => setShowGeneralSettings(false)}
-            >
-              <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
-            </Pressable>
-            <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">Settings</Text>
-          </View>
+          <SettingsHeader eyebrow="Settings" title="General" onClose={() => setShowGeneralSettings(false)} />
           <GeneralSettings />
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
-} 
+}

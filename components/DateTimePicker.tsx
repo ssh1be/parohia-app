@@ -93,17 +93,19 @@ export default function CustomDateTimePicker({
 
   return (
     <View>
-      {label ? <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">{label}</Text> : null}
+      {label ? <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300 mb-2">{label}</Text> : null}
       <Pressable
-        className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-300 dark:border-gray-600 flex-row items-center justify-between active:opacity-70"
+        className="h-12 bg-gray-100 dark:bg-white/5 px-4 rounded-2xl border border-transparent dark:border-white/5 flex-row items-center justify-between active:opacity-70"
         onPress={() => setShowPicker(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`${label || placeholder}: ${formatDisplayValue()}`}
       >
-        <Text className={`${value ? 'text-gray-900 dark:text-white' : 'text-gray-500'}`}>
+        <Text className={`font-sans text-[15px] ${value ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>
           {formatDisplayValue()}
         </Text>
         <Ionicons 
           name={mode === 'date' ? 'calendar-outline' : 'time-outline'} 
-          size={20} 
+          size={18} 
           color="#9CA3AF" 
         />
       </Pressable>
@@ -112,11 +114,11 @@ export default function CustomDateTimePicker({
         <Modal
           visible={showPicker}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
         >
-          <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-            <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-sm border border-gray-200 dark:border-gray-700">
-              <Text className="text-gray-900 dark:text-white text-lg font-semibold mb-4 text-center">
+          <View className="flex-1 justify-center items-center bg-black/50 dark:bg-black/70 px-6">
+            <View className="bg-white dark:bg-gray-950 rounded-[28px] p-6 w-full max-w-sm border border-gray-100 dark:border-white/10">
+              <Text className="font-display text-[26px] text-gray-900 dark:text-white mb-4 text-center">
                 Select {mode === 'date' ? 'Date' : 'Time'}
               </Text>
               
@@ -141,17 +143,17 @@ export default function CustomDateTimePicker({
 
               <View className="flex-row space-x-3">
                 <Pressable
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
+                  className="flex-1 h-12 justify-center bg-gray-200/80 dark:bg-white/10 rounded-full mr-2 active:opacity-70"
                   onPress={handleCancel}
                 >
-                  <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
+                  <Text className="font-sans-semibold text-gray-900 dark:text-white text-center">Cancel</Text>
                 </Pressable>
                 
                 <Pressable
-                  className="flex-1 bg-red-600 rounded-lg py-3 active:opacity-70"
+                  className="flex-1 h-12 justify-center bg-red-600 rounded-full active:opacity-80"
                   onPress={handleConfirm}
                 >
-                  <Text className="text-white text-center font-medium">Confirm</Text>
+                  <Text className="font-sans-semibold text-white text-center">Confirm</Text>
                 </Pressable>
               </View>
             </View>

@@ -40,13 +40,23 @@ import { getParishCalendarId } from './parishService';
 // Use configuration from config file
 const GOOGLE_CALENDAR_API_KEY = CALENDAR_CONFIG.API_KEY;
 
-export const fetchOrthodoxCalendarData = async (date: Date): Promise<OrthodoxCalendarData> => {
+export type CalendarTradition = 'greek' | 'slavic';
+
+/** Orthocal path segment for a tradition on the Gregorian (new) calendar. */
+export function orthocalTraditionPath(tradition: CalendarTradition): string {
+  return tradition === 'greek' ? 'greek/gregorian' : 'slavic/gregorian';
+}
+
+export const fetchOrthodoxCalendarData = async (
+  date: Date,
+  tradition: CalendarTradition = 'greek',
+): Promise<OrthodoxCalendarData> => {
   try {
     // Format date for Orthocal API
     const year = date.getFullYear();
     const month = date.getMonth() + 1; // JS months are 0-based
     const day = date.getDate();
-    const url = `https://orthocal.info/api/gregorian/${year}/${month}/${day}/`;
+    const url = `https://orthocal.info/api/${orthocalTraditionPath(tradition)}/${year}/${month}/${day}/`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

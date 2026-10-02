@@ -881,10 +881,10 @@ export class NotificationService {
     const { data } = response.notification.request.content;
     
     try {
-      if (data.type === 'bulletin-broadcast') {
+      if (data?.type === 'bulletin-broadcast') {
         // Navigate directly to the Events tab
         router.push('/(tabs)/events');
-      } else if (data.type === 'event-reminder') {
+      } else if (data?.type === 'event-reminder') {
         router.push('/(tabs)/calendar');
       }
     } catch (error) {

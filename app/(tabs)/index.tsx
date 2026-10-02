@@ -1,32 +1,61 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "nativewind";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, RefreshControl, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { EventDetailSheet } from "../../components/liturgical/EventDetailSheet";
+import { FastingBadge } from "../../components/liturgical/FastingBadge";
+import { ReadingSheet } from "../../components/liturgical/ReadingSheet";
+import { ReadingsCarousel } from "../../components/liturgical/ReadingsCarousel";
+import { TimelineItem } from "../../components/liturgical/TimelineItem";
 import ParishCalendarSetup from '../../components/ParishCalendarSetup';
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { PressableScale } from "../../components/ui/PressableScale";
+import { Reveal } from "../../components/ui/Reveal";
+import { CompactHeader, LargeHeader, useScrollHeader } from "../../components/ui/ScreenHeader";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { Skeleton, SkeletonRows } from "../../components/ui/Skeleton";
+import { useThemeColors } from "../../components/ui/useThemeColors";
+import { contentBottomPadding, EventKind, eventKindStyle, palette } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { useNotifications } from "../../contexts/NotificationContext";
 import { useOrthodoxCalendar } from "../../hooks/useOrthodoxCalendar";
 import { BulletinEvent, BulletinService } from '../../services/bulletinService';
 import { ConfessionReservationWithSchedule, ConfessionService } from '../../services/confessionService';
 import { getUserProfile } from '../../services/onboardingService';
 import { getParishByAdminId, getParishByUserId } from '../../services/parishService';
 
+type ScheduleItem = {
+  id: string;
+  title: string;
+  timeRange: string;
+  description?: string;
+  type: 'confession' | 'parish' | 'personal';
+  notes?: string;
+  isAllDay: boolean;
+  eventType?: 'event' | 'volunteer' | 'announcement';
+  location?: string;
+  startTime?: string;
+};
+
 export default function Index() {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const colors = useThemeColors();
+  const { scrollY, onScroll } = useScrollHeader();
   const { user, loading: authLoading } = useAuth();
   const { 
     calendarData, 
     greeting, 
-    todayDate, 
     loading, 
     error,
     parishEvents,
     refreshData
   } = useOrthodoxCalendar(user?.id);
   
-  // State for modal
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedReading, setSelectedReading] = useState<{ display: string; passage: string } | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
@@ -39,6 +68,40 @@ export default function Index() {
   const [parishDetails, setParishDetails] = useState<any>(null);
   const [personalEvents, setPersonalEvents] = useState<BulletinEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeItem, setActiveItem] = useState<ScheduleItem | null>(null);
+  const [itemSheetVisible, setItemSheetVisible] = useState(false);
+  const [reminderStates, setReminderStates] = useState<Record<string, boolean>>({});
+  const [togglingReminder, setTogglingReminder] = useState<string | null>(null);
+  const { isParishEventNotificationEnabled, setParishEventNotificationEnabled } = useNotifications();
+
+  const openItem = async (item: ScheduleItem) => {
+    Haptics.selectionAsync().catch(() => {});
+    setActiveItem(item);
+    setItemSheetVisible(true);
+    if (item.type === 'parish') {
+      const enabled = await isParishEventNotificationEnabled(item.id);
+      setReminderStates(prev => ({ ...prev, [item.id]: !!enabled }));
+    }
+  };
+
+  const toggleReminder = async (eventId: string) => {
+    try {
+      setTogglingReminder(eventId);
+      const next = !reminderStates[eventId];
+      await setParishEventNotificationEnabled(eventId, next, parishEvents.find(e => e.id === eventId));
+      setReminderStates(prev => ({ ...prev, [eventId]: next }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (error) {
+      console.error('Error toggling notification for event:', error);
+    } finally {
+      setTogglingReminder(null);
+    }
+  };
+
+  const closeItemThen = (navigate: () => void) => {
+    setItemSheetVisible(false);
+    setTimeout(navigate, 320);
+  };
 
   const fetchProfile = async () => {
     if (user) {
@@ -76,8 +139,6 @@ export default function Index() {
     initializeData();
   }, [user]);
 
-
-
   const handleCalendarSetupSuccess = () => {
     setParishHasCalendar(true);
     refreshData();
@@ -106,43 +167,43 @@ export default function Index() {
       const profile = await getUserProfile(user.id);
       const isAdmin = profile?.user_type === 'parish_admin';
       
+      if (__DEV__) {
+        console.log('Fetching confessions for user type:', profile?.user_type);
+        console.log('Is parish admin:', isAdmin);
+      }
+      
+      let confessionsForToday: ConfessionReservationWithSchedule[] = [];
+      const today = new Date();
+      
+      if (isAdmin) {
+        // For parish admins, get all reservations for their parish today
+        const parish = await getParishByAdminId(user.id);
+        if (__DEV__) {
+          console.log('Parish admin parish:', parish);
+        }
+        
+        if (parish) {
+          confessionsForToday = await ConfessionService.getParishReservations(parish.id, today);
           if (__DEV__) {
-            console.log('Fetching confessions for user type:', profile?.user_type);
-            console.log('Is parish admin:', isAdmin);
+            console.log('Parish reservations found:', confessionsForToday.length);
           }
-          
-          let confessionsForToday: ConfessionReservationWithSchedule[] = [];
-          const today = new Date();
-          
-          if (isAdmin) {
-            // For parish admins, get all reservations for their parish today
-            const parish = await getParishByAdminId(user.id);
-            if (__DEV__) {
-              console.log('Parish admin parish:', parish);
-            }
-            
-            if (parish) {
-              confessionsForToday = await ConfessionService.getParishReservations(parish.id, today);
-              if (__DEV__) {
-                console.log('Parish reservations found:', confessionsForToday.length);
-              }
-            }
-          } else {
-            // For regular users, get their own reservations
-            const userReservations = await ConfessionService.getUserReservations(user.id);
-            const todayStr = today.getFullYear() + '-' + 
-              String(today.getMonth() + 1).padStart(2, '0') + '-' + 
-              String(today.getDate()).padStart(2, '0');
-            
-            confessionsForToday = userReservations.filter(reservation => {
-              const reservationDate = reservation.confession_schedules?.date;
-              if (!reservationDate) return false;
-              return reservationDate === todayStr;
-            });
-            if (__DEV__) {
-              console.log('User reservations found:', confessionsForToday.length);
-            }
-          }
+        }
+      } else {
+        // For regular users, get their own reservations
+        const userReservations = await ConfessionService.getUserReservations(user.id);
+        const todayStr = today.getFullYear() + '-' + 
+          String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+          String(today.getDate()).padStart(2, '0');
+        
+        confessionsForToday = userReservations.filter(reservation => {
+          const reservationDate = reservation.confession_schedules?.date;
+          if (!reservationDate) return false;
+          return reservationDate === todayStr;
+        });
+        if (__DEV__) {
+          console.log('User reservations found:', confessionsForToday.length);
+        }
+      }
       
       setPersonalConfessions(confessionsForToday);
       
@@ -194,426 +255,368 @@ export default function Index() {
     }
   };
 
-  // Show auth loading state
+  const buildSchedule = (): ScheduleItem[] => {
+    const allEvents: ScheduleItem[] = [];
+
+    personalConfessions.forEach((confession) => {
+      const details = confessionDetails[confession.id];
+      const timeRange = formatConfessionTimeRange(confession.confession_schedules?.time_slot);
+
+      // Regular users see "Confession with <priest>", parish admins see "Confession with <parishioner>"
+      let title = "Confession";
+      if (isParishAdmin && details?.user_profiles?.full_name) {
+        title = `Confession with ${details.user_profiles.full_name}`;
+      } else if (!isParishAdmin && parishDetails?.priest_name) {
+        title = `Confession with ${parishDetails.priest_name}`;
+      }
+
+      allEvents.push({
+        id: confession.id,
+        title,
+        timeRange,
+        type: 'confession',
+        notes: confession.notes || undefined,
+        isAllDay: false
+      });
+    });
+
+    personalEvents.forEach((event) => {
+      const timeDisplay = event.event_time ? formatBulletinEventTime(event.event_time) : '';
+      const isAllDay = event.event_date && !event.event_time;
+      const dateDisplay = event.event_date ? (() => {
+        // Parse date as local date to avoid timezone issues
+        const [year, month, day] = event.event_date.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        return localDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      })() : '';
+
+      allEvents.push({
+        id: event.id,
+        title: event.title,
+        timeRange: isAllDay ? dateDisplay : `Starts at ${timeDisplay}`,
+        type: 'personal',
+        notes: event.user_response?.notes || undefined,
+        isAllDay: !!isAllDay,
+        eventType: event.event_type,
+        location: event.location,
+      });
+    });
+
+    parishEvents.forEach((event) => {
+      allEvents.push({
+        id: event.id,
+        title: event.title,
+        timeRange: formatEventTimeRange(event.startTime, event.endTime),
+        description: event.description,
+        type: 'parish',
+        isAllDay: false,
+        location: event.location,
+        startTime: event.startTime,
+      });
+    });
+
+    // All-day events first, then chronological
+    allEvents.sort((a, b) => {
+      if (a.isAllDay && !b.isAllDay) return -1;
+      if (!a.isAllDay && b.isAllDay) return 1;
+
+      if (a.isAllDay && b.isAllDay) {
+        const parseLocalDate = (dateString: string) => {
+          const match = dateString.match(/(\w+)\s+(\d+),\s+(\d+)/);
+          if (match) {
+            const [_, month, day, year] = match;
+            const monthIndex = new Date(`${month} 1, 2000`).getMonth();
+            return new Date(parseInt(year), monthIndex, parseInt(day));
+          }
+          return new Date(0);
+        };
+        return parseLocalDate(a.timeRange).getTime() - parseLocalDate(b.timeRange).getTime();
+      }
+
+      const getStartTime = (timeRange: string) => {
+        const match = timeRange.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/);
+        if (match) {
+          let hour = parseInt(match[1]);
+          const minute = parseInt(match[2]);
+          const ampm = match[3];
+          if (ampm === 'PM' && hour !== 12) hour += 12;
+          if (ampm === 'AM' && hour === 12) hour = 0;
+          return hour * 60 + minute;
+        }
+        return 0;
+      };
+
+      return getStartTime(a.timeRange) - getStartTime(b.timeRange);
+    });
+
+    return allEvents;
+  };
+
+  const kindFor = (item: ScheduleItem): EventKind => {
+    if (item.type === 'confession') return 'confession';
+    if (item.type === 'personal') return item.eventType === 'volunteer' ? 'volunteer' : 'event';
+    return 'parish';
+  };
+
   if (authLoading) {
     return (
       <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
-        <ActivityIndicator size="large" color={isDark ? 'white' : '#374151'} />
-        <Text className="text-gray-900 dark:text-white mt-4">Authenticating...</Text>
+        <ActivityIndicator size="small" color={colors.textMuted} />
+        <Text className="font-sans-medium text-gray-500 dark:text-gray-400 mt-3">Signing you in…</Text>
       </View>
     );
   }
 
-  // Show user state debug info in development
   if (__DEV__ && !user) {
     return (
       <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center p-6">
-        <Text className="text-red-400 text-lg font-bold mb-4">DEBUG: No User Found</Text>
-        <Text className="text-gray-900 dark:text-white text-center">
+        <Text className="font-sans-bold text-red-400 text-lg mb-4">DEBUG: No User Found</Text>
+        <Text className="font-sans text-gray-900 dark:text-white text-center">
           The user is null, which means authentication failed or user is not logged in.
         </Text>
-        <Text className="text-gray-500 dark:text-gray-400 text-sm text-center mt-4">
+        <Text className="font-sans text-gray-500 dark:text-gray-400 text-sm text-center mt-4">
           This debug screen only shows in development builds.
         </Text>
       </View>
     );
   }
 
-  // In production, if no user, show a generic error
   if (!user) {
     return (
       <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center p-6">
-        <Text className="text-gray-900 dark:text-white text-lg font-bold mb-4">Please log in</Text>
-        <Text className="text-gray-500 dark:text-gray-400 text-center">
+        <Text className="font-display text-3xl text-gray-900 dark:text-white mb-2">Please log in</Text>
+        <Text className="font-sans text-gray-500 dark:text-gray-400 text-center">
           You need to be logged in to view this content.
         </Text>
       </View>
     );
   }
 
+  const today = new Date();
+  const weekdayLine = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const schedule = loading ? [] : buildSchedule();
+
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-      <ScrollView 
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <CompactHeader title="Home" scrollY={scrollY} />
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: contentBottomPadding(insets.bottom) }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? 'white' : '#374151'}
-            colors={[isDark ? 'white' : '#374151']}
+            tintColor={colors.textMuted}
+            colors={[palette.accent]}
+            progressViewOffset={insets.top}
           />
         }
       >
-        
-        <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-          {/* Header */}
-          <View className="flex-row justify-between items-center pt-0">
-            <View>
-              <Text className="text-3xl font-bold text-gray-900 dark:text-white">Home</Text>
-              <Text className="text-sm text-gray-900 dark:text-white opacity-70">
-                {greeting}, <Text className="font-semibold">{profileName ? profileName + '!' : 'User!'}</Text>
-              </Text>
-            </View>
-            <View className="h-10 w-10 rounded-full bg-transparent flex items-center justify-center">
-              <Ionicons name="home" size={25} color={isDark ? 'white' : '#374151'} />
-            </View>
-          </View>
-          
-          {/* Today's Card */}
-          <View className="mt-6 rounded-xl shadow-md p-4 bg-gray-200/50 dark:bg-gray-800/50">
-            {loading ? (
-              <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
-                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading calendar data...</Text>
+        <LargeHeader
+          scrollY={scrollY}
+          eyebrow={weekdayLine}
+          title={`${greeting}, ${profileName ?? 'friend'}`}
+          subtitle={
+            parishName ? (
+              <View className="flex-row items-center">
+                <Ionicons name="location" size={13} color={palette.accentSoft} />
+                <Text className="font-sans-medium text-[14px] text-gray-500 dark:text-gray-400 ml-1" numberOfLines={1}>
+                  {parishName}
+                </Text>
               </View>
-            ) : error ? (
-              <View className="py-4">
-                <Text className="text-red-400 text-sm">Error loading calendar data</Text>
-                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
+            ) : undefined
+          }
+        />
+
+        {/* Liturgical day */}
+        <Reveal index={1} style={{ paddingHorizontal: 20, marginTop: 12 }}>
+          <PressableScale
+            onPress={() => router.push('/(tabs)/calendar')}
+            scaleTo={0.985}
+            accessibilityRole="button"
+            accessibilityHint="Opens the calendar"
+            className="rounded-[28px] overflow-hidden border border-red-100 dark:border-red-500/15"
+          >
+            <LinearGradient
+              colors={colors.isDark ? ['#1C0A0B', '#0A0A0D'] : ['#FFFFFF', '#FEF2F2']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ padding: 22 }}
+            >
+              <View className="flex-row items-center justify-between">
+                <Text className="font-sans-bold text-[11px] tracking-[1.6px] uppercase text-red-600 dark:text-red-400">
+                  Today in the Church
+                </Text>
+                <Ionicons name="arrow-forward" size={16} color={palette.accentSoft} />
               </View>
-            ) : (
-              <View>
-                <View className="flex-row justify-between items-center">
-                  <View>
-                    <Text className="text-gray-900 dark:text-white text-xs">TODAY</Text>
-                    <Text className="text-gray-900 dark:text-white text-lg font-bold">{todayDate}</Text>
-                    {calendarData?.title && (
-                      <Text className="text-gray-900 dark:text-white text-md font-light mt-1">{calendarData.title}</Text>
-                    )}
-                  </View>
+
+              {loading ? (
+                <View className="mt-4">
+                  <Skeleton width="80%" height={26} />
+                  <Skeleton width="55%" height={26} className="mt-2" />
+                  <Skeleton width="90%" height={13} className="mt-5" />
+                  <Skeleton width={150} height={26} radius={13} className="mt-5" />
                 </View>
-                <View className="mt-1">
-                  <Text className="text-gray-900 dark:text-white text-sm">{calendarData?.fasting || ''}</Text>
-                  {calendarData?.saintsFeasts && (
-                    <Text className="text-gray-900 dark:text-white text-sm font-semibold mt-1">
+              ) : error ? (
+                <View className="mt-4">
+                  <Text className="font-display text-[26px] leading-[30px] text-gray-900 dark:text-white">
+                    The calendar couldn't load
+                  </Text>
+                  <Text className="font-sans text-[13px] text-gray-500 dark:text-gray-400 mt-2">{error}</Text>
+                  <Button label="Try again" variant="secondary" size="sm" icon="refresh" onPress={refreshData} className="mt-4 self-start" />
+                </View>
+              ) : (
+                <View className="mt-3">
+                  {!!calendarData?.title && (
+                    <Text className="font-display text-[30px] leading-[34px] text-gray-900 dark:text-white">
+                      {calendarData.title}
+                    </Text>
+                  )}
+                  {!!calendarData?.saintsFeasts && (
+                    <Text
+                      className="font-display-italic text-[18px] leading-[24px] text-gray-600 dark:text-gray-300 mt-3"
+                      numberOfLines={4}
+                    >
                       {calendarData.saintsFeasts}
                     </Text>
                   )}
+                  <FastingBadge fasting={calendarData?.fasting} className="mt-5" />
                 </View>
-              </View>
-            )}
-          </View>
-        </View>
-        
-        {/* Today's Schedule */}
-        <View className="bg-gradient-to-b from-gray-100 dark:from-gray-800 to-gray-200 dark:to-gray-900 p-6">
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-gray-900 dark:text-white text-lg font-bold">Today's Schedule</Text>
-            <Pressable className=" bg-red-600 text-xs rounded-lg px-2 py-1 flex-row items-center active:opacity-70">
-              <Text className="text-xs text-white">{parishName || 'Loading...'}</Text>
-              {/* <Ionicons name="chevron-down" size={10} color="white" className="ml-1" /> */}
-            </Pressable>
-          </View>
-          
-          {/* Calendar Setup Prompt for Parish Admins */}
-          {isParishAdmin && !parishHasCalendar && (
-            <View className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-500/30 rounded-xl p-4 mb-4">
+              )}
+            </LinearGradient>
+          </PressableScale>
+        </Reveal>
+
+        {/* Calendar setup prompt for parish admins */}
+        {isParishAdmin && !parishHasCalendar && (
+          <Reveal index={2} style={{ paddingHorizontal: 20, marginTop: 16 }}>
+            <View className="rounded-3xl p-5 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
               <View className="flex-row items-start">
-                <Ionicons name="calendar-outline" size={20} color="#3B82F6" className="mt-0.5" />
+                <View className="h-10 w-10 rounded-2xl bg-blue-500/15 items-center justify-center">
+                  <Ionicons name="calendar-outline" size={18} color={palette.blue} />
+                </View>
                 <View className="flex-1 ml-3">
-                  <Text className="text-blue-400 font-semibold text-sm">Set Up Parish Calendar</Text>
-                  <Text className="text-blue-300 text-xs mt-1">
+                  <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">Set up your parish calendar</Text>
+                  <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
                     Connect your Google Calendar to display parish events in the app.
                   </Text>
-                  <Pressable
-                    className="bg-blue-600 rounded-lg px-4 py-2 mt-3 self-start active:opacity-70"
-                    onPress={() => setShowCalendarSetup(true)}
-                  >
-                    <Text className="text-white text-xs font-medium">Set Up Calendar</Text>
-                  </Pressable>
+                  <Button label="Set up calendar" size="sm" onPress={() => setShowCalendarSetup(true)} className="mt-3 self-start" />
                 </View>
               </View>
             </View>
-          )}
+          </Reveal>
+        )}
 
-          {/* Schedule Cards */}
-          <View className="space-y-4">
-            {loading ? (
-              <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
-                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading events...</Text>
-              </View>
-            ) : error ? (
-              <View className="py-4">
-                <Text className="text-red-400 text-sm">Error loading events</Text>
-                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
-              </View>
-            ) : (
-              (() => {
-                // Combine and sort all events chronologically
-                const allEvents: Array<{
-                  id: string;
-                  title: string;
-                  timeRange: string;
-                  description?: string;
-                  type: 'confession' | 'parish' | 'personal';
-                  notes?: string;
-                  isAllDay: boolean;
-                  eventType?: 'event' | 'volunteer' | 'announcement';
-                  location?: string;
-                }> = [];
-
-                // Add personal confessions
-                personalConfessions.forEach((confession) => {
-                  const details = confessionDetails[confession.id];
-                  const timeRange = formatConfessionTimeRange(confession.confession_schedules?.time_slot);
-                  
-                  // For regular users, show "Confession with priest_name"
-                  // For parish admins, show "Confession with user_name"
-                  let title = "Confession";
-                  if (isParishAdmin && details?.user_profiles?.full_name) {
-                    title = `Confession with ${details.user_profiles.full_name}`;
-                  } else if (!isParishAdmin && parishDetails?.priest_name) {
-                    title = `Confession with ${parishDetails.priest_name}`;
-                  }
-
-                  if (__DEV__) {
-                    console.log('Adding confession to display:', { title, timeRange, isParishAdmin });
-                  }
-
-                  allEvents.push({
-                    id: confession.id,
-                    title,
-                    timeRange,
-                    type: 'confession',
-                    notes: confession.notes || undefined,
-                    isAllDay: false
-                  });
-                });
-
-                // Add personal events from bulletin board
-                personalEvents.forEach((event) => {
-                  const timeDisplay = event.event_time ? formatBulletinEventTime(event.event_time) : '';
-                  const locationDisplay = event.location ? ` • ${event.location}` : '';
-                  const isAllDay = event.event_date && !event.event_time;
-                  const dateDisplay = event.event_date ? (() => {
-                    // Parse date as local date to avoid timezone issues
-                    const [year, month, day] = event.event_date.split('-').map(Number);
-                    const localDate = new Date(year, month - 1, day);
-                    return localDate.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    });
-                  })() : '';
-                  
-                  const timeRange = isAllDay ? `${dateDisplay}${locationDisplay}` : `Starts at ${timeDisplay}${locationDisplay}`;
-
-                  allEvents.push({
-                    id: event.id,
-                    title: event.title,
-                    timeRange,
-                    type: 'personal',
-                    notes: event.user_response?.notes || undefined,
-                    isAllDay: !!isAllDay,
-                    eventType: event.event_type // Add event type for icon selection
-                  });
-                });
-
-                // Add parish events
-                parishEvents.forEach((event) => {
-                  allEvents.push({
-                    id: event.id,
-                    title: event.title,
-                    timeRange: formatEventTimeRange(event.startTime, event.endTime),
-                    description: event.description,
-                    type: 'parish',
-                    isAllDay: false,
-                    location: event.location
-                  });
-                });
-
-                // Sort events: all-day events first, then by time
-                allEvents.sort((a, b) => {
-                  // All-day events come first
-                  if (a.isAllDay && !b.isAllDay) return -1;
-                  if (!a.isAllDay && b.isAllDay) return 1;
-                  
-                  // If both are all-day or both have times, sort by time
-                  if (a.isAllDay && b.isAllDay) {
-                    // For all-day events, sort by date
-                    const parseLocalDate = (dateString: string) => {
-                      const match = dateString.match(/(\w+)\s+(\d+),\s+(\d+)/);
-                      if (match) {
-                        const [_, month, day, year] = match;
-                        const monthIndex = new Date(`${month} 1, 2000`).getMonth();
-                        return new Date(parseInt(year), monthIndex, parseInt(day));
-                      }
-                      return new Date(0);
-                    };
-                    const dateA = parseLocalDate(a.timeRange);
-                    const dateB = parseLocalDate(b.timeRange);
-                    return dateA.getTime() - dateB.getTime();
-                  }
-                  
-                  // For timed events, sort by time
-                  const getStartTime = (timeRange: string) => {
-                    const match = timeRange.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/);
-                    if (match) {
-                      let hour = parseInt(match[1]);
-                      const minute = parseInt(match[2]);
-                      const ampm = match[3];
-                      
-                      if (ampm === 'PM' && hour !== 12) hour += 12;
-                      if (ampm === 'AM' && hour === 12) hour = 0;
-                      
-                      return hour * 60 + minute;
-                    }
-                    return 0;
-                  };
-                  
-                  return getStartTime(a.timeRange) - getStartTime(b.timeRange);
-                });
-
-                if (allEvents.length > 0) {
-                  return allEvents.map((event) => (
-                    <View 
-                      key={event.id} 
-                      className={`rounded-xl shadow-sm p-4 mb-2 ${
-                        event.type === 'confession' 
-                          ? 'bg-red-900/20 border border-red-500/30' 
-                          : event.type === 'personal' && event.eventType === 'volunteer'
-                          ? 'bg-green-900/20 border border-green-500/30'
-                          : event.type === 'personal'
-                          ? 'bg-purple-900/20 border border-purple-500/30'
-                          : 'bg-gray-200/50 dark:bg-gray-800/50'
-                      }`}
-                    >
-                      <View className="flex-row justify-between items-start">
-                        <View className="flex-1">
-                          <Text className="text-sm text-gray-900 dark:text-white font-semibold pr-1">{event.title}</Text>
-                          <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">
-                            {event.timeRange}
-                          </Text>
-                          {event.location && (
-                            <Text className="text-xs text-gray-900 dark:text-white opacity-80 mt-1">
-                              {event.location}
-                            </Text>
-                          )}
-                        </View>
-                        <View className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                          event.type === 'confession' 
-                            ? 'bg-red-600/20' 
-                            : event.type === 'personal' && event.eventType === 'volunteer'
-                            ? 'bg-green-600/20'
-                            : event.type === 'personal'
-                            ? 'bg-purple-600/20'
-                            : 'bg-gray-200 dark:bg-gray-700'
-                        }`}>
-                          <Ionicons 
-                            name={
-                              event.type === 'confession' ? 'person' : 
-                              event.type === 'personal' ? (event.eventType === 'volunteer' ? 'hand-right' : 'people') : 
-                              'calendar'
-                            } 
-                            size={16} 
-                            color={
-                              event.type === 'confession' ? '#EF4444' : 
-                              event.type === 'personal' && event.eventType === 'volunteer' ? '#10B981' : 
-                              event.type === 'personal' ? '#A855F7' : 
-                              isDark ? 'white' : '#374151'
-                            } 
-                          />
-                        </View>
-                      </View>
-                    </View>
-                  ));
-                } else {
-                  return (
-                    <Text className="text-xs text-gray-900 dark:text-white opacity-70">
-                      {!parishHasCalendar 
-                        ? (isParishAdmin 
-                            ? "Set up your parish calendar to see events here." 
-                            : "Your administrator hasn't set up the parish calendar yet.")
-                        : "No events scheduled for today."}
-                    </Text>
-                  );
-                }
-              })()
-            )}
-          </View>
-        </View>
-        
-        {/* Daily Scripture Readings */}
-        <View className="bg-gradient-to-b from-gray-200 dark:from-gray-900 to-gray-50 dark:to-black p-4 pb-8">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-gray-900 dark:text-white text-lg font-bold ml-2">Daily Readings</Text>
-          </View>
-          <View className="rounded-xl p-2">
-            {loading ? (
-              <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
-                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading readings...</Text>
-              </View>
-            ) : error ? (
-              <View className="py-4">
-                <Text className="text-red-400 text-sm">Error loading readings</Text>
-                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
-              </View>
-            ) : (
-              <View className="space-y-2">
-                {calendarData?.readingsFull && calendarData.readingsFull.length > 0 ? (
-                  calendarData.readingsFull.map((reading, idx) => (
-                    <Pressable
-                      key={idx}
-                      className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2 active:opacity-70"
-                      onPress={() => {
-                        setSelectedReading(reading);
-                        setModalVisible(true);
-                      }}
-                    >
-                      <View className="flex-row justify-between items-start">
-                        <View className="flex-1">
-                          <Text className="text-sm text-gray-700 dark:text-gray-200 font-semibold">{reading.display}</Text>
-                          <Text className="text-xs text-gray-900 dark:text-white opacity-70">{"tap to read..."}</Text>
-                        </View>
-                        <View className="h-8 w-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <Ionicons name="book" size={16} color={isDark ? 'white' : '#374151'} />
-                        </View>
-                      </View>
-                    </Pressable>
-                  ))
-                ) : (
-                  <Text className="text-xs text-gray-900 dark:text-white opacity-70">No readings for today.</Text>
-                )}
-                {calendarData?.readingsLink && (
-                  <Pressable onPress={() => Linking.openURL(calendarData.readingsLink!)} className="mt-2 active:opacity-70">
-                    <Text className="text-lg text-blue-400 underline">Full readings</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-          </View>
-          {/* Modal for full reading */}
-          <Modal
-            visible={modalVisible}
-            animationType="fade"
-            transparent={true}
-            onRequestClose={() => setModalVisible(false)}
-          >
-            <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-              <Pressable
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                onPress={() => setModalVisible(false)}
-                pointerEvents="auto"
-              />
-              <View
-                className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-200 dark:border-gray-700"
-              >
-                <Text className="text-xl text-gray-900 dark:text-white font-bold mb-6 text-center">{selectedReading?.display + " (KJV)"}</Text>
-                <ScrollView className="max-h-96 mb-4">
-                  <Text className="text-gray-900 dark:text-white text-base leading-relaxed italic">"{selectedReading?.passage}"</Text>
-                </ScrollView>
-              </View>
+        {/* Today's schedule */}
+        <Reveal index={3} style={{ paddingHorizontal: 20, marginTop: 32 }}>
+          <SectionHeader title="Today's schedule" caption={parishName || undefined} />
+          {loading ? (
+            <View className="mt-2"><SkeletonRows rows={3} /></View>
+          ) : error ? (
+            <EmptyState compact icon="cloud-offline-outline" title="Couldn't load events" message={error} />
+          ) : schedule.length > 0 ? (
+            <View className="mt-1 -ml-1">
+              {schedule.map((item, i) => (
+                <TimelineItem
+                  key={item.id}
+                  kind={kindFor(item)}
+                  title={item.title}
+                  time={item.timeRange}
+                  meta={item.location}
+                  isLast={i === schedule.length - 1}
+                  onPress={() => openItem(item)}
+                />
+              ))}
             </View>
-          </Modal>
-        </View>
-        
-        {/* Remove Sign Out Button from here */}
-      </ScrollView>
+          ) : (
+            <EmptyState
+              compact
+              icon="sunny-outline"
+              title={parishHasCalendar ? 'A quiet day' : 'No parish calendar yet'}
+              message={
+                !parishHasCalendar
+                  ? (isParishAdmin
+                      ? "Set up your parish calendar to see events here."
+                      : "Your administrator hasn't set up the parish calendar yet.")
+                  : "No events scheduled for today."
+              }
+            />
+          )}
+        </Reveal>
 
-      {/* Calendar Setup Modal */}
+        {/* Daily readings */}
+        <Reveal index={4} style={{ marginTop: 32 }}>
+          <View className="px-5">
+            <SectionHeader title="Daily readings" caption="Tap a passage to read" />
+          </View>
+          <ReadingsCarousel
+            readings={calendarData?.readingsFull}
+            readingsLink={calendarData?.readingsLink}
+            loading={loading}
+            error={error}
+            onSelect={(reading) => {
+              setSelectedReading(reading);
+              setModalVisible(true);
+            }}
+          />
+        </Reveal>
+      </Animated.ScrollView>
+
+      <ReadingSheet
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        eyebrow="Scripture"
+        title={selectedReading?.display}
+        subtitle="King James Version"
+        body={selectedReading?.passage}
+        scripture
+      />
+
+      <EventDetailSheet
+        visible={itemSheetVisible}
+        onClose={() => setItemSheetVisible(false)}
+        eyebrow={
+          activeItem?.type === 'parish'
+            ? parishName || 'Parish event'
+            : activeItem
+              ? eventKindStyle[kindFor(activeItem)].label
+              : undefined
+        }
+        title={activeItem?.title}
+        when={activeItem?.timeRange}
+        whenDetail={today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        location={activeItem?.location}
+        description={activeItem?.description}
+        notes={activeItem?.notes}
+        reminder={
+          activeItem?.type === 'parish' && activeItem.startTime?.includes('T')
+            ? {
+                isTimed: activeItem.startTime.includes('T'),
+                isUpcoming: activeItem.startTime.includes('T') && new Date(activeItem.startTime) > new Date(),
+                isOn: !!reminderStates[activeItem.id],
+                loading: togglingReminder === activeItem.id,
+                onToggle: () => toggleReminder(activeItem.id),
+                onOpenSettings: () => closeItemThen(() => router.push('/(tabs)/calendar/notification-settings')),
+              }
+            : undefined
+        }
+        secondaryAction={
+          activeItem && activeItem.type !== 'parish'
+            ? {
+                label: 'Open in Events',
+                icon: 'arrow-forward',
+                onPress: () => closeItemThen(() => router.push('/(tabs)/events')),
+              }
+            : undefined
+        }
+      />
+
       <ParishCalendarSetup
         visible={showCalendarSetup}
         onClose={() => setShowCalendarSetup(false)}
@@ -673,7 +676,7 @@ function formatEventTimeRange(start: string, end: string) {
       endDate.setDate(endDate.getDate());
       const endStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       if (startStr === endStr) return startStr;
-      return `${startStr} – ${endStr}`;
+      return `${startStr} - ${endStr}`;
     }
     return startStr;
   }
@@ -701,19 +704,4 @@ function formatBulletinEventTime(timeString: string): string {
     console.error('Error formatting time:', error);
     return timeString; // Return original on error
   }
-}
-
-// Helper function to convert time strings to minutes since midnight
-function convertTimeToMinutes(timeString: string): number {
-  if (!timeString) return 0;
-  
-  // Handle different time formats
-  const timeMatch = timeString.match(/(\d{1,2}):(\d{2})/);
-  if (timeMatch) {
-    const hours = parseInt(timeMatch[1], 10);
-    const minutes = parseInt(timeMatch[2], 10);
-    return hours * 60 + minutes;
-  }
-  
-  return 0;
 }

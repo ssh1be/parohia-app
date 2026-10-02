@@ -7,7 +7,6 @@
     "icon": "./assets/images/App_store_1024_1x.png",
     "scheme": "parohia",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ssh1be.Parohia",
@@ -21,7 +20,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.ssh1be.Parohia"
     },
     "web": {
@@ -47,7 +45,11 @@
           "color": "#ffffff"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font",
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

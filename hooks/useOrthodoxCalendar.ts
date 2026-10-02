@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useCalendarTradition } from '../contexts/CalendarTraditionContext';
 import { fetchOrthodoxCalendarData, fetchParishEventsForToday, OrthodoxCalendarData, ParishEvent } from '../services/calendarService';
 import { getDayOfWeek, getGreeting, getTodayDate } from '../utils/dateUtils';
 
@@ -14,6 +15,7 @@ interface UseOrthodoxCalendarReturn {
 }
 
 export const useOrthodoxCalendar = (userId?: string): UseOrthodoxCalendarReturn => {
+  const { tradition } = useCalendarTradition();
   const [calendarData, setCalendarData] = useState<OrthodoxCalendarData | null>(null);
   const [parishEvents, setParishEvents] = useState<ParishEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export const useOrthodoxCalendar = (userId?: string): UseOrthodoxCalendarReturn 
       setLoading(true);
       setError(null);
       const [calendar, parish] = await Promise.all([
-        fetchOrthodoxCalendarData(today),
+        fetchOrthodoxCalendarData(today, tradition),
         fetchParishEventsForToday(today, userId)
       ]);
       setCalendarData(calendar);
@@ -54,7 +56,7 @@ export const useOrthodoxCalendar = (userId?: string): UseOrthodoxCalendarReturn 
 
   useEffect(() => {
     fetchData();
-  }, [userId]);
+  }, [userId, tradition]);
 
   return {
     calendarData,

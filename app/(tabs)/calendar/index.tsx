@@ -1,24 +1,103 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { useColorScheme } from "nativewind";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { FadeIn, FadeInLeft, FadeInRight, runOnJS } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { EventDetailSheet } from "../../../components/liturgical/EventDetailSheet";
+import { FastingBadge } from "../../../components/liturgical/FastingBadge";
+import { ReadingSheet } from "../../../components/liturgical/ReadingSheet";
+import { ReadingsCarousel } from "../../../components/liturgical/ReadingsCarousel";
+import { TimelineItem } from "../../../components/liturgical/TimelineItem";
 import ParishCalendarSetup from "../../../components/ParishCalendarSetup";
+import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { PressableScale } from "../../../components/ui/PressableScale";
+import { CompactHeader, LargeHeader, useScrollHeader } from "../../../components/ui/ScreenHeader";
+import { SectionHeader } from "../../../components/ui/SectionHeader";
+import { SegmentedControl } from "../../../components/ui/SegmentedControl";
+import { SkeletonRows } from "../../../components/ui/Skeleton";
+import { useThemeColors } from "../../../components/ui/useThemeColors";
+import { contentBottomPadding, entrance, fastingStyle, getFastingKind, palette } from "../../../constants/theme";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useCalendarTradition } from "../../../contexts/CalendarTraditionContext";
 import { useNotifications } from "../../../contexts/NotificationContext";
 import { BulletinEvent, BulletinService } from "../../../services/bulletinService";
-import { fetchOrthodoxCalendarData, fetchParishEventsForToday, OrthodoxCalendarData, ParishEvent } from "../../../services/calendarService";
+import {
+  fetchOrthodoxCalendarData,
+  fetchParishEventsForMultipleDays,
+  fetchParishEventsForToday,
+  OrthodoxCalendarData,
+  ParishEvent,
+} from "../../../services/calendarService";
 import { ConfessionReservationWithSchedule, ConfessionService } from "../../../services/confessionService";
 import { getUserProfile } from "../../../services/onboardingService";
 import { getParishByAdminId, getParishByUserId } from "../../../services/parishService";
 
+type PersonalItem = {
+  id: string;
+  type: 'confession' | 'event';
+  title: string;
+  timeDisplay: string;
+  isAllDay: boolean;
+  notes?: string;
+  location?: string;
+  eventType?: 'event' | 'volunteer' | 'announcement';
+  data: any;
+};
+
+type ViewMode = 'month' | 'week';
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const localDateKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const parseDateOnly = (value: string) => {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+/** Groups events by the local days they occur on; all-day events span until their exclusive end date. */
+function groupEventsByDay(events: ParishEvent[], dayKeys: Set<string>) {
+  const byDay: Record<string, ParishEvent[]> = {};
+  const add = (key: string, event: ParishEvent) => {
+    if (dayKeys.has(key)) (byDay[key] ??= []).push(event);
+  };
+
+  events.forEach((event) => {
+    if (!event.startTime) return;
+    if (event.startTime.includes('T')) {
+      add(localDateKey(new Date(event.startTime)), event);
+      return;
+    }
+    const cursor = parseDateOnly(event.startTime);
+    const end = event.endTime && !event.endTime.includes('T') ? parseDateOnly(event.endTime) : null;
+    let guard = 0;
+    do {
+      add(localDateKey(cursor), event);
+      cursor.setDate(cursor.getDate() + 1);
+      guard++;
+    } while (end && cursor < end && guard < 14);
+  });
+
+  Object.values(byDay).forEach((list) =>
+    list.sort((a, b) => {
+      const aAllDay = !a.startTime.includes('T');
+      const bAllDay = !b.startTime.includes('T');
+      if (aAllDay !== bAllDay) return aAllDay ? -1 : 1;
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+    })
+  );
+  return byDay;
+}
+
 export default function Calendar() {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const colors = useThemeColors();
+  const { scrollY, onScroll } = useScrollHeader();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [monthDirection, setMonthDirection] = useState<'prev' | 'next'>('next');
   const [calendarData, setCalendarData] = useState<OrthodoxCalendarData | null>(null);
   const [parishEvents, setParishEvents] = useState<ParishEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,15 +118,23 @@ export default function Calendar() {
   const [personalEvents, setPersonalEvents] = useState<BulletinEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [fastingData, setFastingData] = useState<Record<string, string>>({});
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [weekEvents, setWeekEvents] = useState<ParishEvent[]>([]);
+  const [weekLoading, setWeekLoading] = useState(false);
+  const [weekReload, setWeekReload] = useState(0);
+  const [weekAnchor, setWeekAnchor] = useState(new Date());
+  const [activeEvent, setActiveEvent] = useState<ParishEvent | null>(null);
+  const [eventSheetVisible, setEventSheetVisible] = useState(false);
 
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
+  const { tradition } = useCalendarTradition();
   const { preferences, setParishEventNotificationEnabled, isParishEventNotificationEnabled } = useNotifications();
 
   // Fetch fasting data for multiple days
   const fetchFastingDataForDays = async (days: Date[]) => {
     try {
       const fastingPromises = days.map(async (date) => {
-        const data = await fetchOrthodoxCalendarData(date);
+        const data = await fetchOrthodoxCalendarData(date, tradition);
         return {
           dateKey: date.toISOString().split('T')[0],
           fasting: data.fasting
@@ -67,23 +154,6 @@ export default function Calendar() {
     }
   };
 
-  // Helper function to get fasting emoji
-  const getFastingEmoji = (fastingText: string): string => {
-    if (!fastingText || fastingText.includes('No Fast')) {
-      return '';
-    }
-    if (fastingText.includes('Fish')) {
-      return '🐟';
-    }
-    if (fastingText.includes('Wine')) {
-      return '🍷';
-    }
-    if (fastingText.includes('Fast')) {
-      return '🌱';
-    }
-    return '';
-  };
-
   // Fetch data for selected date
   const fetchDataForDate = async (date: Date) => {
     try {
@@ -92,7 +162,7 @@ export default function Calendar() {
       
       // Fetch calendar data and parish events
       const [calendar, parish] = await Promise.all([
-        fetchOrthodoxCalendarData(date),
+        fetchOrthodoxCalendarData(date, tradition),
         fetchParishEventsForToday(date, user?.id)
       ]);
       setCalendarData(calendar);
@@ -199,7 +269,6 @@ export default function Calendar() {
     }
   };
 
-
   const checkUserAndParish = async () => {
     if (user) {
       const profile = await getUserProfile(user.id);
@@ -233,7 +302,7 @@ export default function Calendar() {
       const isEnabled = await isParishEventNotificationEnabled(event.id);
       states[event.id] = !!isEnabled;
     }
-    setEventNotificationStates(states);
+    setEventNotificationStates(prev => ({ ...prev, ...states }));
   };
 
   const handleNotificationToggle = async (eventId: string) => {
@@ -241,9 +310,10 @@ export default function Calendar() {
       setTogglingEvent(eventId);
       const currentState = eventNotificationStates[eventId];
       const newEnabledState = !currentState;
-      const eventData = parishEvents.find(e => e.id === eventId);
+      const eventData = parishEvents.find(e => e.id === eventId) ?? weekEvents.find(e => e.id === eventId);
       await setParishEventNotificationEnabled(eventId, newEnabledState, eventData);
       setEventNotificationStates(prev => ({ ...prev, [eventId]: newEnabledState }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (error) {
       console.error('Error toggling notification for event:', error);
     } finally {
@@ -251,18 +321,15 @@ export default function Calendar() {
     }
   };
 
-  // Fetch data when selected date changes
+  // Fetch data when selected date or calendar tradition changes
   useEffect(() => {
     fetchDataForDate(selectedDate);
-  }, [selectedDate, user]);
-
-  // Scheduling is handled globally via refreshNotifications() on init and settings changes
-
-
+  }, [selectedDate, user, tradition]);
 
   const handleCalendarSetupSuccess = () => {
     setParishHasCalendar(true);
     fetchDataForDate(selectedDate);
+    setWeekReload(n => n + 1);
   };
 
   const onRefresh = async () => {
@@ -270,6 +337,7 @@ export default function Calendar() {
     try {
       await checkUserAndParish(); // Refresh parish information
       await fetchDataForDate(selectedDate);
+      setWeekReload(n => n + 1);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -282,7 +350,6 @@ export default function Calendar() {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
     
@@ -309,23 +376,16 @@ export default function Calendar() {
 
   const calendarDays = generateCalendarDays();
 
-  // Fetch fasting data when calendar days change
+  // Fetch fasting data when calendar days or tradition change
   useEffect(() => {
     const dates = calendarDays.map(day => day.date);
     fetchFastingDataForDays(dates);
-  }, [currentMonth]);
+  }, [currentMonth, tradition]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
       month: 'long', 
       day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
-
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      month: 'long', 
       year: 'numeric' 
     });
   };
@@ -337,12 +397,91 @@ export default function Calendar() {
     } else {
       newMonth.setMonth(newMonth.getMonth() + 1);
     }
+    Haptics.selectionAsync().catch(() => {});
+    setMonthDirection(direction);
     setCurrentMonth(newMonth);
   };
 
-  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const jumpToToday = () => {
+    const today = new Date();
+    setMonthDirection(today < currentMonth ? 'prev' : 'next');
+    setCurrentMonth(today);
+    setSelectedDate(today);
+    setWeekAnchor(today);
+    Haptics.selectionAsync().catch(() => {});
+  };
 
-  // Helper function for formatting event time range (same as in index.tsx)
+  const selectDay = (date: Date, isCurrentMonth: boolean) => {
+    Haptics.selectionAsync().catch(() => {});
+    setSelectedDate(date);
+    if (!isCurrentMonth) {
+      setMonthDirection(date < currentMonth ? 'prev' : 'next');
+      setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    }
+  };
+
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-14, 14])
+    .onEnd((e) => {
+      if (e.translationX < -50) runOnJS(navigateMonth)('next');
+      else if (e.translationX > 50) runOnJS(navigateMonth)('prev');
+    });
+
+  const weekStart = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate());
+  const weekDays = Array.from({ length: 7 }, (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i));
+  const weekKey = localDateKey(weekStart);
+  const isInWeekWindow = (date: Date) => weekDays.some((d) => d.toDateString() === date.toDateString());
+
+  const changeViewMode = (mode: ViewMode) => {
+    if (mode === 'week' && !isInWeekWindow(selectedDate)) setWeekAnchor(selectedDate);
+    setViewMode(mode);
+  };
+
+  useEffect(() => {
+    if (viewMode !== 'week' || !user) return;
+    let cancelled = false;
+    (async () => {
+      setWeekLoading(true);
+      try {
+        const events = await fetchParishEventsForMultipleDays(weekStart, 7, user.id);
+        if (cancelled) return;
+        setWeekEvents(events);
+        if (events.length > 0) await loadEventNotificationStates(events);
+      } catch (err) {
+        console.error('Error fetching parish events for week:', err);
+        if (!cancelled) setWeekEvents([]);
+      } finally {
+        if (!cancelled) setWeekLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [weekKey, viewMode, user, weekReload]);
+
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    const next = new Date(weekAnchor);
+    next.setDate(next.getDate() + (direction === 'next' ? 7 : -7));
+    Haptics.selectionAsync().catch(() => {});
+    setMonthDirection(direction);
+    setWeekAnchor(next);
+    setSelectedDate(next);
+    if (next.getMonth() !== currentMonth.getMonth() || next.getFullYear() !== currentMonth.getFullYear()) {
+      setCurrentMonth(new Date(next.getFullYear(), next.getMonth(), 1));
+    }
+  };
+
+  const weekSwipe = Gesture.Pan()
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-14, 14])
+    .onEnd((e) => {
+      if (e.translationX < -50) runOnJS(navigateWeek)('next');
+      else if (e.translationX > 50) runOnJS(navigateWeek)('prev');
+    });
+
+  const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
   const formatEventTimeRange = (start: string, end: string) => {
     if (!start) return '';
     // If start/end are dateTime, show time range
@@ -366,20 +505,10 @@ export default function Calendar() {
         endDate.setDate(endDate.getDate());
         const endStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         if (startStr === endStr) return startStr;
-        return `${startStr} – ${endStr}`;
+        return `${startStr} - ${endStr}`;
       }
       return startStr;
     }
-  };
-
-  const formatConfessionTime = (timeSlot: string) => {
-    // Convert database time format (HH:MM:SS) to display format
-    const [hours, minutes] = timeSlot.split(':').slice(0, 2);
-    const hour = parseInt(hours);
-    const displayHour = hour > 12 ? hour - 12 : hour;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const minuteStr = minutes === '00' ? '00' : minutes;
-    return `${displayHour}:${minuteStr} ${ampm}`;
   };
 
   const formatConfessionTimeRange = (timeSlot: string) => {
@@ -430,552 +559,754 @@ export default function Calendar() {
     }
   };
 
+  const convertTimeToMinutes = (timeString: string): number => {
+    if (!timeString) return 0;
+    const timeMatch = timeString.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      return hours * 60 + minutes;
+    }
+    return 0;
+  };
+
+  const buildPersonalSchedule = (): PersonalItem[] => {
+    const allEvents: PersonalItem[] = [];
+
+    personalConfessions.forEach((confession) => {
+      const details = confessionDetails[confession.id];
+      const timeRange = formatConfessionTimeRange(confession.confession_schedules?.time_slot);
+
+      let title = "Confession";
+      if (isParishAdmin && details?.user_profiles?.full_name) {
+        title = `Confession with ${details.user_profiles.full_name}`;
+      } else if (!isParishAdmin && parishDetails?.priest_name) {
+        title = `Confession with ${parishDetails.priest_name}`;
+      }
+      allEvents.push({
+        id: confession.id,
+        type: 'confession',
+        title,
+        timeDisplay: timeRange,
+        isAllDay: false,
+        notes: confession.notes || undefined,
+        data: confession
+      });
+    });
+
+    personalEvents.forEach((event) => {
+      const timeDisplay = event.event_time ? formatEventTime(event.event_time) : '';
+      const isAllDay = event.event_date && !event.event_time;
+      const dateDisplay = event.event_date ? (() => {
+        // Parse date as local date to avoid timezone issues
+        const [year, month, day] = event.event_date.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        return formatDate(localDate);
+      })() : '';
+      allEvents.push({
+        id: event.id,
+        type: 'event',
+        title: event.title,
+        timeDisplay: isAllDay ? dateDisplay : `Starts at ${timeDisplay}`,
+        isAllDay: !!isAllDay,
+        notes: event.user_response?.notes || undefined,
+        location: event.location,
+        eventType: event.event_type,
+        data: event
+      });
+    });
+
+    // All-day events first, then chronological across confessions and events
+    allEvents.sort((a, b) => {
+      if (a.isAllDay && !b.isAllDay) return -1;
+      if (!a.isAllDay && b.isAllDay) return 1;
+
+      if (a.isAllDay && b.isAllDay) {
+        const parseLocalDate = (dateString: string) => {
+          const [year, month, day] = dateString.split('-').map(Number);
+          return new Date(year, month - 1, day);
+        };
+        const dateA = parseLocalDate(a.data.event_date || '1970-01-01');
+        const dateB = parseLocalDate(b.data.event_date || '1970-01-01');
+        return dateA.getTime() - dateB.getTime();
+      }
+
+      const timeOf = (item: PersonalItem) =>
+        item.type === 'confession' ? item.data.confession_schedules?.time_slot || '' : item.data.event_time || '';
+
+      if (a.type === b.type) return timeOf(a).localeCompare(timeOf(b));
+      return convertTimeToMinutes(timeOf(a)) - convertTimeToMinutes(timeOf(b));
+    });
+
+    return allEvents;
+  };
+
+  const renderReminderBell = (event: ParishEvent) => {
+    if (!event.startTime.includes('T')) return undefined;
+    const isNotificationEnabled = eventNotificationStates[event.id];
+    const isUpcoming = new Date(event.startTime) > new Date() && event.startTime.includes('T');
+    const canToggle = isUpcoming && preferences.enabled;
+
+    return (
+      <PressableScale
+        onPress={() =>
+          canToggle
+            ? handleNotificationToggle(event.id)
+            : router.push('/(tabs)/calendar/notification-settings')
+        }
+        disabled={!isUpcoming || togglingEvent === event.id}
+        accessibilityRole={canToggle ? "switch" : "button"}
+        accessibilityState={{ checked: canToggle && !!isNotificationEnabled, disabled: !isUpcoming }}
+        accessibilityLabel={
+          !isUpcoming
+            ? `Reminders unavailable for ${event.title}`
+            : canToggle
+              ? `Reminder for ${event.title}`
+              : 'Turn on reminders in notification settings'
+        }
+        scaleTo={0.9}
+        style={{ opacity: isUpcoming ? 1 : 0.4 }}
+        className={`h-9 w-9 rounded-xl items-center justify-center ${
+          canToggle && isNotificationEnabled ? 'bg-emerald-500/15' : 'bg-gray-100 dark:bg-white/10'
+        }`}
+      >
+        {togglingEvent === event.id ? (
+          <ActivityIndicator size="small" color={colors.textMuted} />
+        ) : (
+          <Ionicons
+            name={canToggle && isNotificationEnabled ? "notifications" : "notifications-off-outline"}
+            size={16}
+            color={canToggle && isNotificationEnabled ? palette.green : palette.gray400}
+          />
+        )}
+      </PressableScale>
+    );
+  };
+
+  const openEvent = (event: ParishEvent) => {
+    Haptics.selectionAsync().catch(() => {});
+    setActiveEvent(event);
+    setEventSheetVisible(true);
+  };
+
+  const weekDayKeys = new Set(weekDays.map(localDateKey));
+  const weekEventsByDay = groupEventsByDay(weekEvents, weekDayKeys);
+  const weekEnd = weekDays[6];
+  const weekRangeLabel =
+    weekStart.getMonth() === weekEnd.getMonth()
+      ? `${weekStart.toLocaleDateString('en-US', { month: 'short' })} ${weekStart.getDate()} - ${weekEnd.getDate()}`
+      : `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const weekYearLabel = weekEnd.getFullYear();
+  const daysWithEvents = weekDays.filter((d) => weekEventsByDay[localDateKey(d)]?.length);
+
+  const isViewingTodayMonth =
+    currentMonth.getMonth() === new Date().getMonth() && currentMonth.getFullYear() === new Date().getFullYear();
+  const isTodaySelected = selectedDate.toDateString() === new Date().toDateString();
+  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
+  const personalSchedule = buildPersonalSchedule();
+  const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long' });
+  const yearLabel = currentMonth.getFullYear();
+
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-      <ScrollView 
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <CompactHeader title={formatDate(selectedDate)} scrollY={scrollY} />
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: contentBottomPadding(insets.bottom) }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? 'white' : '#374151'}
-            colors={[isDark ? 'white' : '#374151']}
+            tintColor={colors.textMuted}
+            colors={[palette.accent]}
+            progressViewOffset={insets.top}
           />
         }
       >
-        {/* Header */}
-        <View className="p-6">
-          <View className="flex-row justify-between items-center pt-0">
-            <View>
-              <Text className="text-3xl font-bold text-gray-900 dark:text-white">Calendar</Text>
-              <Pressable className="rounded-lg flex-row items-center active:opacity-70">
-                <Text className="text-sm text-gray-900 dark:text-white opacity-70">{parishName || 'Loading...'}</Text>
-                {/* <Ionicons name="chevron-down" size={10} color="white" className="ml-1 opacity-70" /> */}
+        <LargeHeader
+          scrollY={scrollY}
+          title="Calendar"
+          subtitle={parishName || undefined}
+          right={
+            !(isViewingTodayMonth && isTodaySelected) ? (
+              <Animated.View entering={entrance.pop()}>
+                <Pressable
+                  onPress={jumpToToday}
+                  accessibilityRole="button"
+                  className="h-9 px-4 rounded-full bg-red-600 flex-row items-center active:opacity-80 mb-1.5"
+                >
+                  <Ionicons name="today-outline" size={14} color="white" />
+                  <Text className="font-sans-semibold text-[13px] text-white ml-1.5">Today</Text>
+                </Pressable>
+              </Animated.View>
+            ) : undefined
+          }
+        />
+
+        <View className="mx-4 mt-3">
+          <SegmentedControl
+            segments={[
+              { key: 'month', label: 'Month', icon: 'grid-outline' },
+              { key: 'week', label: 'Week', icon: 'list-outline' },
+            ]}
+            value={viewMode}
+            onChange={changeViewMode}
+          />
+        </View>
+
+        {/* Month / week card */}
+        <View className="mx-4 mt-3 rounded-[28px] bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] px-3 pt-4 pb-3">
+          <View className="flex-row items-center justify-between px-2">
+            <Animated.View
+              key={`label-${viewMode}-${viewMode === 'month' ? monthKey : weekKey}`}
+              entering={FadeIn.duration(220)}
+              style={{ flexDirection: 'row', alignItems: 'baseline', flexShrink: 1 }}
+            >
+              <Text className="font-display text-[28px] text-gray-900 dark:text-white" numberOfLines={1}>
+                {viewMode === 'month' ? monthLabel : weekRangeLabel}
+              </Text>
+              <Text className="font-display text-[28px] text-gray-400 dark:text-gray-500 ml-2">
+                {viewMode === 'month' ? yearLabel : weekYearLabel}
+              </Text>
+            </Animated.View>
+            <View className="flex-row">
+              <Pressable
+                onPress={() => (viewMode === 'month' ? navigateMonth('prev') : navigateWeek('prev'))}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={viewMode === 'month' ? 'Previous month' : 'Previous week'}
+                className="h-9 w-9 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center active:opacity-70 mr-2"
+              >
+                <Ionicons name="chevron-back" size={17} color={colors.icon} />
+              </Pressable>
+              <Pressable
+                onPress={() => (viewMode === 'month' ? navigateMonth('next') : navigateWeek('next'))}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={viewMode === 'month' ? 'Next month' : 'Next week'}
+                className="h-9 w-9 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center active:opacity-70"
+              >
+                <Ionicons name="chevron-forward" size={17} color={colors.icon} />
               </Pressable>
             </View>
-            <View className="h-10 w-10 rounded-full bg-transparent flex items-center justify-center">
-              <Ionicons name="calendar" size={25} color={isDark ? 'white' : '#374151'} />
-            </View>
           </View>
-          
-          {/* Month Navigation */}
-          <View className="flex-row justify-between items-center mt-6">
-            <Pressable 
-              className="h-8 w-8 rounded-full bg-transparent flex items-center justify-center active:opacity-70"
-              onPress={() => navigateMonth('prev')}
-            >
-              <Ionicons name="chevron-back" size={16} color={isDark ? 'white' : '#374151'} />
-            </Pressable>
-            <Text className="text-gray-900 dark:text-white text-base font-semibold">{formatMonthYear(currentMonth)}</Text>
-            <Pressable 
-              className="h-8 w-8 rounded-full bg-transparent flex items-center justify-center active:opacity-70"
-              onPress={() => navigateMonth('next')}
-            >
-              <Ionicons name="chevron-forward" size={16} color={isDark ? 'white' : '#374151'} />
-            </Pressable>
-          </View>
-          
-          {/* Days of Week */}
-          <View className="flex-row mt-4">
-            {daysOfWeek.map((day) => (
-              <View key={day} className="flex-1 items-center">
-                <Text className="text-gray-900 dark:text-white text-xs font-medium">{day}</Text>
+
+          {viewMode === 'week' ? (
+            <GestureDetector gesture={weekSwipe}>
+              <Animated.View
+                key={`week-${weekKey}`}
+                entering={(monthDirection === 'next' ? FadeInRight : FadeInLeft).duration(260)}
+                style={{ flexDirection: 'row', marginTop: 14 }}
+              >
+                {weekDays.map((date) => {
+                  const key = localDateKey(date);
+                  const isSelected = date.toDateString() === selectedDate.toDateString();
+                  const isToday = date.toDateString() === new Date().toDateString();
+                  const isSunday = date.getDay() === 0;
+                  const fastingKind = getFastingKind(fastingData[date.toISOString().split('T')[0]] || '');
+                  const fasting = fastingStyle[fastingKind];
+                  const count = weekEventsByDay[key]?.length ?? 0;
+
+                  return (
+                    <Pressable
+                      key={key}
+                      onPress={() => selectDay(date, date.getMonth() === currentMonth.getMonth())}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      accessibilityLabel={`${formatDate(date)}${count ? `, ${count} parish event${count > 1 ? 's' : ''}` : ''}${fastingKind !== 'none' ? `, ${fasting.label}` : ''}`}
+                      className="flex-1 items-center py-1"
+                    >
+                      <Text
+                        className={`font-sans-bold text-[11px] ${
+                          isSunday ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'
+                        }`}
+                      >
+                        {daysOfWeek[date.getDay()]}
+                      </Text>
+                      <View className="h-10 w-10 mt-2 items-center justify-center">
+                        {isSelected && (
+                          <Animated.View
+                            entering={entrance.pop()}
+                            style={{ position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: palette.accent }}
+                          />
+                        )}
+                        {isToday && !isSelected && (
+                          <View style={{ position: 'absolute', width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: palette.accentSoft }} />
+                        )}
+                        <Text
+                          className={`font-sans-semibold text-[16px] ${
+                            isSelected
+                              ? 'text-white'
+                              : isToday || isSunday
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-900 dark:text-gray-100'
+                          }`}
+                        >
+                          {date.getDate()}
+                        </Text>
+                      </View>
+                      <View className="h-3 mt-1.5 items-center justify-center">
+                        {fastingKind !== 'none' && (
+                          <Ionicons name={fasting.icon as keyof typeof Ionicons.glyphMap} size={10} color={fasting.color} />
+                        )}
+                      </View>
+                      <View className="h-1.5 mt-1 flex-row items-center">
+                        {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
+                          <View
+                            key={i}
+                            style={{
+                              width: 5,
+                              height: 5,
+                              borderRadius: 2.5,
+                              marginHorizontal: 1,
+                              backgroundColor: palette.accent,
+                              opacity: 1 - i * 0.25,
+                            }}
+                          />
+                        ))}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </Animated.View>
+            </GestureDetector>
+          ) : (
+          <>
+          <View className="flex-row mt-4 mb-1">
+            {daysOfWeek.map((day, i) => (
+              <View key={`${day}-${i}`} className="flex-1 items-center">
+                <Text className={`font-sans-bold text-[11px] ${i === 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                  {day}
+                </Text>
               </View>
             ))}
           </View>
-          
-          {/* Calendar Grid */}
-          <View className="mt-2">
-            <View className="flex-row flex-wrap">
+
+          <GestureDetector gesture={swipe}>
+            <Animated.View
+              key={monthKey}
+              entering={(monthDirection === 'next' ? FadeInRight : FadeInLeft).duration(260)}
+              style={{ flexDirection: 'row', flexWrap: 'wrap' }}
+            >
               {calendarDays.map((day, index) => {
                 const dateKey = day.date.toISOString().split('T')[0];
-                const fastingEmoji = getFastingEmoji(fastingData[dateKey] || '');
-                
+                const fastingKind = getFastingKind(fastingData[dateKey] || '');
+                const fasting = fastingStyle[fastingKind];
+                const isSunday = day.date.getDay() === 0;
+
                 return (
                   <Pressable
                     key={index}
-                    className={`w-[14.28%] h-10 aspect-square items-center justify-center active:opacity-70 ${
-                      day.isSelected ? 'bg-red-600 rounded-3xl' : ''
-                    }`}
-                    onPress={() => setSelectedDate(day.date)}
+                    onPress={() => selectDay(day.date, day.isCurrentMonth)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: day.isSelected }}
+                    accessibilityLabel={`${formatDate(day.date)}${fastingKind !== 'none' ? `, ${fasting.label}` : ''}`}
+                    style={{ width: '14.2857%', height: 50 }}
+                    className="items-center justify-center"
                   >
-                    <View className="relative w-full h-full items-center justify-center">
-                      <Text 
-                        className={`text-xs ${
-                          day.isSelected 
-                            ? 'text-white font-bold' 
-                            : day.isCurrentMonth 
-                              ? 'text-gray-900 dark:text-white' 
-                              : 'text-gray-900 dark:text-white opacity-30'
-                        }`}
-                      >
-                        {day.date.getDate()}
-                      </Text>
-                      {day.isToday && !day.isSelected && (
-                        <View className={`absolute h-1 w-1 bg-green-500 rounded-full ${
-                          day.date.getDate() < 10 ? 'right-2' : 'right-3'
-                        } top-15`} />
-                      )}
-                      {fastingEmoji && day.isCurrentMonth && (
-                        <Text className="absolute text-xs bottom-1 left-0 right-0 text-center">
-                          {fastingEmoji}
-                        </Text>
+                    {day.isSelected && (
+                      <Animated.View
+                        entering={entrance.pop()}
+                        style={{
+                          position: 'absolute',
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          backgroundColor: palette.accent,
+                          top: 3,
+                        }}
+                      />
+                    )}
+                    {day.isToday && !day.isSelected && (
+                      <View
+                        style={{ position: 'absolute', width: 40, height: 40, borderRadius: 20, top: 3, borderWidth: 1.5, borderColor: palette.accentSoft }}
+                      />
+                    )}
+                    <Text
+                      className={`font-sans-semibold text-[15px] -mt-1.5 ${
+                        day.isSelected
+                          ? 'text-white'
+                          : !day.isCurrentMonth
+                            ? 'text-gray-300 dark:text-gray-700'
+                            : day.isToday || isSunday
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-gray-900 dark:text-gray-100'
+                      }`}
+                    >
+                      {day.date.getDate()}
+                    </Text>
+                    <View style={{ position: 'absolute', bottom: day.isSelected ? 9 : 4, height: 10, justifyContent: 'center' }}>
+                      {fastingKind !== 'none' && day.isCurrentMonth && (
+                        <Ionicons
+                          name={fasting.icon as keyof typeof Ionicons.glyphMap}
+                          size={9}
+                          color={day.isSelected ? 'rgba(255,255,255,0.9)' : fasting.color}
+                        />
                       )}
                     </View>
                   </Pressable>
                 );
               })}
-            </View>
+            </Animated.View>
+          </GestureDetector>
+          </>
+          )}
+
+          <View className="flex-row items-center justify-center mt-2 pt-3 border-t border-gray-100 dark:border-white/[0.06]">
+            {(['fish', 'wine', 'strict'] as const).map((kind) => (
+              <View key={kind} className="flex-row items-center mx-2.5">
+                <Ionicons name={fastingStyle[kind].icon as keyof typeof Ionicons.glyphMap} size={11} color={fastingStyle[kind].color} />
+                <Text className="font-sans-medium text-[11px] text-gray-500 dark:text-gray-400 ml-1">{fastingStyle[kind].label}</Text>
+              </View>
+            ))}
           </View>
         </View>
-        
-        {/* Selected Day Details */}
-        <View className="p-6 pb-8 bg-gradient-to-b from-gray-100 dark:from-gray-800 to-gray-200 dark:to-gray-900">
-          <View className="flex-row justify-between items-start mb-8">
-            <Text className="text-gray-900 dark:text-white text-lg font-bold flex-shrink-0">{formatDate(selectedDate)}</Text>
-            {calendarData?.fasting && (
-              <View className="flex-row items-center pt-1" style={{ maxWidth: '40%' }}>
-                {!calendarData.fasting.startsWith('No') && (
-                  <View className="h-2 w-2 rounded-full bg-red-500 mr-1 flex-shrink-0"></View>
-                )}
-                <Text className="text-xs text-gray-900 dark:text-white leading-4 text-right">{calendarData.fasting}</Text>
-              </View>
-            )}
-          </View>
-          
-          {/* Feast Days & Commemorations */}
-          {calendarData?.saintsFull && calendarData.saintsFull.length > 0 && (
-            <View className="mb-6">
-                <Text className="text-gray-900 dark:text-white text-sm font-semibold mb-4">Feast Days & Commemorations</Text>
-                <View className="space-y-2">
-                    {calendarData.saintsFull.map((saint, index) => (
-                        <Pressable 
-                            key={index} 
-                            className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-md p-3 mb-2 active:opacity-70" 
-                            onPress={() => {
-                                if (saint.story && saint.story.length > 0) {
-                                    setSelectedSaint(saint);
-                                    setModalVisible(true);
-                                }
-                            }}
-                            disabled={!saint.story || saint.story.length === 0}
-                        >
-                            <View className="flex-row justify-between items-start">
-                                <View className="flex-1">
-                                    <Text className="text-sm text-gray-900 dark:text-white font-semibold">{saint.title}</Text>
-                                </View>
-                                <View className="h-8 w-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center ml-3">
-                                    <Ionicons name="star" size={16} color={isDark ? 'white' : '#374151'} />
-                                </View>
-                            </View>
-                            {saint.story && saint.story.length > 0 && (
-                                <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">{"tap to learn more..."}</Text>
-                            )}
-                        </Pressable>
-                    ))}
-                </View>
-                <Modal
-                    visible={modalVisible}
-                    animationType="fade"
-                    transparent={true}
-                    onRequestClose={() => setModalVisible(false)}
-                >
-                    <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-                        <Pressable
-                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                            onPress={() => setModalVisible(false)}
-                            pointerEvents="auto"
-                        />
-                        <View
-                            className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-200 dark:border-gray-700"
-                        >
-                            <Text className="text-xl text-gray-900 dark:text-white font-bold mb-6 text-center">{selectedSaint?.title}</Text>
-                            <ScrollView className="max-h-96 mb-4">
-                                <Text className="text-gray-900 dark:text-white text-md leading-relaxed">{selectedSaint?.story}</Text>
-                            </ScrollView>
-                        </View>
-                    </View>
-                </Modal>
-            </View>
-          )}
-          
-          {/* Parish Schedule */}
-          <View>
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-gray-900 dark:text-white text-sm font-semibold">Parish Schedule</Text>
-              <Pressable
-                onPress={() => router.push('/(tabs)/calendar/notification-settings')}
-                className="flex-row items-center rounded-lg px-3 py-1 active:opacity-70"
-              >
-                <Ionicons 
-                  name={preferences.enabled ? "notifications" : "notifications-off"} 
-                  size={16} 
-                  color={preferences.enabled ? "#10B981" : "#9CA3AF"} 
-                />
-                <Text className="text-gray-900 dark:text-white opacity-80 font-medium text-xs ml-1">Notifications</Text>
-              </Pressable>
-            </View>
-            
-            {/* Calendar Setup Prompt for Parish Admins */}
+
+        {/* Week agenda */}
+        {viewMode === 'week' && (
+          <Animated.View entering={FadeIn.duration(260)} style={{ paddingHorizontal: 20, marginTop: 32 }}>
+            <SectionHeader
+              title="The week ahead"
+              caption={
+                weekLoading
+                  ? 'Loading parish events'
+                  : weekEvents.length > 0
+                    ? `${weekEvents.length} ${weekEvents.length === 1 ? 'event' : 'events'} at ${parishName || 'your parish'}`
+                    : parishHasCalendar
+                      ? 'Nothing scheduled this week'
+                      : parishName || undefined
+              }
+              actionLabel="Reminders"
+              actionIcon={preferences.enabled ? "notifications" : "notifications-off"}
+              actionIconColor={preferences.enabled ? palette.green : palette.gray400}
+              onAction={() => router.push('/(tabs)/calendar/notification-settings')}
+            />
+
             {isParishAdmin && !parishHasCalendar && (
-              <View className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-500/30 rounded-xl p-4 mb-4">
-                <View className="flex-row items-start">
-                  <Ionicons name="calendar-outline" size={20} color="#3B82F6" className="mt-0.5" />
-                  <View className="flex-1 ml-3">
-                    <Text className="text-blue-400 font-semibold text-sm">Set Up Parish Calendar</Text>
-                    <Text className="text-blue-300 text-xs mt-1">
-                      Connect your Google Calendar to display parish events in the app.
-                    </Text>
-                    <Pressable
-                      className="bg-blue-600 rounded-lg px-4 py-2 mt-3 self-start active:opacity-70"
-                      onPress={() => setShowCalendarSetup(true)}
-                    >
-                      <Text className="text-white text-xs font-medium">Set Up Calendar</Text>
-                    </Pressable>
-                  </View>
-                </View>
+              <View className="rounded-3xl p-5 mb-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
+                <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">Set up your parish calendar</Text>
+                <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
+                  Connect your Google Calendar to display parish events in the app.
+                </Text>
+                <Button label="Set up calendar" size="sm" onPress={() => setShowCalendarSetup(true)} className="mt-3 self-start" />
               </View>
             )}
 
-            {loading ? (
-              <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
-                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading events...</Text>
-              </View>
-            ) : error ? (
-              <View className="py-4">
-                <Text className="text-red-400 text-sm">Error loading events</Text>
-                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
-              </View>
-            ) : parishEvents && parishEvents.length > 0 ? (
-              <View className="space-y-3">
-                {parishEvents.map((event) => {
-                  const isNotificationEnabled = eventNotificationStates[event.id];
-                  const isUpcoming = new Date(event.startTime) > new Date() && event.startTime.includes('T');
-                  
+            {weekLoading && weekEvents.length === 0 ? (
+              <SkeletonRows rows={3} />
+            ) : !parishHasCalendar && daysWithEvents.length === 0 ? (
+              <EmptyState
+                compact
+                icon="calendar-clear-outline"
+                title="A quiet week"
+                message={
+                  !parishHasCalendar
+                    ? (isParishAdmin
+                        ? "Set up your parish calendar to see events here."
+                        : "Your parish hasn't set up their calendar yet.")
+                    : "No parish events scheduled this week."
+                }
+              />
+            ) : (
+              <Animated.View key={`agenda-${weekKey}`}>
+                {weekDays.map((date, groupIndex) => {
+                  const key = localDateKey(date);
+                  const events = weekEventsByDay[key] ?? [];
+                  const isSelected = date.toDateString() === selectedDate.toDateString();
+                  const isToday = date.toDateString() === new Date().toDateString();
+
                   return (
-                    <View key={event.id} className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-3 mb-2">
-                      <View className="flex-row justify-between items-start">
-                        <View className="flex-1">
-                          <Text className="text-sm text-gray-900 dark:text-white font-semibold">{event.title}</Text>
-                          <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">
-                            {formatEventTimeRange(event.startTime, event.endTime)}
+                    <Animated.View
+                      key={key}
+                      entering={entrance.card(Math.min(groupIndex, 6) * 60)}
+                      style={{ marginBottom: 12 }}
+                    >
+                      <Pressable
+                        onPress={() => selectDay(date, date.getMonth() === currentMonth.getMonth())}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
+                        className="flex-row items-center mb-2 ml-1"
+                      >
+                        <View
+                          className={`h-1.5 w-1.5 rounded-full mr-2 ${isSelected ? 'bg-red-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                        />
+                        <Text
+                          className={`font-sans-bold text-[12px] tracking-[1.2px] uppercase ${
+                            isSelected ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
+                          }`}
+                        >
+                          {date.toLocaleDateString('en-US', { weekday: 'long' })}
+                        </Text>
+                        <Text className="font-sans-medium text-[12px] text-gray-400 dark:text-gray-500 ml-2">
+                          {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </Text>
+                        {isToday && (
+                          <View className="ml-2 rounded-full px-2 py-0.5 bg-red-600/10">
+                            <Text className="font-sans-bold text-[10px] text-red-600 dark:text-red-400">TODAY</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                      {events.length === 0 ? (
+                        <View className="rounded-2xl px-4 py-3 border border-dashed border-gray-200 dark:border-white/10">
+                          <Text className="font-sans text-[13px] text-gray-400 dark:text-gray-500">
+                            No parish events
                           </Text>
-                          {/* {event.description && (
-                            <Text className="text-xs text-gray-900 dark:text-white mt-2">{event.description}</Text>
-                          )} */}
-                          {event.location && (
-                            <Text className="text-xs text-gray-900 dark:text-white opacity-80 mt-1">
-                              {event.location}
-                            </Text>
-                          )}
                         </View>
-                        {isUpcoming && preferences.enabled && (
-                          <Pressable
-                            onPress={() => handleNotificationToggle(event.id)}
-                            disabled={togglingEvent === event.id}
-                            className="ml-3 p-2 rounded-lg bg-gray-200/50 dark:bg-gray-700/50 active:opacity-70"
-                          >
-                            {togglingEvent === event.id ? (
-                              <ActivityIndicator size="small" color={isDark ? 'white' : '#374151'} />
-                            ) : (
-                              <Ionicons 
-                                name={isNotificationEnabled ? "notifications" : "notifications-off"} 
-                                size={16} 
-                                color={isNotificationEnabled ? "#10B981" : "#9CA3AF"} 
-                              />
-                            )}
-                          </Pressable>
+                      ) : (
+                      <View className="-ml-1">
+                        {events.map((event, i) => (
+                          <TimelineItem
+                            key={`${key}-${event.id}`}
+                            kind="parish"
+                            title={event.title}
+                            time={event.startTime.includes('T') ? formatEventTimeRange(event.startTime, event.endTime) : undefined}
+                            meta={event.location}
+                            isLast={i === events.length - 1}
+                            right={renderReminderBell(event)}
+                            onPress={() => openEvent(event)}
+                          />
+                        ))}
+                      </View>
+                      )}
+                    </Animated.View>
+                  );
+                })}
+              </Animated.View>
+            )}
+          </Animated.View>
+        )}
+
+        {/* Selected day */}
+        <Animated.View key={selectedDate.toDateString()} entering={FadeIn.duration(280)}>
+          <View className="px-6 mt-8">
+            <Text className="font-sans-bold text-[12px] tracking-[1.4px] uppercase text-red-600 dark:text-red-400">
+              {selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}
+              {isTodaySelected ? ' · Today' : ''}
+            </Text>
+            <Text className="font-display text-[34px] leading-[38px] text-gray-900 dark:text-white mt-1">
+              {formatDate(selectedDate)}
+            </Text>
+            {loading && !calendarData ? null : (
+              <>
+                {!!calendarData?.title && (
+                  <Text className="font-display-italic text-[19px] leading-[25px] text-gray-600 dark:text-gray-300 mt-1">
+                    {calendarData.title}
+                  </Text>
+                )}
+                <FastingBadge fasting={calendarData?.fasting} className="mt-4" />
+              </>
+            )}
+          </View>
+
+          {/* Feast days & commemorations */}
+          {calendarData?.saintsFull && calendarData.saintsFull.length > 0 && (
+            <View className="px-5 mt-8">
+              <SectionHeader title="Commemorations" caption={`${calendarData.saintsFull.length} remembered today`} />
+              <View className="rounded-3xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden">
+                {calendarData.saintsFull.map((saint, index) => {
+                  const hasStory = !!saint.story && saint.story.length > 0;
+                  return (
+                    <Pressable
+                      key={index}
+                      disabled={!hasStory}
+                      onPress={() => {
+                        if (hasStory) {
+                          setSelectedSaint(saint);
+                          setModalVisible(true);
+                        }
+                      }}
+                      accessibilityRole={hasStory ? 'button' : 'text'}
+                      className={`flex-row items-center px-4 py-3.5 active:bg-gray-50 dark:active:bg-white/5 ${
+                        index > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
+                      }`}
+                    >
+                      <View className="h-9 w-9 rounded-full bg-amber-500/10 items-center justify-center mr-3">
+                        <Ionicons name="sparkles" size={15} color={palette.amber} />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="font-serif text-[18px] leading-[23px] text-gray-900 dark:text-white">{saint.title}</Text>
+                        {hasStory && (
+                          <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 mt-0.5">Read the life</Text>
                         )}
                       </View>
-                    </View>
+                      {hasStory && <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />}
+                    </Pressable>
                   );
                 })}
               </View>
-            ) : (
-              <Text className="text-xs text-gray-900 dark:text-white opacity-70">
-                {!parishHasCalendar 
-                  ? (isParishAdmin 
-                      ? "Set up your parish calendar to see events here." 
-                      : "Your administrator hasn't set up the parish calendar yet.")
-                  : "No events scheduled for this day."}
-              </Text>
-            )}
-          </View>
-        </View>
-        {/* Personal Schedule */}
-        <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-800 to-gray-200 dark:to-gray-900 pb-4">
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-gray-900 dark:text-white text-sm font-semibold">Personal Schedule</Text>
-            <Pressable
-              onPress={() => router.push('/(tabs)/events')}
-              className="flex-row items-center rounded-lg px-3 py-1 active:opacity-70"
-            >
-              <Ionicons name="add-circle" size={16} color="#EF4444" />
-              <Text className="text-gray-900 dark:text-white opacity-80 font-medium text-xs ml-1">Schedule</Text>
-            </Pressable>
-          </View>
-          
-          {(personalConfessions && personalConfessions.length > 0) || (personalEvents && personalEvents.length > 0) ? (
-            <View className="space-y-3">
-              {(() => {
-                // Combine and sort all personal events chronologically
-                const allEvents: Array<{
-                  id: string;
-                  type: 'confession' | 'event';
-                  title: string;
-                  timeDisplay: string;
-                  isAllDay: boolean;
-                  notes?: string;
-                  icon: string;
-                  iconColor: string;
-                  bgColor: string;
-                  data: any;
-                }> = [];
-
-                // Add confessions
-                personalConfessions.forEach((confession) => {
-                  const details = confessionDetails[confession.id];
-                  const timeRange = formatConfessionTimeRange(confession.confession_schedules?.time_slot);
-                  
-                  let title = "Confession";
-                  if (isParishAdmin && details?.user_profiles?.full_name) {
-                    title = `Confession with ${details.user_profiles.full_name}`;
-                  } else if (!isParishAdmin && parishDetails?.priest_name) {
-                    title = `Confession with ${parishDetails.priest_name}`;
-                  }
-                    allEvents.push({
-                     id: confession.id,
-                     type: 'confession',
-                     title,
-                     timeDisplay: timeRange,
-                     isAllDay: false,
-                     notes: confession.notes || undefined,
-                     icon: 'person',
-                     iconColor: '#EF4444',
-                     bgColor: 'bg-red-600/20',
-                     data: confession
-                   });
-                });
-
-                // Add personal events
-                personalEvents.forEach((event) => {
-                  const timeDisplay = event.event_time ? formatEventTime(event.event_time) : '';
-                  const locationDisplay = event.location ? ` • ${event.location}` : '';
-                  const isAllDay = event.event_date && !event.event_time;
-                  const dateDisplay = event.event_date ? (() => {
-                  // Parse date as local date to avoid timezone issues
-                  const [year, month, day] = event.event_date.split('-').map(Number);
-                  const localDate = new Date(year, month - 1, day);
-                  return formatDate(localDate);
-                })() : '';
-                    allEvents.push({
-                     id: event.id,
-                     type: 'event',
-                     title: event.title,
-                     timeDisplay: isAllDay ? `${dateDisplay}${locationDisplay}` : `Starts at ${timeDisplay}${locationDisplay}`,
-                     isAllDay: !!isAllDay,
-                     notes: event.user_response?.notes || undefined,
-                     icon: event.event_type === 'event' ? 'people' : 'hand-right',
-                     iconColor: event.event_type === 'event' ? '#A855F7' : '#10B981',
-                     bgColor: event.event_type === 'event' ? 'bg-purple-600/20' : 'bg-green-600/20',
-                     data: event
-                   });
-                });
-
-                // Helper function to convert time strings to minutes since midnight
-                const convertTimeToMinutes = (timeString: string): number => {
-                  if (!timeString) return 0;
-                  
-                  // Handle different time formats
-                  const timeMatch = timeString.match(/(\d{1,2}):(\d{2})/);
-                  if (timeMatch) {
-                    const hours = parseInt(timeMatch[1], 10);
-                    const minutes = parseInt(timeMatch[2], 10);
-                    return hours * 60 + minutes;
-                  }
-                  
-                  return 0;
-                };
-
-                // Sort events: all-day events first, then by time
-                allEvents.sort((a, b) => {
-                  // All-day events come first
-                  if (a.isAllDay && !b.isAllDay) return -1;
-                  if (!a.isAllDay && b.isAllDay) return 1;
-                  
-                  // If both are all-day or both have times, sort by time
-                  if (a.isAllDay && b.isAllDay) {
-                    // For all-day events, sort by date
-                    const parseLocalDate = (dateString: string) => {
-                      const [year, month, day] = dateString.split('-').map(Number);
-                      return new Date(year, month - 1, day);
-                    };
-                    const dateA = parseLocalDate(a.data.event_date || '1970-01-01');
-                    const dateB = parseLocalDate(b.data.event_date || '1970-01-01');
-                    return dateA.getTime() - dateB.getTime();
-                  }
-                  
-                  // For timed events, sort by time
-                  if (a.type === 'confession' && b.type === 'confession') {
-                    // Both are confessions, sort by time slot
-                    const timeA = a.data.confession_schedules?.time_slot || '';
-                    const timeB = b.data.confession_schedules?.time_slot || '';
-                    return timeA.localeCompare(timeB);
-                  }
-                  
-                  if (a.type === 'event' && b.type === 'event') {
-                    // Both are events, sort by time
-                    const timeA = a.data.event_time || '';
-                    const timeB = b.data.event_time || '';
-                    return timeA.localeCompare(timeB);
-                  }
-                  
-                  // Mixed types - convert times to comparable format
-                  if (a.type === 'confession' && b.type === 'event') {
-                    const timeA = a.data.confession_schedules?.time_slot || '';
-                    const timeB = b.data.event_time || '';
-                    
-                    // Convert both times to minutes since midnight for comparison
-                    const minutesA = convertTimeToMinutes(timeA);
-                    const minutesB = convertTimeToMinutes(timeB);
-                    
-                    return minutesA - minutesB;
-                  }
-                  
-                  if (a.type === 'event' && b.type === 'confession') {
-                    const timeA = a.data.event_time || '';
-                    const timeB = b.data.confession_schedules?.time_slot || '';
-                    
-                    // Convert both times to minutes since midnight for comparison
-                    const minutesA = convertTimeToMinutes(timeA);
-                    const minutesB = convertTimeToMinutes(timeB);
-                    
-                    return minutesA - minutesB;
-                  }
-                  
-                  return 0;
-                });
-
-                return allEvents.map((event) => (
-                  <View key={event.id} className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2">
-                    <View className="flex-row justify-between items-start">
-                      <View className="flex-1">
-                        <Text className="text-sm text-gray-900 dark:text-white font-semibold">{event.title}</Text>
-                        {event.timeDisplay && (
-                          <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-1">
-                            {event.timeDisplay}
-                          </Text>
-                        )}
-                        {/* {event.notes && (
-                          <Text className="text-xs text-white mt-2 opacity-80">
-                            "{event.notes}"
-                          </Text>
-                        )} */}
-                      </View>
-                      <View className={`h-8 w-8 rounded-lg flex items-center justify-center ${event.bgColor}`}>
-                        <Ionicons 
-                          name={event.icon as any} 
-                          size={16} 
-                          color={event.iconColor} 
-                        />
-                      </View>
-                    </View>
-                  </View>
-                ));
-              })()}
             </View>
-          ) : (
-            <Text className="text-xs text-gray-900 dark:text-white opacity-70">
-              No personal events scheduled for this day.
-            </Text>
           )}
-        </View>
-        
-        {/* Daily Scripture Readings */}
-        <View className="bg-gradient-to-b from-gray-200 dark:from-gray-900 to-gray-50 dark:to-black p-4 pb-8">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-gray-900 dark:text-white text-sm font-semibold ml-2">Daily Readings</Text>
-          </View>
-          <View className="rounded-xl p-2">
-            {loading ? (
-              <View className="flex-row items-center justify-center py-4">
-                <ActivityIndicator color={isDark ? 'white' : '#374151'} size="small" />
-                <Text className="text-gray-900 dark:text-white text-sm ml-2">Loading readings...</Text>
-              </View>
-            ) : error ? (
-              <View className="py-4">
-                <Text className="text-red-400 text-sm">Error loading readings</Text>
-                <Text className="text-gray-900 dark:text-white text-xs opacity-70 mt-1">{error}</Text>
-              </View>
-            ) : (
-              <View className="space-y-2">
-                {calendarData?.readingsFull && calendarData.readingsFull.length > 0 ? (
-                  calendarData.readingsFull.map((reading, idx) => (
-                    <Pressable
-                      key={idx}
-                      className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl shadow-sm p-4 mb-2 active:opacity-70"
-                      onPress={() => {
-                        setSelectedReading(reading);
-                        setReadingModalVisible(true);
-                      }}
-                    >
-                      <View className="flex-row justify-between items-start">
-                        <View className="flex-1">
-                          <Text className="text-sm text-gray-700 dark:text-gray-200 font-semibold">{reading.display}</Text>
-                          <Text className="text-xs text-gray-900 dark:text-white opacity-70">{"tap to read..."}</Text>
-                        </View>
-                        <View className="h-8 w-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <Ionicons name="book" size={16} color={isDark ? 'white' : '#374151'} />
-                        </View>
-                      </View>
-                    </Pressable>
-                  ))
-                ) : (
-                  <Text className="text-xs text-gray-900 dark:text-white opacity-70">No readings for today.</Text>
-                )}
-                {calendarData?.readingsLink && (
-                  <Pressable onPress={() => Linking.openURL(calendarData.readingsLink!)} className="mt-2 active:opacity-70">
-                    <Text className="text-lg text-blue-400 underline">Full readings</Text>
-                  </Pressable>
-                )}
+
+          {/* Parish schedule (the week agenda covers this in week view) */}
+          {viewMode === 'month' && (
+          <View className="px-5 mt-8">
+            <SectionHeader
+              title="Parish schedule"
+              actionLabel="Reminders"
+              actionIcon={preferences.enabled ? "notifications" : "notifications-off"}
+              actionIconColor={preferences.enabled ? palette.green : palette.gray400}
+              onAction={() => router.push('/(tabs)/calendar/notification-settings')}
+            />
+
+            {isParishAdmin && !parishHasCalendar && (
+              <View className="rounded-3xl p-5 mb-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
+                <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">Set up your parish calendar</Text>
+                <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
+                  Connect your Google Calendar to display parish events in the app.
+                </Text>
+                <Button label="Set up calendar" size="sm" onPress={() => setShowCalendarSetup(true)} className="mt-3 self-start" />
               </View>
             )}
-          </View>
-          {/* Modal for full reading */}
-          <Modal
-            visible={readingModalVisible}
-            animationType="fade"
-            transparent={true}
-            onRequestClose={() => setReadingModalVisible(false)}
-          >
-            <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-              <Pressable
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                onPress={() => setReadingModalVisible(false)}
-                pointerEvents="auto"
-              />
-              <View
-                className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-xl shadow-lg border border-gray-200 dark:border-gray-700"
-              >
-                <Text className="text-xl text-gray-900 dark:text-white font-bold mb-6 text-center">{selectedReading?.display + " (KJV)"}</Text>
-                <ScrollView className="max-h-96 mb-4">
-                  <Text className="text-gray-900 dark:text-white text-base leading-relaxed italic">"{selectedReading?.passage}"</Text>
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
-        </View>
-      </ScrollView>
 
-      {/* Calendar Setup Modal */}
+            {loading ? (
+              <SkeletonRows rows={2} />
+            ) : error ? (
+              <EmptyState compact icon="cloud-offline-outline" title="Couldn't load events" message={error} />
+            ) : parishEvents && parishEvents.length > 0 ? (
+              <View className="-ml-1">
+                {parishEvents.map((event, i) => (
+                  <TimelineItem
+                    key={event.id}
+                    kind="parish"
+                    title={event.title}
+                    time={formatEventTimeRange(event.startTime, event.endTime)}
+                    meta={event.location}
+                    isLast={i === parishEvents.length - 1}
+                    right={renderReminderBell(event)}
+                    onPress={() => openEvent(event)}
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                compact
+                icon="calendar-clear-outline"
+                title="Nothing on the parish calendar"
+                message={
+                  !parishHasCalendar
+                    ? (isParishAdmin
+                        ? "Set up your parish calendar to see events here."
+                        : "Your administrator hasn't set up the parish calendar yet.")
+                    : "No events scheduled for this day."
+                }
+              />
+            )}
+          </View>
+          )}
+
+          {/* Personal schedule */}
+          <View className="px-5 mt-8">
+            <SectionHeader
+              title="Your schedule"
+              actionLabel="Schedule"
+              actionIcon="add"
+              actionIconColor={palette.accentSoft}
+              onAction={() => router.push('/(tabs)/events')}
+            />
+            {personalSchedule.length > 0 ? (
+              <View className="-ml-1">
+                {personalSchedule.map((event, i) => (
+                  <TimelineItem
+                    key={event.id}
+                    kind={event.type === 'confession' ? 'confession' : event.eventType === 'volunteer' ? 'volunteer' : 'event'}
+                    title={event.title}
+                    time={event.timeDisplay}
+                    meta={event.location}
+                    isLast={i === personalSchedule.length - 1}
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                compact
+                icon="person-outline"
+                title="Nothing planned"
+                message="No personal events scheduled for this day. Book confession or RSVP to parish events from the Events tab."
+              />
+            )}
+          </View>
+
+          {/* Daily readings */}
+          <View className="mt-8">
+            <View className="px-5">
+              <SectionHeader title="Readings" caption="Appointed for this day" />
+            </View>
+            <ReadingsCarousel
+              readings={calendarData?.readingsFull}
+              readingsLink={calendarData?.readingsLink}
+              loading={loading}
+              error={error}
+              onSelect={(reading) => {
+                setSelectedReading(reading);
+                setReadingModalVisible(true);
+              }}
+            />
+          </View>
+        </Animated.View>
+      </Animated.ScrollView>
+
+      <ReadingSheet
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        eyebrow="Synaxarion"
+        title={selectedSaint?.title}
+        body={selectedSaint?.story}
+      />
+
+      <ReadingSheet
+        visible={readingModalVisible}
+        onClose={() => setReadingModalVisible(false)}
+        eyebrow="Scripture"
+        title={selectedReading?.display}
+        subtitle="King James Version"
+        body={selectedReading?.passage}
+        scripture
+      />
+
+      <EventDetailSheet
+        visible={eventSheetVisible}
+        onClose={() => setEventSheetVisible(false)}
+        eyebrow={parishName || 'Parish event'}
+        title={activeEvent?.title}
+        when={
+          activeEvent
+            ? activeEvent.startTime.includes('T')
+              ? formatEventTimeRange(activeEvent.startTime, activeEvent.endTime)
+              : 'All day'
+            : undefined
+        }
+        whenDetail={
+          activeEvent
+            ? (activeEvent.startTime.includes('T') ? new Date(activeEvent.startTime) : parseDateOnly(activeEvent.startTime))
+                .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+            : undefined
+        }
+        location={activeEvent?.location}
+        description={activeEvent?.description}
+        reminder={
+          activeEvent?.startTime.includes('T')
+            ? {
+                isTimed: activeEvent.startTime.includes('T'),
+                isUpcoming: activeEvent.startTime.includes('T') && new Date(activeEvent.startTime) > new Date(),
+                isOn: !!eventNotificationStates[activeEvent.id],
+                loading: togglingEvent === activeEvent.id,
+                onToggle: () => handleNotificationToggle(activeEvent.id),
+                onOpenSettings: () => {
+                  setEventSheetVisible(false);
+                  setTimeout(() => router.push('/(tabs)/calendar/notification-settings'), 320);
+                },
+              }
+            : undefined
+        }
+      />
+
       <ParishCalendarSetup
         visible={showCalendarSetup}
         onClose={() => setShowCalendarSetup(false)}
         onSuccess={handleCalendarSetupSuccess}
       />
-      
     </View>
   );
-} 
+}

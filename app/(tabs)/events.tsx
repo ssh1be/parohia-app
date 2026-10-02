@@ -1,9 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "nativewind";
+import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Switch, Text, View } from "react-native";
+import Animated, { FadeIn, FadeInDown, LinearTransition, ZoomIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomDateTimePicker from "../../components/DateTimePicker";
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { Field } from "../../components/ui/Field";
+import { PressableScale } from "../../components/ui/PressableScale";
+import { SegmentedControl } from "../../components/ui/SegmentedControl";
+import { Sheet } from "../../components/ui/Sheet";
+import { Skeleton, SkeletonRows } from "../../components/ui/Skeleton";
+import { useThemeColors } from "../../components/ui/useThemeColors";
+import { contentBottomPadding, entrance, eventKindStyle, palette, TAB_BAR_GAP, TAB_BAR_HEIGHT } from "../../constants/theme";
 import { supabase } from "../../config/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "../../services/bulletinService";
@@ -13,13 +23,33 @@ import { getUserProfile } from "../../services/onboardingService";
 import { getParishByAdminId, getParishByUserId } from "../../services/parishService";
 
 type TabType = 'confession' | 'bulletin';
+type BulletinFilter = 'all' | 'announcement' | 'event' | 'volunteer';
+
+const FILTERS: { key: BulletinFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'announcement', label: 'Announcements' },
+  { key: 'event', label: 'Events' },
+  { key: 'volunteer', label: 'Volunteer' },
+];
+
+const RESPONSE_LABEL: Record<string, string> = {
+  interested: 'Interested',
+  unavailable: 'Unavailable',
+  attending: 'Attending',
+  volunteer: 'Volunteering',
+};
+
+const parseLocalDate = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 export default function Events() {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const { user, session } = useAuth();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const [activeTab, setActiveTab] = useState<TabType>('bulletin');
+  const [bulletinFilter, setBulletinFilter] = useState<BulletinFilter>('all');
   const [loading, setLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [weekSchedule, setWeekSchedule] = useState<DaySchedule[]>([]);
@@ -27,8 +57,6 @@ export default function Events() {
   const [parish, setParish] = useState<any>(null);
   const [isParishAdmin, setIsParishAdmin] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
-
-
 
   // Modal states
   const [showReservationModal, setShowReservationModal] = useState(false);
@@ -105,8 +133,6 @@ export default function Events() {
     initializeData();
   }, [user, parishId]);
 
-
-
   const loadWeekSchedule = async (showLoading: boolean = true) => {
     if (!parishId) return;
     
@@ -179,8 +205,6 @@ export default function Events() {
       setLoadingBulletin(false);
     }
   };
-
-
 
   const handleTimeSlotPress = async (daySchedule: DaySchedule, timeSlot: TimeSlot) => {
     // Check if time slot has passed (for non-admin users)
@@ -255,8 +279,8 @@ export default function Events() {
         newAvailability
       );
       
-      
       if (result.success) {
+        Haptics.selectionAsync().catch(() => {});
         // Update the local state to match the database operation
         setWeekSchedule(prevSchedule => 
           prevSchedule.map(day => {
@@ -338,6 +362,7 @@ export default function Events() {
       );
       
       if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         Alert.alert('Success', 'Reservation confirmed!');
         setShowReservationModal(false);
         setReservationNotes('');
@@ -408,20 +433,20 @@ export default function Events() {
       if (diffInMinutes < 1) {
         return 'just now';
       } else if (diffInMinutes < 60) {
-        return `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
+        return `${diffInMinutes}m ago`;
       } else if (diffInHours < 24) {
-        return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
+        return `${diffInHours}h ago`;
       } else if (diffInDays === 1) {
         return 'yesterday';
       } else if (diffInDays < 7) {
-        return `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`;
+        return `${diffInDays}d ago`;
       } else if (diffInWeeks < 4) {
-        return `${diffInWeeks} week${diffInWeeks === 1 ? '' : 's'} ago`;
+        return `${diffInWeeks}w ago`;
       } else if (diffInMonths < 12) {
-        return `${diffInMonths} month${diffInMonths === 1 ? '' : 's'} ago`;
+        return `${diffInMonths}mo ago`;
       } else {
         const diffInYears = Math.floor(diffInDays / 365);
-        return `${diffInYears} year${diffInYears === 1 ? '' : 's'} ago`;
+        return `${diffInYears}y ago`;
       }
     } catch (error) {
       console.error('Error formatting relative time:', error);
@@ -448,12 +473,25 @@ export default function Events() {
 
   const getSlotStatus = (daySchedule: DaySchedule, timeSlot: TimeSlot) => {
     if (timeSlot.reservedBy) {
-      // For now, we'll return 'reserved' and check ownership in handleTimeSlotPress
-      // This is because we need to fetch reservation details to know ownership
+      // Ownership is checked in handleTimeSlotPress, which needs to fetch reservation details
       return 'reserved';
     }
     
     return timeSlot.available ? 'available' : 'unavailable';
+  };
+
+  const resetCreateForm = () => {
+    setCreateEventData({
+      title: '',
+      description: '',
+      event_type: 'announcement',
+      event_date: '',
+      event_time: '',
+      location: '',
+      contact_info: '',
+      volunteers_needed: undefined
+    });
+    setNotifyParishioners(false);
   };
 
   // Bulletin board functions
@@ -499,17 +537,7 @@ export default function Events() {
           Alert.alert('Success', 'Event updated successfully!');
           setShowCreateEventModal(false);
           setEditingEventId(null);
-          setCreateEventData({
-            title: '',
-            description: '',
-            event_type: 'announcement',
-            event_date: '',
-            event_time: '',
-            location: '',
-            contact_info: '',
-            volunteers_needed: undefined
-          });
-          setNotifyParishioners(false);
+          resetCreateForm();
           await loadBulletinEvents();
         } else {
           Alert.alert('Error', updateResult.error || 'Failed to update event');
@@ -533,19 +561,10 @@ export default function Events() {
           } catch (err) {
             console.error('Error invoking remote push function:', err);
           }
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           Alert.alert('Success', 'Event created successfully!');
           setShowCreateEventModal(false);
-          setCreateEventData({
-            title: '',
-            description: '',
-            event_type: 'announcement',
-            event_date: '',
-            event_time: '',
-            location: '',
-            contact_info: '',
-            volunteers_needed: undefined
-          });
-          setNotifyParishioners(false);
+          resetCreateForm();
           await loadBulletinEvents();
         } else {
           Alert.alert('Error', result.error || 'Failed to create event');
@@ -568,6 +587,7 @@ export default function Events() {
       const result = await BulletinService.respondToEvent(selectedEvent.id, user.id, responseData);
       
       if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         Alert.alert('Success', 'Response submitted successfully!');
         setShowEventDetailsModal(false);
         setResponseData({
@@ -656,1395 +676,1038 @@ export default function Events() {
     }
   };
 
-  const renderConfessionTab = () => (
-    <ScrollView
-      className="flex-1"
-      contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="white"
-          colors={["white"]}
-        />
-      }
-    >
-      <View className="p-5">
-        {/* Header */}
-        <View className="mb-6">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-gray-900 dark:text-white text-lg font-semibold">Confession {parish?.priest_name ? `with ${parish.priest_name}` : `Schedule`}</Text>
+  const openEventDetails = (event: BulletinEvent) => {
+    setSelectedEvent(event);
+    setShowEventDetailsModal(true);
+    // Load responses if parish admin and event type
+    if (isParishAdmin && (event.event_type === 'event' || event.event_type === 'volunteer')) {
+      loadEventResponses(event.id);
+    }
+  };
+
+  const startEditingSelectedEvent = () => {
+    if (!selectedEvent) return;
+    setCreateEventData({
+      title: selectedEvent.title || '',
+      description: selectedEvent.description || '',
+      event_type: selectedEvent.event_type,
+      event_date: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_date || '') : '',
+      event_time: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_time || '') : '',
+      location: selectedEvent.event_type !== 'announcement' ? (selectedEvent.location || '') : '',
+      contact_info: selectedEvent.contact_info || '',
+      volunteers_needed: selectedEvent.event_type === 'volunteer' ? (selectedEvent.volunteers_needed || undefined) : undefined
+    });
+    setNotifyParishioners(false);
+    setEditingEventId(selectedEvent.id);
+    setShowEventDetailsModal(false);
+    // iOS can't present a modal while another is still animating out
+    setTimeout(() => setShowCreateEventModal(true), 320);
+  };
+
+  const canSubmitPost =
+    !creatingEvent && !!createEventData.title.trim() && !(createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed);
+
+  const refreshControl = (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textMuted} colors={[palette.accent]} />
+  );
+
+  const renderVolunteerProgress = (event: BulletinEvent) => {
+    const count = event.volunteer_count || 0;
+    const needed = event.volunteers_needed || 0;
+    const ratio = Math.min(1, count / (needed || 1));
+    const reached = !!needed && !!count && count >= needed;
+    return (
+      <View className="rounded-2xl p-4 mb-4 bg-emerald-500/[0.08] border border-emerald-500/20">
+        <View className="flex-row items-end justify-between">
+          <View>
+            <Text className="font-sans-semibold text-xs text-emerald-700 dark:text-emerald-400">Volunteers</Text>
+            <Text className="font-display text-[30px] leading-[34px] text-gray-900 dark:text-white">
+              {count}
+              <Text className="font-display text-[20px] text-gray-400"> of {needed}</Text>
+            </Text>
           </View>
-          <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
-            {isParishAdmin 
-              ? 'Tap slots to enable/disable availability'
-              : `Select a time slot to schedule your confession`
-            }
-          </Text>
+          <Text className="font-sans-bold text-sm text-emerald-700 dark:text-emerald-400">{Math.round(ratio * 100)}%</Text>
         </View>
-
-        {/* Days Selection */}
-        <ScrollView 
-          showsHorizontalScrollIndicator={false}
-          horizontal={true}
-          className="mb-6"
-        >
-          <View className="flex-row space-x-3">
-            {weekSchedule.map((daySchedule, index) => {
-              const isSelected = daySchedule.date.toDateString() === selectedDay.toDateString();
-              const isToday = daySchedule.date.toDateString() === new Date().toDateString();
-              
-              return (
-                <Pressable
-                  key={index}
-                  className={`px-1.5 py-1 rounded-xl border m-1 active:opacity-70 ${
-                    isSelected 
-                      ? 'bg-red-600 border-red-500' 
-                      : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                  }`}
-                  onPress={() => setSelectedDay(daySchedule.date)}
-                >
-                  <Text className={`text-center font-medium ${
-                    isSelected ? 'text-white' : 'text-gray-900 dark:text-white opacity-70'
-                  }`}>
-                    {daySchedule.dayName}
-                  </Text>
-                  <Text className={`text-center text-xs mt-1 ${
-                    isSelected ? 'text-white' : 'text-gray-900 dark:text-white opacity-50'
-                  }`}>
-                    {daySchedule.dateString}
-                  </Text>
-                  {isToday && (
-                    <View className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-
-        {/* Time Slots */}
-        <View className="space-y-4">
-          <Text className="text-gray-900 dark:text-white font-medium mb-3">
-            {isParishAdmin ? 'Manage' : 'Available'} Times for {selectedDay.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+        <View className="h-2 rounded-full bg-emerald-500/15 mt-3 overflow-hidden">
+          <View className="h-2 rounded-full bg-emerald-500" style={{ width: `${ratio * 100}%` }} />
+        </View>
+        <View className="flex-row items-center mt-2.5">
+          {reached && <Ionicons name="checkmark-circle" size={14} color={palette.green} style={{ marginRight: 4 }} />}
+          <Text className="font-sans text-xs text-gray-600 dark:text-gray-300">
+            {reached ? 'Volunteer goal reached' : `${needed - count} more volunteers needed`}
           </Text>
-          
-          <View className="flex-row flex-wrap justify-between">
-            {weekSchedule
-              .find(day => day.date.toDateString() === selectedDay.toDateString())
-              ?.timeSlots.map((timeSlot, index) => {
-                const selectedDaySchedule = weekSchedule.find(day => day.date.toDateString() === selectedDay.toDateString())!;
-                const slotStatus = getSlotStatus(selectedDaySchedule, timeSlot);
-                const isPassed = isTimeSlotPassed(selectedDaySchedule, timeSlot);
-                const isReservedByCurrentUser = !!timeSlot.reservationId && userReservations.has(timeSlot.reservationId);
-                const showAsPassed = isPassed && !isReservedByCurrentUser;
-
-                return (
-                <Pressable
-                  key={timeSlot.id}
-                  className={`w-[48%] p-3 rounded-xl border mb-3 active:opacity-70 ${
-                      showAsPassed
-                        ? 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 opacity-50'
-                        : slotStatus === 'reserved' || (isPassed && isReservedByCurrentUser)
-                        ? 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
-                        : slotStatus === 'available'
-                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                        : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-70'
-                  }`}
-                  onPress={() => handleTimeSlotPress(
-                    selectedDaySchedule,
-                    timeSlot
-                  )}
-                    disabled={
-                      (!isParishAdmin && slotStatus === 'reserved' && !isReservedByCurrentUser) || 
-                      (!isParishAdmin && slotStatus === 'unavailable') ||
-                      (!isParishAdmin && isPassed && !isReservedByCurrentUser)
-                    }
-                >
-                  <View className="items-center">
-                    <View className="flex-row items-center mb-1">
-                      <Ionicons 
-                          name={showAsPassed ? "close-circle" : slotStatus === 'available' ? "time-outline" : "close-circle"} 
-                        size={16} 
-                          color={showAsPassed ? "#6B7280" : slotStatus === 'available' ? "#10B981" : "#9CA3AF"} 
-                      />
-                      <Text className={`ml-2 font-medium text-sm ${
-                          showAsPassed ? 'text-gray-500' : slotStatus === 'available' ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'
-                      }`}>
-                        {timeSlot.displayTime}
-                      </Text>
-                    </View>
-                    
-                      {isReservedByCurrentUser ? (
-                      <View className="flex-row items-center">
-                        <Ionicons name="person" size={12} color="#6B7280" />
-                        <Text className="text-gray-500 text-xs ml-1">
-                          Reserved by you
-                        </Text>
-                      </View>
-                      ) : showAsPassed ? (
-                        <Text className="text-gray-500 text-xs">
-                          Passed
-                        </Text>
-                      ) : slotStatus === 'reserved' ? (
-                      <View className="flex-row items-center">
-                        <Ionicons name="person" size={12} color="#6B7280" />
-                        <Text className="text-gray-500 text-xs ml-1">
-                          Reserved
-                        </Text>
-                      </View>
-                      ) : slotStatus === 'available' ? (
-                      <View className="flex-row items-center">
-                        <Ionicons name="checkmark-circle" size={12} color="#10B981" />
-                        <Text className="text-green-400 text-xs ml-1">
-                            {"Available"}
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text className="text-gray-500 dark:text-gray-400 text-xs">
-                          {isParishAdmin ? 'Tap to enable' : 'Closed'}
-                      </Text>
-                    )}
-                  </View>
-                </Pressable>
-                );
-              })}
-          </View>
         </View>
       </View>
-    </ScrollView>
-  );
+    );
+  };
+
+  const renderDateTile = (dateString: string, inverted = false) => {
+    const date = parseLocalDate(dateString);
+    return (
+      <View
+        className={`w-14 min-h-[68px] rounded-2xl items-center justify-center py-2 mr-4 ${
+          inverted ? 'bg-white/15' : 'bg-red-600/[0.08] dark:bg-red-500/[0.12]'
+        }`}
+      >
+        <Text className="font-sans-bold text-[10px] tracking-[1.2px] uppercase text-red-600 dark:text-red-400">
+          {date.toLocaleDateString('en-US', { month: 'short' })}
+        </Text>
+        <Text className="font-display text-[26px] leading-[28px] text-gray-900 dark:text-white">{date.getDate()}</Text>
+        <Text className="font-sans-medium text-[10px] text-gray-500 dark:text-gray-400">
+          {date.toLocaleDateString('en-US', { weekday: 'short' })}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderConfessionTab = () => {
+    const selectedDaySchedule = weekSchedule.find(day => day.date.toDateString() === selectedDay.toDateString());
+    const slots = selectedDaySchedule?.timeSlots ?? [];
+
+    return (
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: contentBottomPadding(insets.bottom) }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
+      >
+        <View className="px-5 pt-5">
+          <View className="rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex-row items-center">
+            <View className="h-12 w-12 rounded-2xl bg-red-600/10 items-center justify-center mr-4">
+              <Ionicons name="time" size={22} color={palette.accent} />
+            </View>
+            <View className="flex-1">
+              <Text className="font-display text-[24px] leading-[28px] text-gray-900 dark:text-white">
+                Confession{parish?.priest_name ? ` with ${parish.priest_name}` : ''}
+              </Text>
+              <Text className="font-sans text-[13px] text-gray-500 dark:text-gray-400 mt-0.5">
+                {isParishAdmin ? 'Tap slots to enable or disable availability' : 'Choose a time to schedule your confession'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Week strip */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }}
+        >
+          {weekSchedule.map((daySchedule, index) => {
+            const isSelected = daySchedule.date.toDateString() === selectedDay.toDateString();
+            const isToday = daySchedule.date.toDateString() === new Date().toDateString();
+            const openCount = daySchedule.timeSlots.filter(s => s.available && !s.reservedBy).length;
+
+            return (
+              <PressableScale
+                key={index}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setSelectedDay(daySchedule.date);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`${daySchedule.dayName} ${daySchedule.dateString}, ${openCount} open`}
+                scaleTo={0.94}
+                style={{ marginRight: 10 }}
+                className={`w-[60px] rounded-[22px] items-center py-3 border ${
+                  isSelected
+                    ? 'bg-red-600 border-red-600'
+                    : 'bg-white dark:bg-white/[0.04] border-gray-100 dark:border-white/[0.06]'
+                }`}
+              >
+                <Text className={`font-sans-semibold text-[11px] uppercase tracking-[1px] ${isSelected ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {daySchedule.dayName}
+                </Text>
+                <Text className={`font-display text-[26px] leading-[30px] mt-0.5 ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                  {daySchedule.date.getDate()}
+                </Text>
+                <View className="h-3 mt-0.5 flex-row items-center">
+                  {isToday ? (
+                    <Text className={`font-sans-bold text-[9px] ${isSelected ? 'text-white' : 'text-red-600 dark:text-red-400'}`}>TODAY</Text>
+                  ) : openCount > 0 ? (
+                    <View className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} />
+                  ) : null}
+                </View>
+              </PressableScale>
+            );
+          })}
+        </ScrollView>
+
+        {/* Time slots */}
+        <View className="px-5">
+          <View className="flex-row items-end justify-between mb-3">
+            <View className="flex-1">
+              <Text className="font-display text-[24px] leading-[28px] text-gray-900 dark:text-white">
+                {selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </Text>
+              <Text className="font-sans text-[13px] text-gray-500 dark:text-gray-400 mt-0.5">
+                {isParishAdmin ? 'Manage times' : 'Available times'}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row mb-4">
+            {[
+              { label: 'Open', color: palette.green },
+              { label: 'Reserved', color: palette.gray400 },
+              { label: isParishAdmin ? 'Closed' : 'Unavailable', color: colors.isDark ? '#374151' : '#D1D5DB' },
+            ].map((item) => (
+              <View key={item.label} className="flex-row items-center mr-4">
+                <View className="h-2 w-2 rounded-full mr-1.5" style={{ backgroundColor: item.color }} />
+                <Text className="font-sans-medium text-[11px] text-gray-500 dark:text-gray-400">{item.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {slots.length === 0 ? (
+            <EmptyState compact icon="time-outline" title="No times listed" message="There are no confession times for this day." />
+          ) : (
+            <Animated.View key={selectedDay.toDateString()} entering={FadeIn.duration(220)} style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {slots.map((timeSlot) => {
+                const slotStatus = getSlotStatus(selectedDaySchedule!, timeSlot);
+                const isPassed = isTimeSlotPassed(selectedDaySchedule!, timeSlot);
+                const isReservedByCurrentUser = !!timeSlot.reservationId && userReservations.has(timeSlot.reservationId);
+                const showAsPassed = isPassed && !isReservedByCurrentUser;
+                const isDisabled =
+                  (!isParishAdmin && slotStatus === 'reserved' && !isReservedByCurrentUser) ||
+                  (!isParishAdmin && slotStatus === 'unavailable') ||
+                  (!isParishAdmin && isPassed && !isReservedByCurrentUser);
+
+                let caption = '';
+                let captionClass = 'text-gray-500 dark:text-gray-400';
+                let containerClass = 'bg-white dark:bg-white/[0.04] border-gray-100 dark:border-white/[0.06]';
+                let icon: keyof typeof Ionicons.glyphMap = 'time-outline';
+                let iconColor = palette.gray400;
+
+                if (isReservedByCurrentUser) {
+                  caption = 'Yours';
+                  captionClass = 'text-red-600 dark:text-red-400';
+                  containerClass = 'bg-red-600/[0.08] border-red-500/30';
+                  icon = 'person';
+                  iconColor = palette.accentSoft;
+                } else if (showAsPassed) {
+                  caption = 'Passed';
+                  containerClass = 'bg-transparent border-gray-200 dark:border-white/[0.06] opacity-50';
+                  icon = 'remove-circle-outline';
+                } else if (slotStatus === 'reserved') {
+                  caption = 'Reserved';
+                  containerClass = 'bg-gray-100 dark:bg-white/[0.06] border-transparent';
+                  icon = 'person';
+                } else if (slotStatus === 'available') {
+                  caption = 'Open';
+                  captionClass = 'text-emerald-600 dark:text-emerald-400';
+                  containerClass = 'bg-white dark:bg-white/[0.04] border-emerald-500/30';
+                  icon = 'checkmark-circle';
+                  iconColor = palette.green;
+                } else {
+                  caption = isParishAdmin ? 'Tap to open' : 'Closed';
+                  containerClass = 'bg-transparent border-dashed border-gray-300 dark:border-white/10';
+                  icon = 'close-circle-outline';
+                }
+
+                return (
+                  <PressableScale
+                    key={timeSlot.id}
+                    onPress={() => handleTimeSlotPress(selectedDaySchedule!, timeSlot)}
+                    disabled={isDisabled}
+                    scaleTo={0.94}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${timeSlot.time}, ${caption}`}
+                    style={{ width: '31.5%', marginBottom: 10 }}
+                    className={`rounded-2xl border py-3.5 items-center ${containerClass}`}
+                  >
+                    <Ionicons name={icon} size={16} color={iconColor} />
+                    <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white mt-1">{timeSlot.displayTime}</Text>
+                    <Text className={`font-sans-medium text-[11px] mt-0.5 ${captionClass}`}>{caption}</Text>
+                  </PressableScale>
+                );
+              })}
+            </Animated.View>
+          )}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const filteredBulletin = bulletinFilter === 'all'
+    ? bulletinEvents
+    : bulletinEvents.filter(e => e.event_type === bulletinFilter);
 
   const renderBulletinTab = () => (
     <View className="flex-1">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        contentContainerStyle={{ paddingBottom: contentBottomPadding(insets.bottom) + (isParishAdmin ? 56 : 0) }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="white"
-            colors={["white"]}
-          />
-        }
+        refreshControl={refreshControl}
       >
-        <View className="p-6">
-          {/* Header */}
-          <View className="mb-6">
-            <Text className="text-gray-900 dark:text-white text-lg font-semibold mb-1">Parish Bulletin Board</Text>
-            <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
-              Latest announcements and opportunities at your parish
-            </Text>
-          </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}
+        >
+          {FILTERS.map((filter) => {
+            const active = bulletinFilter === filter.key;
+            const count = filter.key === 'all' ? bulletinEvents.length : bulletinEvents.filter(e => e.event_type === filter.key).length;
+            return (
+              <Pressable
+                key={filter.key}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setBulletinFilter(filter.key);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                className={`h-9 px-4 mr-2 rounded-full flex-row items-center border ${
+                  active
+                    ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white'
+                    : 'bg-transparent border-gray-200 dark:border-white/10'
+                }`}
+              >
+                <Text className={`font-sans-semibold text-[13px] ${active ? 'text-white dark:text-gray-900' : 'text-gray-600 dark:text-gray-300'}`}>
+                  {filter.label}
+                </Text>
+                {count > 0 && (
+                  <Text className={`font-sans-semibold text-[12px] ml-1.5 ${active ? 'text-white/60 dark:text-gray-500' : 'text-gray-400'}`}>
+                    {count}
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-          {/* Events List */}
+        <View className="px-5 pt-3">
           {loadingBulletin ? (
-            <View className="items-center py-8">
-              <ActivityIndicator size="large" color={isDark ? "white" : "#374151"} />
-              <Text className="text-gray-900 dark:text-white mt-4">Loading events...</Text>
-            </View>
+            [0, 1, 2].map((i) => (
+              <View key={i} className="rounded-3xl p-5 mb-3 bg-white dark:bg-white/[0.04]">
+                <Skeleton width={90} height={20} radius={10} />
+                <Skeleton width="75%" height={20} className="mt-4" />
+                <Skeleton width="95%" height={12} className="mt-3" />
+                <Skeleton width="60%" height={12} className="mt-2" />
+              </View>
+            ))
           ) : bulletinEvents.length === 0 ? (
-            <View className="items-center py-8">
-              <Ionicons name="document-text-outline" size={48} color="#6B7280" />
-              <Text className="text-gray-900 dark:text-white mt-4 text-center">No events posted yet</Text>
-              <Text className="text-gray-500 dark:text-gray-400 text-sm text-center mt-2">
-                {isParishAdmin ? 'Create the first event to get started!' : 'Check back later for announcements'}
-              </Text>
-            </View>
+            <EmptyState
+              icon="newspaper-outline"
+              title="No posts yet"
+              message={isParishAdmin ? 'Create the first post to share news with your parish.' : 'Check back later for announcements.'}
+            />
+          ) : filteredBulletin.length === 0 ? (
+            <EmptyState compact icon="filter-outline" title="Nothing here" message="No posts match this filter." />
           ) : (
-            <View className="space-y-4">
-              {bulletinEvents.map((event) => (
-                <Pressable
+            filteredBulletin.map((event, index) => {
+              const kind = eventKindStyle[event.event_type];
+              const isDated = (event.event_type === 'volunteer' || event.event_type === 'event') && !!event.event_date;
+              const hasMeta = (event.event_type === 'volunteer' || event.event_type === 'event') && (!!event.event_time || !!event.location);
+
+              return (
+                <Animated.View
                   key={event.id}
-                  className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700 mb-2 active:opacity-70"
-                  onPress={() => {
-                    setSelectedEvent(event);
-                    setShowEventDetailsModal(true);
-                    // Load responses if parish admin and event type
-                    if (isParishAdmin && (event.event_type === 'event' || event.event_type === 'volunteer')) {
-                      loadEventResponses(event.id);
-                    }
-                  }}
+                  entering={entrance.card(Math.min(index, 6) * 50)}
+                  layout={entrance.layout()}
                 >
-                  <View className="flex-row justify-between items-start mb-2">
-                    <View className="flex-1">
-                      <View className="flex-row items-center mb-2">
-                        <View className={`px-2 py-1 rounded-full mr-2 ${
-                          event.event_type === 'announcement' 
-                            ? 'bg-blue-600' 
-                            : event.event_type === 'volunteer'
-                            ? 'bg-green-600'
-                            : 'bg-purple-600'
-                        }`}>
-                          <Text className="text-white text-xs font-medium">
-                            {event.event_type === 'announcement' ? 'Announcement' : 
-                             event.event_type === 'volunteer' ? 'Volunteer' : 'Event'}
-                          </Text>
+                  <PressableScale
+                    onPress={() => openEventDetails(event)}
+                    scaleTo={0.985}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${kind.label}: ${event.title}`}
+                    style={{ marginBottom: 12 }}
+                    className="rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06]"
+                  >
+                    <View className="flex-row items-center justify-between mb-3">
+                      <View className="flex-row items-center">
+                        <View className="flex-row items-center rounded-full pl-1.5 pr-2.5 py-1" style={{ backgroundColor: kind.tint }}>
+                          <Ionicons name={kind.icon as keyof typeof Ionicons.glyphMap} size={11} color={kind.color} />
+                          <Text className="font-sans-bold text-[11px] ml-1" style={{ color: kind.color }}>{kind.label}</Text>
                         </View>
                         {event.created_by === user?.id && (
-                          <View className="px-2 py-1 rounded-full bg-gray-600">
-                            <Text className="text-white text-xs">Your Post</Text>
+                          <View className="rounded-full px-2.5 py-1 ml-1.5 bg-gray-100 dark:bg-white/10">
+                            <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300">Your post</Text>
                           </View>
                         )}
                       </View>
-                      
-                      <Text className="text-gray-900 dark:text-white font-semibold text-lg mb-1">
-                        {event.title}
-                      </Text>
-                      
-                      {event.description && (
-                        <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2" numberOfLines={2}>
-                          {event.description}
-                        </Text>
-                      )}
-                      
-                      <View className="flex-row items-center space-x-4">
-                        {(event.event_type === 'volunteer' || event.event_type === 'event') && event.event_date && (
-                          <View className="flex-row items-center mr-2">
-                            <Ionicons name="calendar-outline" size={14} color="#9CA3AF" />
-                            <Text className="text-gray-500 dark:text-gray-400 text-xs ml-1">
-                          {(() => {
-                            // Parse date as local date to avoid timezone issues
-                            const [year, month, day] = event.event_date?.split('-').map(Number) || [];
-                            const localDate = new Date(year, month - 1, day);
-                            return localDate.toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              month: 'long',
-                              day: 'numeric'
-                            });
-                          })()}
-                        </Text>
+                      <Text className="font-sans text-xs text-gray-400 dark:text-gray-500">{formatRelativeTime(event.created_at)}</Text>
+                    </View>
+
+                    <View className="flex-row">
+                      {isDated && renderDateTile(event.event_date!)}
+                      <View className="flex-1">
+                        <Text className="font-display text-[23px] leading-[27px] text-gray-900 dark:text-white">{event.title}</Text>
+                        {!!event.description && (
+                          <Text className="font-sans text-[14px] leading-5 text-gray-600 dark:text-gray-300 mt-1.5" numberOfLines={2}>
+                            {event.description}
+                          </Text>
+                        )}
+                        {hasMeta && (
+                          <View className="flex-row flex-wrap mt-2.5">
+                            {!!event.event_time && (
+                              <View className="flex-row items-center mr-3 mb-1">
+                                <Ionicons name="time-outline" size={13} color={palette.gray400} />
+                                <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 ml-1">{formatEventTime(event.event_time)}</Text>
+                              </View>
+                            )}
+                            {!!event.location && (
+                              <View className="flex-row items-center mb-1 flex-shrink">
+                                <Ionicons name="location-outline" size={13} color={palette.gray400} />
+                                <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 ml-1" numberOfLines={1}>{event.location}</Text>
+                              </View>
+                            )}
                           </View>
                         )}
-                        
-                        {(event.event_type === 'volunteer' || event.event_type === 'event') && event.event_time && (
-                          <View className="flex-row items-center mr-2">
-                            <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-                            <Text className="text-gray-500 dark:text-gray-400 text-xs ml-1">
-                              {formatEventTime(event.event_time)}
-                            </Text>
-                          </View>
-                        )}
-                        
-                        {(event.event_type === 'volunteer' || event.event_type === 'event') && event.location && (
-                          <View className="flex-row items-center mr-2">
-                            <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                            <Text className="text-gray-500 dark:text-gray-400 text-xs ml-1">
-                              {event.location}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      
-                      <View className="flex-row justify-between items-center mt-3">
-                        <Text className="text-gray-500 text-xs">
-                          Posted {formatRelativeTime(event.created_at)}
-                        </Text>
-                        
-                        <View className="flex-row items-center space-x-2">
-                          {event.event_type === 'event' && event.user_response && (
-                            <View className="flex-row items-center">
-                              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                              <Text className="text-green-400 text-xs ml-1">
-                                {event.user_response.response_type === 'interested' ? 'Interested' :
-                                 event.user_response.response_type === 'unavailable' ? 'Unavailable' : 'Attending'}
-                              </Text>
-                            </View>
-                          )}
-                          
-                          {event.event_type === 'volunteer' && event.volunteers_needed && (
-                            <View className="flex-row items-center">
-                              <Ionicons name="people" size={16} color="#10B981" />
-                              <Text className="text-green-400 text-xs ml-1">
-                                {event.volunteer_count || 0}/{event.volunteers_needed} volunteers
-                              </Text>
-                            </View>
-                          )}
-                        </View>
                       </View>
                     </View>
-                    
 
-                  </View>
-                </Pressable>
-              ))}
-            </View>
+                    {((event.event_type === 'event' && event.user_response) || (event.event_type === 'volunteer' && !!event.volunteers_needed)) && (
+                      <View className="flex-row items-center mt-4 pt-3 border-t border-gray-100 dark:border-white/[0.06]">
+                        {event.event_type === 'event' && event.user_response && (
+                          <View className="flex-row items-center">
+                            <Ionicons name="checkmark-circle" size={15} color={palette.green} />
+                            <Text className="font-sans-semibold text-xs text-emerald-600 dark:text-emerald-400 ml-1">
+                              {RESPONSE_LABEL[event.user_response.response_type] ?? 'Attending'}
+                            </Text>
+                          </View>
+                        )}
+                        {event.event_type === 'volunteer' && !!event.volunteers_needed && (
+                          <View className="flex-1 flex-row items-center">
+                            <Ionicons name="people" size={14} color={palette.green} />
+                            <Text className="font-sans-semibold text-xs text-emerald-600 dark:text-emerald-400 ml-1">
+                              {event.volunteer_count || 0}/{event.volunteers_needed} volunteers
+                            </Text>
+                            <View className="flex-1 h-1.5 rounded-full bg-emerald-500/15 ml-3 overflow-hidden">
+                              <View
+                                className="h-1.5 rounded-full bg-emerald-500"
+                                style={{ width: `${Math.min(100, ((event.volunteer_count || 0) / (event.volunteers_needed || 1)) * 100)}%` }}
+                              />
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </PressableScale>
+                </Animated.View>
+              );
+            })
           )}
         </View>
       </ScrollView>
 
-      {/* Floating Action Button for Parish Admins */}
+      {/* Floating action button for parish admins */}
       {isParishAdmin && (
-      <View className="absolute bottom-6 right-6 z-50">
-        <Pressable
-        className="bg-red-600 rounded-full p-4 shadow-lg active:opacity-70"
-        onPress={() => setShowCreateEventModal(true)}
-        style={{
-          shadowColor: '#000',
-          shadowOffset: {
-            width: 0,
-            height: 4,
-          },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 8,
-        }}
-      >
-          <Ionicons name="add" size={30} color="white" />
-        </Pressable>
-        </View>
+        <Animated.View
+          entering={entrance.pop()}
+          style={{ position: 'absolute', right: 20, bottom: Math.max(insets.bottom, TAB_BAR_GAP) + TAB_BAR_HEIGHT + 16 }}
+        >
+          <PressableScale
+            onPress={() => {
+              resetCreateForm();
+              setEditingEventId(null);
+              setShowCreateEventModal(true);
+            }}
+            haptic
+            accessibilityRole="button"
+            accessibilityLabel="Create a new post"
+            className="h-14 pl-5 pr-6 rounded-full bg-red-600 flex-row items-center"
+            style={{ shadowColor: palette.accent, shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8, borderRadius: 999 }}
+          >
+            <Ionicons name="add" size={22} color="white" />
+            <Text className="font-sans-bold text-[15px] text-white ml-1.5">New post</Text>
+          </PressableScale>
+        </Animated.View>
       )}
     </View>
   );
 
-  if (loading) {
+  const header = (
+    <View className="px-6 pt-4 pb-4">
+      <Text className="font-display text-[40px] leading-[44px] text-gray-900 dark:text-white" accessibilityRole="header">Events</Text>
+      <Text className="font-sans text-[15px] text-gray-500 dark:text-gray-400 mt-1">
+        {parish?.name ? `News and confession at ${parish.name}` : 'Parish events and announcements'}
+      </Text>
+    </View>
+  );
+
+  if (loading && weekSchedule.length === 0 && bulletinEvents.length === 0) {
     return (
       <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-        <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-          <View className="flex-row justify-between items-center pt-0">
-            <View>
-              <Text className="text-3xl font-bold text-gray-900 dark:text-white">Events</Text>
-              <Text className="text-sm text-gray-900 dark:text-white opacity-70">Parish events and announcements</Text>
-            </View>
-          </View>
-        </View>
-        <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color={isDark ? "white" : "#374151"} />
-          <Text className="text-gray-900 dark:text-white mt-4">Loading events...</Text>
+        {header}
+        <View className="px-5">
+          <Skeleton height={44} radius={22} />
+          <View className="mt-6"><SkeletonRows rows={4} /></View>
         </View>
       </View>
     );
   }
 
+  const selectedKind = selectedEvent ? eventKindStyle[selectedEvent.event_type] : null;
+
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-      {/* Header */}
-      <View className="p-6 bg-gradient-to-b from-gray-100 dark:from-gray-900 to-gray-200 dark:to-gray-800 border-b border-gray-200 dark:border-gray-800">
-        <View className="flex-row justify-between items-center pt-0">
-          <View>
-            <Text className="text-3xl font-bold text-gray-900 dark:text-white">Events</Text>
-            <Text className="text-sm text-gray-900 dark:text-white opacity-70">Parish events and announcements</Text>
-          </View>
-          <View className="h-10 w-10 rounded-full bg-transparent flex items-center justify-center">
-              <Ionicons name="notifications" size={25} color={isDark ? 'white' : '#374151'} />
-          </View>
-        </View>
+      {header}
+
+      <View className="px-5">
+        <SegmentedControl
+          value={activeTab}
+          onChange={setActiveTab}
+          segments={[
+            { key: 'bulletin', label: 'Bulletin Board', icon: activeTab === 'bulletin' ? 'pin' : 'pin-outline' },
+            { key: 'confession', label: 'Confession', icon: activeTab === 'confession' ? 'time' : 'time-outline' },
+          ]}
+        />
       </View>
 
-      {/* Tab Navigation */}
-      <View className="flex-row border-b border-gray-200 dark:border-gray-700">
-        <Pressable
-          className={`flex-1 py-4 px-6 active:opacity-70 ${
-            activeTab === 'bulletin' 
-              ? 'border-b-2 border-red-500' 
-              : ''
-          }`}
-          onPress={() => setActiveTab('bulletin')}
-        >
-          <View className="flex-row items-center justify-center">
-            <Ionicons 
-              name={activeTab === 'bulletin' ? 'pin' : 'pin-outline'} 
-              size={20} 
-              color={activeTab === 'bulletin' ? '#EF4444' : '#9CA3AF'} 
-            />
-            <Text className={`ml-2 font-medium ${
-              activeTab === 'bulletin' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
-            }`}>
-              Bulletin Board
-            </Text>
-          </View>
-        </Pressable>
-
-        <Pressable
-          className={`flex-1 py-4 px-6 active:opacity-70 ${
-            activeTab === 'confession' 
-              ? 'border-b-2 border-red-500' 
-              : ''
-          }`}
-          onPress={() => setActiveTab('confession')}
-        >
-          <View className="flex-row items-center justify-center">
-            <Ionicons 
-              name={activeTab === 'confession' ? 'time' : 'time-outline'}  
-              size={20} 
-              color={activeTab === 'confession' ? '#EF4444' : '#9CA3AF'} 
-            />
-            <Text className={`ml-2 font-medium ${
-              activeTab === 'confession' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
-            }`}>
-              Confession
-            </Text>
-          </View>
-        </Pressable>
-      </View>
-
-      {/* Tab Content */}
-      <View className="flex-1">
+      <Animated.View key={activeTab} entering={FadeIn.duration(220)} style={{ flex: 1 }}>
         {activeTab === 'confession' ? renderConfessionTab() : renderBulletinTab()}
-      </View>
+      </Animated.View>
 
-      {/* Reservation Modal */}
-      <Modal
+      {/* Reservation sheet */}
+      <Sheet
         visible={showReservationModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowReservationModal(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
-            <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-xl text-gray-900 dark:text-white font-bold">Make Reservation</Text>
-              <Pressable className="active:opacity-70" onPress={() => setShowReservationModal(false)}>
-                <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-              </Pressable>
-            </View>
-
-            <View className="mb-6">
-              <Text className="text-gray-900 dark:text-white text-lg">
-                {selectedTimeSlot?.time}
-              </Text>
-              <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
-                {selectedDay.toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </Text>
-            </View>
-
-            <View className="mb-6">
-              <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Notes (Optional)</Text>
-              <TextInput
-                className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                value={reservationNotes}
-                onChangeText={setReservationNotes}
-                placeholder="Any special requests or notes..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={3}
-                autoComplete="street-address"
-                textContentType="location"
-              />
-            </View>
-
-            <View className="flex-row space-x-3">
-              <Pressable
-                className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
-                onPress={() => setShowReservationModal(false)}
-                disabled={reservationLoading}
-              >
-                <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
-              </Pressable>
-              
-              <Pressable
-                className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
-                onPress={handleMakeReservation}
-                disabled={reservationLoading}
-              >
-                {reservationLoading ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Ionicons name="checkmark" size={20} color="white" />
-                )}
-                <Text className="text-white text-center font-medium ml-2">
-                  {reservationLoading ? 'Confirming...' : 'Confirm'}
-                </Text>
-              </Pressable>
-            </View>
+        onClose={() => setShowReservationModal(false)}
+        eyebrow="Confession"
+        title={selectedTimeSlot?.time}
+        subtitle={selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        footer={
+          <View className="flex-row">
+            <Button label="Cancel" variant="secondary" onPress={() => setShowReservationModal(false)} disabled={reservationLoading} style={{ flex: 1, marginRight: 8 }} />
+            <Button label={reservationLoading ? 'Confirming…' : 'Confirm'} icon="checkmark" loading={reservationLoading} onPress={handleMakeReservation} style={{ flex: 1 }} />
           </View>
-        </View>
-      </Modal>
-
-      {/* Reservation Details Modal */}
-      <Modal
-        visible={showReservationDetailsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowReservationDetailsModal(false)}
+        }
       >
-        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
-            <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-xl text-gray-900 dark:text-white font-bold">Reservation Details</Text>
-              <Pressable className="active:opacity-70" onPress={() => setShowReservationDetailsModal(false)}>
-                <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-              </Pressable>
+        {parish?.priest_name && (
+          <View className="flex-row items-center rounded-2xl p-4 mb-5 bg-gray-50 dark:bg-white/[0.04]">
+            <Ionicons name="person-circle-outline" size={22} color={colors.textMuted} />
+            <Text className="font-sans-medium text-sm text-gray-700 dark:text-gray-300 ml-2">With {parish.priest_name}</Text>
+          </View>
+        )}
+        <Field
+          label="Notes (optional)"
+          value={reservationNotes}
+          onChangeText={setReservationNotes}
+          placeholder="Any special requests or notes..."
+          multiline
+          numberOfLines={3}
+        />
+      </Sheet>
+
+      {/* Reservation details sheet (admin) */}
+      <Sheet
+        visible={showReservationDetailsModal}
+        onClose={() => setShowReservationDetailsModal(false)}
+        eyebrow="Reservation"
+        title={selectedTimeSlot?.time}
+        subtitle={selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        footer={<Button label="Close" variant="secondary" onPress={() => setShowReservationDetailsModal(false)} fullWidth />}
+      >
+        {loadingReservationDetails ? (
+          <View className="py-6"><SkeletonRows rows={2} /></View>
+        ) : reservationDetails ? (
+          <View>
+            <View className="rounded-2xl p-4 mb-3 bg-gray-50 dark:bg-white/[0.04]">
+              <Text className="font-sans-semibold text-xs text-gray-500 dark:text-gray-400 mb-1">Reserved by</Text>
+              <Text className="font-sans-bold text-base text-gray-900 dark:text-white">
+                {reservationDetails.user_profiles?.full_name || 'Unknown User'}
+              </Text>
+              <Text className="font-sans text-sm text-gray-600 dark:text-gray-300 mt-1">
+                {reservationDetails.user_profiles?.email || 'No email provided'}
+              </Text>
+              {reservationDetails.user_profiles?.phone_number && (
+                <Text className="font-sans text-sm text-gray-600 dark:text-gray-300 mt-0.5">
+                  {formatPhoneNumber(reservationDetails.user_profiles.phone_number)}
+                </Text>
+              )}
             </View>
 
-            {loadingReservationDetails ? (
-              <View className="items-center py-8">
-                <ActivityIndicator size="large" color={isDark ? "white" : "#374151"} />
-                <Text className="text-gray-900 dark:text-white mt-4">Loading details...</Text>
-              </View>
-            ) : reservationDetails ? (
-              <View className="space-y-4">
-                <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
-                  <Text className="text-gray-900 dark:text-white font-semibold text-lg mb-2">
-                    {selectedTimeSlot?.time}
-                  </Text>
-                  <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
-                    {selectedDay.toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </Text>
-                </View>
-
-                <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Reserved By</Text>
-                  <Text className="text-gray-900 dark:text-white font-medium">
-                    {reservationDetails.user_profiles?.full_name || 'Unknown User'}
-                  </Text>
-                  <Text className="text-gray-900 dark:text-white opacity-70 text-sm mt-1">
-                    {reservationDetails.user_profiles?.email || 'No email provided'}
-                  </Text>
-                  {reservationDetails.user_profiles?.phone_number && (
-                    <Text className="text-gray-900 dark:text-white opacity-70 text-sm mt-1">
-                      {formatPhoneNumber(reservationDetails.user_profiles.phone_number)}
-                    </Text>
-                  )}
-                </View>
-
-                {reservationDetails.notes && (
-                  <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
-                    <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Notes</Text>
-                    <Text className="text-gray-900 dark:text-white">
-                      {reservationDetails.notes}
-                    </Text>
-                  </View>
-                )}
-
-                <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Reservation Date</Text>
-                  <Text className="text-gray-900 dark:text-white">
-                    {new Date(reservationDetails.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View className="items-center py-8">
-                <Ionicons name="alert-circle" size={48} color="#6B7280" />
-                <Text className="text-gray-900 dark:text-white mt-4 text-center">Failed to load reservation details</Text>
+            {reservationDetails.notes && (
+              <View className="rounded-2xl p-4 mb-3 bg-gray-50 dark:bg-white/[0.04]">
+                <Text className="font-sans-semibold text-xs text-gray-500 dark:text-gray-400 mb-1">Notes</Text>
+                <Text className="font-sans text-[15px] text-gray-900 dark:text-white">{reservationDetails.notes}</Text>
               </View>
             )}
 
-            <View className="mt-6">
-              <Pressable
-                className="w-full bg-gray-200 dark:bg-gray-700 rounded-lg py-3 active:opacity-70"
-                onPress={() => setShowReservationDetailsModal(false)}
-              >
-                <Text className="text-gray-900 dark:text-white text-center font-medium">Close</Text>
-              </Pressable>
+            <View className="rounded-2xl p-4 bg-gray-50 dark:bg-white/[0.04]">
+              <Text className="font-sans-semibold text-xs text-gray-500 dark:text-gray-400 mb-1">Booked on</Text>
+              <Text className="font-sans text-[15px] text-gray-900 dark:text-white">
+                {new Date(reservationDetails.created_at).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </Text>
             </View>
           </View>
-        </View>
-      </Modal>
+        ) : (
+          <EmptyState compact icon="alert-circle-outline" title="Failed to load reservation details" />
+        )}
+      </Sheet>
 
-      {/* Create Event Modal */}
-      <Modal
+      {/* Create / edit post sheet */}
+      <Sheet
         visible={showCreateEventModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCreateEventModal(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700 max-h-[90%]">
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-xl text-gray-900 dark:text-white font-bold">{editingEventId ? 'Edit Post' : 'Create New Post'}</Text>
-                <Pressable className="active:opacity-70" onPress={() => setShowCreateEventModal(false)}>
-                  <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-                </Pressable>
-              </View>
-
-              <View className="space-y-4">
-                {/* Event Type */}
-                {!editingEventId && (
-                  <View className="mb-2">
-                    <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Type</Text>
-                    <View className="flex-row space-x-2 mb-2">
-                      <Pressable
-                        className={`flex-1 pt-2 pb-2 rounded-lg border mr-1 active:opacity-70 ${
-                          createEventData.event_type === 'announcement'
-                            ? 'bg-blue-600 border-blue-500'
-                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                        }`}
-                        onPress={() => setCreateEventData({
-                          ...createEventData, 
-                          event_type: 'announcement',
-                          event_date: '',
-                          event_time: '',
-                          location: ''
-                        })}
-                      >
-                        <Text className={`text-center text-xs ${
-                          createEventData.event_type === 'announcement' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
-                        }`}>
-                          Announcement
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        className={`flex-1 pt-2 pb-2 rounded-lg border mr-1 active:opacity-70 ${
-                          createEventData.event_type === 'event'
-                            ? 'bg-purple-600 border-purple-500'
-                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                        }`}
-                        onPress={() => setCreateEventData({...createEventData, event_type: 'event'})}
-                      >
-                        <Text className={`text-center text-xs ${
-                          createEventData.event_type === 'event' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
-                        }`}>
-                          Event
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        className={`flex-1 pt-2 pb-2 rounded-lg border active:opacity-70 ${
-                          createEventData.event_type === 'volunteer'
-                            ? 'bg-green-600 border-green-500'
-                            : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                        }`}
-                        onPress={() => setCreateEventData({...createEventData, event_type: 'volunteer'})}
-                      >
-                        <Text className={`text-center text-xs ${
-                          createEventData.event_type === 'volunteer' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
-                        }`}>
-                          Volunteer
-                        </Text>
-                      </Pressable>
-                      
-                    </View>
-                  </View>
-                )}
-
-                
-
-                {/* Title */}
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Title *</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={createEventData.title}
-                    onChangeText={(text) => setCreateEventData({...createEventData, title: text})}
-                    placeholder={createEventData.event_type === 'announcement' ? 'Announcement title...' : 'Event title...'}
-                    placeholderTextColor="#9CA3AF"
-                    autoComplete="street-address"
-                    textContentType="location"
-                  />
-                </View>
-                
-                {/* Description */}
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Description</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={createEventData.description}
-                    onChangeText={(text) => setCreateEventData({...createEventData, description: text})}
-                    placeholder={createEventData.event_type === 'announcement' ? 'Announcement description...' : 'Event description...'}
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    numberOfLines={3}
-                    autoComplete="street-address"
-                    textContentType="location"
-                  />
-                </View>
-                
-                {/* Volunteers Needed */}
-                {createEventData.event_type === 'volunteer' && (
-                  <View className="mb-2">
-                    <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Volunteers Needed *</Text>
-                    <TextInput
-                      className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                      value={createEventData.volunteers_needed?.toString() || ''}
-                      onChangeText={(text) => {
-                        const num = parseInt(text) || undefined;
-                        setCreateEventData({...createEventData, volunteers_needed: num});
-                      }}
-                      placeholder="Number of volunteers needed..."
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="numeric"
-                      autoComplete="off"
-                      textContentType="none"
-                    />
-                  </View>
-                )}
-
-                
-
-                {/* Date and Time - Only show for volunteer and event types */}
-                {(createEventData.event_type === 'volunteer' || createEventData.event_type === 'event') && (
-                  <View className="flex-row space-x-2 mb-2">
-                    <View className="flex-1 mr-1">
-                      <CustomDateTimePicker
-                        value={createEventData.event_date || ''}
-                        onChange={(value) => setCreateEventData({...createEventData, event_date: value})}
-                        placeholder="Select date"
-                        mode="date"
-                        label="Date"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <CustomDateTimePicker
-                        value={createEventData.event_time || ''}
-                        onChange={(value) => setCreateEventData({...createEventData, event_time: value})}
-                        placeholder="Select time"
-                        mode="time"
-                        label="Time"
-                      />
-                    </View>
-                  </View>
-                )}
-
-                {/* Location - Only show for volunteer and event types */}
-                {(createEventData.event_type === 'volunteer' || createEventData.event_type === 'event') && (
-                  <View className="mb-2">
-                    <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Location</Text>
-                    <TextInput
-                      className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                      value={createEventData.location}
-                      onChangeText={(text) => setCreateEventData({...createEventData, location: text})}
-                      placeholder="Event location..."
-                      placeholderTextColor="#9CA3AF"
-                      autoComplete="street-address"
-                      textContentType="location"
-                    />
-                  </View>
-                )}
-
-                {/* Contact Info */}
-                {(createEventData.event_type === 'volunteer' || createEventData.event_type === 'event') && (
-                <View className="mb-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Contact Information</Text>
-                  <TextInput
-                    className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                    value={createEventData.contact_info}
-                    onChangeText={(text) => setCreateEventData({...createEventData, contact_info: text})}
-                    placeholder="Contact details..."
-                      placeholderTextColor="#9CA3AF"
-                      autoComplete="tel"
-                      textContentType="telephoneNumber"
-                    />
-                  </View>
-                )}
-
-                {/* Volunteers Needed - Only for volunteer type */}
-                
-                {/* Notify Parishioners */}
-                <View className="flex-row items-center mb-2 mt-2">
-                  <Text className="text-gray-600 dark:text-gray-300 text-md">Notify Parishioners?</Text>
-                  <Switch
-                    value={notifyParishioners}
-                    onValueChange={setNotifyParishioners}
-                    trackColor={{ false: "#374151", true: "#EF4444" }}
-                    thumbColor="white"
-                    className="ml-2"
-                  />
-                </View>
-              </View>
-
-              <View className="flex-row space-x-3 mt-6">
-                <Pressable
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
-                  onPress={() => { setShowCreateEventModal(false); setEditingEventId(null); }}
-                  disabled={creatingEvent}
-                >
-                  <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
-                </Pressable>
-                
-                <Pressable
-                  className={`flex-1 rounded-lg py-3 flex-row items-center justify-center active:opacity-70 ${
-                    creatingEvent || !createEventData.title.trim() || (createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed)
-                      ? 'bg-gray-600 opacity-50'
-                      : 'bg-red-600'
-                  }`}
-                  onPress={handleSaveEvent}
-                  disabled={creatingEvent || !createEventData.title.trim() || (createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed)}
-                >
-                  {creatingEvent ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Ionicons name="checkmark" size={20} color={creatingEvent || !createEventData.title.trim() || (createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed) ? "#9CA3AF" : "white"} />
-                  )}
-                  <Text className={`text-center font-medium ml-2 ${
-                    creatingEvent || !createEventData.title.trim() || (createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed)
-                      ? 'text-gray-400'
-                      : 'text-white'
-                  }`}>
-                    {creatingEvent ? (editingEventId ? 'Saving...' : 'Creating...') : (editingEventId ? 'Save Changes' : 'Create Event')}
-                  </Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+        onClose={() => { setShowCreateEventModal(false); setEditingEventId(null); }}
+        eyebrow={editingEventId ? 'Edit post' : 'New post'}
+        title={editingEventId ? 'Update your post' : 'Share with your parish'}
+        footer={
+          <View className="flex-row">
+            <Button
+              label="Cancel"
+              variant="secondary"
+              onPress={() => { setShowCreateEventModal(false); setEditingEventId(null); }}
+              disabled={creatingEvent}
+              style={{ flex: 1, marginRight: 8 }}
+            />
+            <Button
+              label={creatingEvent ? (editingEventId ? 'Saving…' : 'Creating…') : (editingEventId ? 'Save changes' : 'Publish')}
+              icon="checkmark"
+              loading={creatingEvent}
+              disabled={!canSubmitPost}
+              onPress={handleSaveEvent}
+              style={{ flex: 1 }}
+            />
           </View>
-        </View>
-      </Modal>
-
-      {/* Event Details Modal */}
-      <Modal
-        visible={showEventDetailsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowEventDetailsModal(false)}
+        }
       >
-        <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-          <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700 max-h-[90%]">
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-xl text-gray-900 dark:text-white font-bold">Post Details</Text>
-                <Pressable className="active:opacity-70" onPress={() => setShowEventDetailsModal(false)}>
-                  <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-                </Pressable>
-              </View>
-
-              {selectedEvent && (
-                <View className="space-y-4">
-                  <View className="flex-row items-center mb-4">
-                    <View className={`px-2 py-1 rounded-full mr-2 ${
-                      selectedEvent.event_type === 'announcement' 
-                        ? 'bg-blue-600' 
-                        : selectedEvent.event_type === 'volunteer'
-                        ? 'bg-green-600'
-                        : 'bg-purple-600'
-                    }`}>
-                      <Text className="text-white text-xs font-medium">
-                        {selectedEvent.event_type === 'announcement' ? 'Announcement' : 
-                         selectedEvent.event_type === 'volunteer' ? 'Volunteer' : 'Event'}
+        {!editingEventId && (
+          <View className="mb-5">
+            <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300 mb-2">Type</Text>
+            <View className="flex-row">
+              {(['announcement', 'event', 'volunteer'] as const).map((type, i) => {
+                const style = eventKindStyle[type];
+                const active = createEventData.event_type === type;
+                return (
+                  <PressableScale
+                    key={type}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setCreateEventData(
+                        type === 'announcement'
+                          ? { ...createEventData, event_type: 'announcement', event_date: '', event_time: '', location: '' }
+                          : { ...createEventData, event_type: type }
+                      );
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    style={{ flex: 1, marginRight: i < 2 ? 8 : 0 }}
+                  >
+                    <View
+                      className={`rounded-2xl py-3.5 items-center border-2 ${active ? '' : 'border-transparent bg-gray-100 dark:bg-white/5'}`}
+                      style={active ? { backgroundColor: style.tint, borderColor: style.color } : undefined}
+                    >
+                      <Ionicons name={style.icon as keyof typeof Ionicons.glyphMap} size={18} color={active ? style.color : palette.gray400} />
+                      <Text className={`font-sans-semibold text-xs mt-1.5 ${active ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                        {type === 'announcement' ? 'Announcement' : type === 'event' ? 'Event' : 'Volunteer'}
                       </Text>
                     </View>
-                    {selectedEvent.created_by === user?.id && (
-                      <View className="px-2 py-1 rounded-full bg-gray-600">
-                        <Text className="text-white text-xs">Your Post</Text>
-                      </View>
-                    )}
-                  </View>
+                  </PressableScale>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
-                  <Text className="text-gray-900 dark:text-white font-semibold text-xl">
-                    {selectedEvent.title}
-                  </Text>
+        <Field
+          label="Title"
+          required
+          value={createEventData.title}
+          onChangeText={(text) => setCreateEventData({...createEventData, title: text})}
+          placeholder={createEventData.event_type === 'announcement' ? 'Announcement title...' : 'Event title...'}
+        />
 
-                  {selectedEvent.description && (
-                    <Text className="text-gray-600 dark:text-gray-300 text-base">
-                      {selectedEvent.description}
-                    </Text>
-                  )}
+        <Field
+          label="Description"
+          value={createEventData.description}
+          onChangeText={(text) => setCreateEventData({...createEventData, description: text})}
+          placeholder={createEventData.event_type === 'announcement' ? 'Announcement description...' : 'Event description...'}
+          multiline
+          numberOfLines={3}
+        />
 
-                  <View className="space-y-2 mt-4 mb-4">
-                    {(selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event') && selectedEvent.event_date && (
-                      <View className="flex-row items-center mb-1">
-                        <Ionicons name="calendar-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
-                          {(() => {
-                            // Parse date as local date to avoid timezone issues
-                            const [year, month, day] = selectedEvent.event_date.split('-').map(Number);
-                            const localDate = new Date(year, month - 1, day);
-                            return localDate.toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            });
-                          })()}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {(selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event') && selectedEvent.event_time && (
-                      <View className="flex-row items-center mb-1">
-                        <Ionicons name="time-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
-                          {formatEventTime(selectedEvent.event_time)}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {(selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event') && selectedEvent.location && (
-                      <View className="flex-row items-center mb-1">
-                        <Ionicons name="location-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
-                          {selectedEvent.location}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {selectedEvent.contact_info && (
-                      <View className="flex-row items-center mb-1">
-                        <Ionicons name="call-outline" size={16} color="#9CA3AF" />
-                        <Text className="text-gray-500 dark:text-gray-400 text-sm ml-2">
-                          {selectedEvent.contact_info}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+        {createEventData.event_type === 'volunteer' && (
+          <Animated.View entering={FadeInDown.duration(220)}>
+            <Field
+              label="Volunteers needed"
+              required
+              value={createEventData.volunteers_needed?.toString() || ''}
+              onChangeText={(text) => {
+                const num = parseInt(text) || undefined;
+                setCreateEventData({...createEventData, volunteers_needed: num});
+              }}
+              placeholder="Number of volunteers needed..."
+              keyboardType="numeric"
+            />
+          </Animated.View>
+        )}
 
-                  <View className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                    <Text className="text-gray-500 text-sm">{"Posted on "}
-                      {new Date(selectedEvent.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </Text>
-                    
+        {(createEventData.event_type === 'volunteer' || createEventData.event_type === 'event') && (
+          <Animated.View entering={FadeInDown.duration(220)}>
+            <View className="flex-row mb-4">
+              <View className="flex-1 mr-2">
+                <CustomDateTimePicker
+                  value={createEventData.event_date || ''}
+                  onChange={(value) => setCreateEventData({...createEventData, event_date: value})}
+                  placeholder="Select date"
+                  mode="date"
+                  label="Date"
+                />
+              </View>
+              <View className="flex-1">
+                <CustomDateTimePicker
+                  value={createEventData.event_time || ''}
+                  onChange={(value) => setCreateEventData({...createEventData, event_time: value})}
+                  placeholder="Select time"
+                  mode="time"
+                  label="Time"
+                />
+              </View>
+            </View>
 
-                  </View>
+            <Field
+              label="Location"
+              value={createEventData.location}
+              onChangeText={(text) => setCreateEventData({...createEventData, location: text})}
+              placeholder="Event location..."
+              autoComplete="street-address"
+              textContentType="fullStreetAddress"
+            />
 
-                  {/* Response Section for Non-Admins - Only for Event type */}
-                  {!isParishAdmin && selectedEvent.event_type === 'event' && (
-                    <View className="pt-4">
-                      {selectedEvent.user_response ? (
-                        <View className="space-y-2">
-                          <View className="flex-row items-center mb-2">
-                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                            <Text className="text-green-400 text-sm ml-2">
-                              You responded: {selectedEvent.user_response.response_type === 'interested' ? 'Interested' :
-                               selectedEvent.user_response.response_type === 'unavailable' ? 'Unavailable' : 'Attending'}
-                            </Text>
-                          </View>
-                          {selectedEvent.user_response.notes && (
-                            <Text className="text-gray-600 dark:text-gray-300 text-sm">
-                              Your notes: "{selectedEvent.user_response.notes}"
-                            </Text>
-                          )}
-                          <Pressable
-                            className="bg-red-600 rounded-lg py-3 mt-4 active:opacity-70"
-                            onPress={() => handleRemoveResponse(selectedEvent.id)}
-                          >
-                            <Text className="text-white text-center font-medium">Remove Response</Text>
-                          </Pressable>
-                        </View>
-                      ) : (
-                        <View className="space-y-4">
-                          <Text className="text-gray-900 dark:text-white font-medium mb-2">RSVP for this event:</Text>
-                          
-                          <View className="flex-row space-x-2 mb-2">
-                          <Pressable
-                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 active:opacity-70 ${
-                                responseData.response_type === 'unavailable'
-                                  ? 'bg-red-600 border-red-500'
-                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                              }`}
-                              onPress={() => setResponseData({...responseData, response_type: 'unavailable'})}
-                            >
-                              <Text className={`text-center text-sm ${
-                                responseData.response_type === 'unavailable' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
-                              }`}>
-                                Unavailable
-                              </Text>
-                            </Pressable>
-                            <Pressable
-                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 active:opacity-70 ${
-                                responseData.response_type === 'interested'
-                                  ? 'bg-blue-600 border-blue-500'
-                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                              }`}
-                              onPress={() => setResponseData({...responseData, response_type: 'interested'})}
-                            >
-                              <Text className={`text-center text-sm ${
-                                responseData.response_type === 'interested' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
-                              }`}>
-                                Interested
-                              </Text>
-                            </Pressable>
-                            
-                            <Pressable
-                              className={`flex-1 py-2 px-3 rounded-lg border mr-1 active:opacity-70 ${
-                                responseData.response_type === 'attending'
-                                  ? 'bg-green-600 border-green-500'
-                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                              }`}
-                              onPress={() => setResponseData({...responseData, response_type: 'attending'})}
-                            >
-                              <Text className={`text-center text-sm ${
-                                responseData.response_type === 'attending' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
-                              }`}>
-                                Attending
-                              </Text>
-                            </Pressable>
-                          </View>
+            <Field
+              label="Contact information"
+              value={createEventData.contact_info}
+              onChangeText={(text) => setCreateEventData({...createEventData, contact_info: text})}
+              placeholder="Contact details..."
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+            />
+          </Animated.View>
+        )}
 
-                          <View className="mb-4">
-                            <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Notes (Optional)</Text>
-                            <TextInput
-                              className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                              value={responseData.notes}
-                              onChangeText={(text) => setResponseData({...responseData, notes: text})}
-                              placeholder="Any additional notes..."
-                              placeholderTextColor="#9CA3AF"
-                              multiline
-                              numberOfLines={2}
-                              autoComplete="street-address"
-                              textContentType="location"
-                            />
-                          </View>
+        <View className="flex-row items-center rounded-2xl p-4 mt-1 bg-gray-50 dark:bg-white/[0.04]">
+          <View className="h-9 w-9 rounded-xl bg-red-600/10 items-center justify-center mr-3">
+            <Ionicons name="notifications" size={16} color={palette.accent} />
+          </View>
+          <View className="flex-1 pr-3">
+            <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Notify parishioners</Text>
+            <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">Send a push notification when published</Text>
+          </View>
+          <Switch
+            value={notifyParishioners}
+            onValueChange={(value) => {
+              Haptics.selectionAsync().catch(() => {});
+              setNotifyParishioners(value);
+            }}
+            trackColor={{ false: colors.isDark ? '#374151' : '#D1D5DB', true: palette.accentSoft }}
+            thumbColor="white"
+            ios_backgroundColor={colors.isDark ? '#374151' : '#D1D5DB'}
+          />
+        </View>
+      </Sheet>
 
-                          <Pressable
-                            className="bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
-                            onPress={handleRespondToEvent}
-                            disabled={respondingToEvent}
-                          >
-                            {respondingToEvent ? (
-                              <ActivityIndicator color="white" size="small" />
-                            ) : (
-                              <Ionicons name="send" size={20} color="white" />
-                            )}
-                            <Text className="text-white text-center font-medium ml-2">
-                              {respondingToEvent ? 'Submitting...' : 'Submit Response'}
-                            </Text>
-                          </Pressable>
-                        </View>
-                      )}
+      {/* Post details sheet */}
+      <Sheet
+        visible={showEventDetailsModal}
+        onClose={() => setShowEventDetailsModal(false)}
+        eyebrow={selectedKind?.label}
+        title={selectedEvent?.title}
+        footer={
+          isParishAdmin && selectedEvent?.created_by === user?.id ? (
+            <View className="flex-row">
+              <Button label="Edit" variant="secondary" icon="pencil" onPress={startEditingSelectedEvent} style={{ flex: 1, marginRight: 8 }} />
+              <Button label="Delete" variant="danger" icon="trash-outline" onPress={() => handleDeleteEvent(selectedEvent!.id)} style={{ flex: 1 }} />
+            </View>
+          ) : undefined
+        }
+      >
+        {selectedEvent && (
+          <View>
+            {selectedEvent.created_by === user?.id && (
+              <View className="self-start rounded-full px-2.5 py-1 mb-3 bg-gray-100 dark:bg-white/10">
+                <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300">Your post</Text>
+              </View>
+            )}
+
+            {!!selectedEvent.description && (
+              <Text className="font-sans text-[16px] leading-[25px] text-gray-700 dark:text-gray-200">
+                {selectedEvent.description}
+              </Text>
+            )}
+
+            {(() => {
+              const rows: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [];
+              const dated = selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event';
+              if (dated && selectedEvent.event_date) {
+                rows.push({
+                  icon: 'calendar-outline',
+                  text: parseLocalDate(selectedEvent.event_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+                });
+              }
+              if (dated && selectedEvent.event_time) rows.push({ icon: 'time-outline', text: formatEventTime(selectedEvent.event_time) });
+              if (dated && selectedEvent.location) rows.push({ icon: 'location-outline', text: selectedEvent.location });
+              if (selectedEvent.contact_info) rows.push({ icon: 'call-outline', text: selectedEvent.contact_info });
+              if (rows.length === 0) return null;
+              return (
+                <View className="rounded-2xl mt-5 bg-gray-50 dark:bg-white/[0.04] overflow-hidden">
+                  {rows.map((row, i) => (
+                    <View key={row.icon} className={`flex-row items-center px-4 py-3.5 ${i > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''}`}>
+                      <Ionicons name={row.icon} size={17} color={colors.textMuted} />
+                      <Text className="font-sans-medium text-[14px] text-gray-800 dark:text-gray-200 ml-3 flex-1">{row.text}</Text>
                     </View>
-                  )}
-
-                  {/* Volunteer Response Section for Non-Admins - Only for Volunteer type */}
-                  {!isParishAdmin && selectedEvent.event_type === 'volunteer' && (
-                    <View className="pt-4">
-                      {/* Volunteer Count Display */}
-                      <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
-                        <Text className="text-gray-900 dark:text-white font-medium mb-2">Volunteer Progress</Text>
-                        <View className="flex-row items-center justify-between">
-                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
-                            {selectedEvent.volunteer_count || 0} of {selectedEvent.volunteers_needed || 0} volunteers
-                          </Text>
-                          <View className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 flex-1 mx-3">
-                            <View 
-                              className="bg-green-500 rounded-full h-2" 
-                              style={{ 
-                                width: `${Math.min(100, ((selectedEvent.volunteer_count || 0) / (selectedEvent.volunteers_needed || 1)) * 100)}%` 
-                              }}
-                            />
-                          </View>
-                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
-                            {Math.round(((selectedEvent.volunteer_count || 0) / (selectedEvent.volunteers_needed || 1)) * 100)}%
-                          </Text>
-                        </View>
-                        <Text className="text-gray-500 dark:text-gray-400 text-xs mt-2">
-                          {selectedEvent.volunteers_needed && selectedEvent.volunteer_count && 
-                           selectedEvent.volunteer_count >= selectedEvent.volunteers_needed 
-                           ? 'Volunteer goal reached! 🎉' 
-                           : `${(selectedEvent.volunteers_needed || 0) - (selectedEvent.volunteer_count || 0)} more volunteers needed`}
-                        </Text>
-                      </View>
-
-                      {selectedEvent.user_response ? (
-                        <View className="space-y-2">
-                          <View className="flex-row items-center mb-2">
-                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                            <Text className="text-green-400 text-sm ml-2">
-                              You volunteered for this event!
-                            </Text>
-                          </View>
-                          {selectedEvent.user_response.notes && (
-                            <Text className="text-gray-600 dark:text-gray-300 text-sm">
-                              Your notes: "{selectedEvent.user_response.notes}"
-                            </Text>
-                          )}
-                          <Pressable
-                            className="bg-red-600 rounded-lg py-3 mt-4 active:opacity-70"
-                            onPress={() => handleRemoveResponse(selectedEvent.id)}
-                          >
-                            <Text className="text-white text-center font-medium">Remove Response</Text>
-                          </Pressable>
-                        </View>
-                      ) : (
-                        <View className="space-y-4">
-                          <Text className="text-gray-900 dark:text-white font-medium mb-2">Volunteer for this event:</Text>
-                          
-                          <View className="flex-row space-x-2 mb-2">
-                            <Pressable
-                              className={`flex-1 py-2 px-3 rounded-lg border active:opacity-70 ${
-                                responseData.response_type === 'volunteer'
-                                  ? 'bg-green-600 border-green-500'
-                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                              }`}
-                              onPress={() => setResponseData({
-                                ...responseData, 
-                                response_type: responseData.response_type === 'volunteer' ? 'attending' : 'volunteer'
-                              })}
-                            >
-                              <View className="flex-row items-center justify-center">
-                                <Ionicons 
-                                  name={responseData.response_type === 'volunteer' ? 'checkmark-circle' : 'hand-left'} 
-                                  size={24} 
-                                  color={responseData.response_type === 'volunteer' ? 'white' : '#9CA3AF'} 
-                                />
-                                <Text className={`text-center text-sm ml-2 font-medium py-1 ${
-                                  responseData.response_type === 'volunteer' ? 'text-white' : 'text-gray-500 dark:text-gray-400'
-                                }`}>
-                                  I'll Volunteer
-                                </Text>
-                              </View>
-                            </Pressable>
-                          </View>
-
-                          <View className="mb-4">
-                            <Text className="text-gray-600 dark:text-gray-300 text-sm mb-2">Notes (Optional)</Text>
-                            <TextInput
-                              className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg border border-gray-300 dark:border-gray-600"
-                              value={responseData.notes}
-                              onChangeText={(text) => setResponseData({...responseData, notes: text})}
-                              placeholder="Any additional notes..."
-                              placeholderTextColor="#9CA3AF"
-                              multiline
-                              numberOfLines={2}
-                              autoComplete="street-address"
-                              textContentType="location"
-                            />
-                          </View>
-
-                          <Pressable
-                            className={`rounded-lg py-3 flex-row items-center justify-center active:opacity-70 ${
-                              responseData.response_type === 'volunteer' && !respondingToEvent
-                                ? 'bg-red-600'
-                                : 'bg-gray-600'
-                            }`}
-                            onPress={handleRespondToEvent}
-                            disabled={respondingToEvent || responseData.response_type !== 'volunteer'}
-                          >
-                            {respondingToEvent ? (
-                              <ActivityIndicator color="white" size="small" />
-                            ) : (
-                              <Ionicons name="send" size={20} color="white" />
-                            )}
-                            <Text className="text-white text-center font-medium ml-2">
-                              {respondingToEvent ? 'Submitting...' : 'Submit Response'}
-                            </Text>
-                          </Pressable>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  {/* RSVP Summary for Parish Admins - Only for Event type */}
-                  {isParishAdmin && selectedEvent.event_type === 'event' && (
-                    <View className="pt-2">
-                      <View className="flex-row items-center justify-between mb-4">
-                        {loadingResponses && (
-                          <ActivityIndicator size="small" color={isDark ? "white" : "#374151"} />
-                        )}
-                      </View>
-
-                      {/* Response Count Summary */}
-                      {!loadingResponses && eventResponses.length > 0 && (
-                        <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
-                          <Text className="text-gray-900 dark:text-white font-medium mb-2">RSVP Response Summary</Text>
-                          <View className="flex-row justify-between">
-                            <View className="items-center">
-                              <Text className="text-green-400 text-lg font-bold">
-                                {eventResponses.filter(r => r.response_type === 'attending').length}
-                              </Text>
-                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Attending</Text>
-                            </View>
-                            <View className="items-center">
-                              <Text className="text-blue-400 text-lg font-bold">
-                                {eventResponses.filter(r => r.response_type === 'interested').length}
-                              </Text>
-                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Interested</Text>
-                            </View>
-                            <View className="items-center">
-                              <Text className="text-red-400 text-lg font-bold">
-                                {eventResponses.filter(r => r.response_type === 'unavailable').length}
-                              </Text>
-                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Unavailable</Text>
-                            </View>
-                            <View className="items-center">
-                              <Text className="text-gray-900 dark:text-white text-lg font-bold">
-                                {eventResponses.length}
-                              </Text>
-                              <Text className="text-gray-500 dark:text-gray-400 text-xs">Total</Text>
-                            </View>
-                          </View>
-                        </View>
-                      )}
-                      
-                      {eventResponses.length === 0 ? (
-                        <View className="items-center py-4">
-                          <Ionicons name="people-outline" size={32} color="#6B7280" />
-                          <Text className="text-gray-500 dark:text-gray-400 text-sm mt-2">No responses yet</Text>
-                        </View>
-                      ) : (
-                        <View className="space-y-3">
-                          {eventResponses.map((response, index) => (
-                            <View key={index} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-2">
-                              <View className="flex-row items-center justify-between mb-2">
-                                <Text className="text-gray-900 dark:text-white font-medium">
-                                  {response.user_profile?.full_name || 'Unknown User'}
-                                </Text>
-                                <View className={`px-2 py-1 rounded-full ${
-                                  response.response_type === 'attending' ? 'bg-green-600' :
-                                  response.response_type === 'interested' ? 'bg-blue-600' : 'bg-red-600'
-                                }`}>
-                                  <Text className="text-white text-xs font-medium">
-                                    {response.response_type === 'attending' ? 'Attending' :
-                                     response.response_type === 'interested' ? 'Interested' : 'Unavailable'}
-                                  </Text>
-                                </View>
-                              </View>
-                              
-                              {response.notes && (
-                                <Text className="text-gray-600 dark:text-gray-300 text-sm mt-1">
-                                  "{response.notes}"
-                                </Text>
-                              )}
-                              
-                              <Text className="text-gray-500 text-xs mt-2">
-                                {new Date(response.created_at).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  {/* Volunteer Summary for Parish Admins - Only for Volunteer type */}
-                  {isParishAdmin && selectedEvent.event_type === 'volunteer' && (
-                    <View className="pt-2">
-                      <View className="flex-row items-center justify-between mb-4">
-                        {loadingResponses && (
-                          <ActivityIndicator size="small" color={isDark ? "white" : "#374151"} />
-                        )}
-                      </View>
-
-                      {/* Volunteer Progress Summary */}
-                      <View className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 mb-4 border border-gray-200 dark:border-gray-700">
-                        <Text className="text-gray-900 dark:text-white font-medium mb-2">Volunteer Progress</Text>
-                        <View className="flex-row items-center justify-between mb-2">
-                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
-                            {selectedEvent.volunteer_count || 0} of {selectedEvent.volunteers_needed || 0} volunteers
-                          </Text>
-                          <View className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 flex-1 mx-3">
-                            <View 
-                              className="bg-green-500 rounded-full h-2" 
-                              style={{ 
-                                width: `${Math.min(100, ((selectedEvent.volunteer_count || 0) / (selectedEvent.volunteers_needed || 1)) * 100)}%` 
-                              }}
-                            />
-                          </View>
-                          <Text className="text-gray-600 dark:text-gray-300 text-sm">
-                            {Math.round(((selectedEvent.volunteer_count || 0) / (selectedEvent.volunteers_needed || 1)) * 100)}%
-                          </Text>
-                        </View>
-                        <Text className="text-gray-500 dark:text-gray-400 text-xs">
-                          {selectedEvent.volunteers_needed && selectedEvent.volunteer_count && 
-                           selectedEvent.volunteer_count >= selectedEvent.volunteers_needed 
-                           ? 'Volunteer goal reached! 🎉' 
-                           : `${(selectedEvent.volunteers_needed || 0) - (selectedEvent.volunteer_count || 0)} more volunteers needed`}
-                        </Text>
-                      </View>
-
-                      {/* Volunteer List */}
-                      {eventResponses.length === 0 ? (
-                        <View className="items-center py-4">
-                          <Ionicons name="people-outline" size={32} color="#6B7280" />
-                          <Text className="text-gray-500 dark:text-gray-400 text-sm mt-2">No volunteers yet</Text>
-                        </View>
-                      ) : (
-                        <View className="space-y-3">
-                          {eventResponses.map((response, index) => (
-                            <View key={index} className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 mb-2">
-                              <View className="flex-row items-center justify-between mb-2">
-                                <Text className="text-gray-900 dark:text-white font-medium">
-                                  {response.user_profile?.full_name || 'Unknown User'}
-                                </Text>
-                                <View className="px-2 py-1 rounded-full bg-green-600">
-                                  <Text className="text-white text-xs font-medium">
-                                    Volunteer
-                                  </Text>
-                                </View>
-                              </View>
-                              
-                              {response.notes && (
-                                <Text className="text-gray-600 dark:text-gray-300 text-sm">
-                                  Notes: "{response.notes}"
-                                </Text>
-                              )}
-                              
-                              <Text className="text-gray-500 text-xs mt-2">
-                                {new Date(response.created_at).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  )}
+                  ))}
                 </View>
-              )}
+              );
+            })()}
 
-              <View className="mt-2 space-y-3">
-                <Pressable
-                  className="w-full bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mb-2 active:opacity-70"
-                  onPress={() => setShowEventDetailsModal(false)}
-                >
-                  <Text className="text-gray-900 dark:text-white text-center font-medium">Close</Text>
-                </Pressable>
-                
-                {/* Edit/Delete Buttons for Parish Admins */}
-                {isParishAdmin && selectedEvent?.created_by === user?.id && (
-                  <View className="flex-row space-x-3">
-                    <Pressable
-                      className="flex-1 bg-blue-600 rounded-lg py-3 flex-row items-center justify-center mr-2 active:opacity-70"
-                      onPress={() => {
-                        if (!selectedEvent) return;
-                        setCreateEventData({
-                          title: selectedEvent.title || '',
-                          description: selectedEvent.description || '',
-                          event_type: selectedEvent.event_type,
-                          event_date: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_date || '') : '',
-                          event_time: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_time || '') : '',
-                          location: selectedEvent.event_type !== 'announcement' ? (selectedEvent.location || '') : '',
-                          contact_info: selectedEvent.contact_info || '',
-                          volunteers_needed: selectedEvent.event_type === 'volunteer' ? (selectedEvent.volunteers_needed || undefined) : undefined
-                        });
-                        setNotifyParishioners(false);
-                        setEditingEventId(selectedEvent.id);
-                        setShowEventDetailsModal(false);
-                        setShowCreateEventModal(true);
-                      }}
-                    >
-                      <Ionicons name="pencil" size={16} color="white" />
-                      <Text className="text-white text-center font-medium ml-2">Edit Post</Text>
-                    </Pressable>
-                    <Pressable
-                      className="flex-1 bg-red-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
-                      onPress={() => handleDeleteEvent(selectedEvent!.id)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="white" />
-                      <Text className="text-white text-center font-medium ml-2">Delete Post</Text>
-                    </Pressable>
+            <Text className="font-sans text-xs text-gray-400 dark:text-gray-500 mt-4 mb-2">
+              Posted {new Date(selectedEvent.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </Text>
+
+            {/* RSVP for parishioners */}
+            {!isParishAdmin && selectedEvent.event_type === 'event' && (
+              <View className="pt-4 mt-2 border-t border-gray-100 dark:border-white/[0.06]">
+                {selectedEvent.user_response ? (
+                  <View>
+                    <View className="flex-row items-center rounded-2xl p-4 bg-emerald-500/[0.08]">
+                      <Ionicons name="checkmark-circle" size={20} color={palette.green} />
+                      <View className="flex-1 ml-2.5">
+                        <Text className="font-sans-semibold text-sm text-emerald-700 dark:text-emerald-400">
+                          You responded: {RESPONSE_LABEL[selectedEvent.user_response.response_type] ?? 'Attending'}
+                        </Text>
+                        {selectedEvent.user_response.notes && (
+                          <Text className="font-sans text-[13px] text-gray-600 dark:text-gray-300 mt-0.5">
+                            Your notes: “{selectedEvent.user_response.notes}”
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <Button label="Remove response" variant="danger" onPress={() => handleRemoveResponse(selectedEvent.id)} fullWidth className="mt-3" />
+                  </View>
+                ) : (
+                  <View>
+                    <Text className="font-display text-[22px] text-gray-900 dark:text-white mb-3">Will you be there?</Text>
+                    <View className="flex-row mb-4">
+                      {([
+                        { key: 'attending', label: 'Attending', icon: 'checkmark-circle', color: palette.green },
+                        { key: 'interested', label: 'Interested', icon: 'star', color: palette.blue },
+                        { key: 'unavailable', label: 'Can’t make it', icon: 'close-circle', color: palette.accentSoft },
+                      ] as const).map((option, i) => {
+                        const active = responseData.response_type === option.key;
+                        return (
+                          <PressableScale
+                            key={option.key}
+                            onPress={() => {
+                              Haptics.selectionAsync().catch(() => {});
+                              setResponseData({ ...responseData, response_type: option.key });
+                            }}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected: active }}
+                            style={{ flex: 1, marginRight: i < 2 ? 8 : 0 }}
+                            className={`rounded-2xl py-3 items-center ${active ? '' : 'bg-gray-100 dark:bg-white/5'}`}
+                          >
+                            {active && (
+                              <Animated.View
+                                entering={ZoomIn.duration(180)}
+                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 16, backgroundColor: `${option.color}1F`, borderWidth: 1.5, borderColor: option.color }}
+                              />
+                            )}
+                            <Ionicons name={option.icon} size={18} color={active ? option.color : palette.gray400} />
+                            <Text className={`font-sans-semibold text-xs mt-1 ${active ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                              {option.label}
+                            </Text>
+                          </PressableScale>
+                        );
+                      })}
+                    </View>
+                    <Field
+                      label="Notes (optional)"
+                      value={responseData.notes}
+                      onChangeText={(text) => setResponseData({...responseData, notes: text})}
+                      placeholder="Any additional notes..."
+                      multiline
+                      numberOfLines={2}
+                    />
+                    <Button
+                      label={respondingToEvent ? 'Submitting…' : 'Send response'}
+                      icon="send"
+                      loading={respondingToEvent}
+                      onPress={handleRespondToEvent}
+                      fullWidth
+                    />
                   </View>
                 )}
               </View>
-            </ScrollView>
+            )}
+
+            {/* Volunteer sign-up for parishioners */}
+            {!isParishAdmin && selectedEvent.event_type === 'volunteer' && (
+              <View className="pt-4 mt-2 border-t border-gray-100 dark:border-white/[0.06]">
+                {renderVolunteerProgress(selectedEvent)}
+
+                {selectedEvent.user_response ? (
+                  <View>
+                    <View className="flex-row items-center rounded-2xl p-4 bg-emerald-500/[0.08]">
+                      <Ionicons name="checkmark-circle" size={20} color={palette.green} />
+                      <View className="flex-1 ml-2.5">
+                        <Text className="font-sans-semibold text-sm text-emerald-700 dark:text-emerald-400">You volunteered for this event</Text>
+                        {selectedEvent.user_response.notes && (
+                          <Text className="font-sans text-[13px] text-gray-600 dark:text-gray-300 mt-0.5">
+                            Your notes: “{selectedEvent.user_response.notes}”
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <Button label="Remove response" variant="danger" onPress={() => handleRemoveResponse(selectedEvent.id)} fullWidth className="mt-3" />
+                  </View>
+                ) : (
+                  <View>
+                    <PressableScale
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setResponseData({
+                          ...responseData,
+                          response_type: responseData.response_type === 'volunteer' ? 'attending' : 'volunteer'
+                        });
+                      }}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: responseData.response_type === 'volunteer' }}
+                      className={`flex-row items-center rounded-2xl p-4 mb-4 border-2 ${
+                        responseData.response_type === 'volunteer'
+                          ? 'bg-emerald-500/10 border-emerald-500'
+                          : 'bg-gray-100 dark:bg-white/5 border-transparent'
+                      }`}
+                    >
+                      <Ionicons
+                        name={responseData.response_type === 'volunteer' ? 'checkmark-circle' : 'hand-left-outline'}
+                        size={24}
+                        color={responseData.response_type === 'volunteer' ? palette.green : palette.gray400}
+                      />
+                      <View className="ml-3 flex-1">
+                        <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">I'll volunteer</Text>
+                        <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">Let the parish know they can count on you</Text>
+                      </View>
+                    </PressableScale>
+
+                    <Field
+                      label="Notes (optional)"
+                      value={responseData.notes}
+                      onChangeText={(text) => setResponseData({...responseData, notes: text})}
+                      placeholder="Any additional notes..."
+                      multiline
+                      numberOfLines={2}
+                    />
+
+                    <Button
+                      label={respondingToEvent ? 'Submitting…' : 'Send response'}
+                      icon="send"
+                      loading={respondingToEvent}
+                      disabled={respondingToEvent || responseData.response_type !== 'volunteer'}
+                      onPress={handleRespondToEvent}
+                      fullWidth
+                    />
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* RSVP summary for parish admins */}
+            {isParishAdmin && selectedEvent.event_type === 'event' && (
+              <View className="pt-4 mt-2 border-t border-gray-100 dark:border-white/[0.06]">
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text className="font-display text-[22px] text-gray-900 dark:text-white">Responses</Text>
+                  {loadingResponses && <ActivityIndicator size="small" color={colors.textMuted} />}
+                </View>
+
+                {!loadingResponses && eventResponses.length > 0 && (
+                  <View className="flex-row mb-4">
+                    {[
+                      { label: 'Attending', value: eventResponses.filter(r => r.response_type === 'attending').length, color: palette.green },
+                      { label: 'Interested', value: eventResponses.filter(r => r.response_type === 'interested').length, color: palette.blue },
+                      { label: 'Unavailable', value: eventResponses.filter(r => r.response_type === 'unavailable').length, color: palette.accentSoft },
+                      { label: 'Total', value: eventResponses.length, color: colors.text },
+                    ].map((stat, i) => (
+                      <View key={stat.label} className={`flex-1 rounded-2xl py-3 items-center bg-gray-50 dark:bg-white/[0.04] ${i < 3 ? 'mr-2' : ''}`}>
+                        <Text className="font-display text-[28px] leading-[30px]" style={{ color: stat.color }}>{stat.value}</Text>
+                        <Text className="font-sans-medium text-[10.5px] text-gray-500 dark:text-gray-400 mt-0.5">{stat.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {eventResponses.length === 0 ? (
+                  !loadingResponses && <EmptyState compact icon="people-outline" title="No responses yet" />
+                ) : (
+                  eventResponses.map((response, index) => {
+                    const tone =
+                      response.response_type === 'attending' ? palette.green :
+                      response.response_type === 'interested' ? palette.blue : palette.accentSoft;
+                    return (
+                      <View key={index} className="rounded-2xl p-4 mb-2 bg-gray-50 dark:bg-white/[0.04]">
+                        <View className="flex-row items-center justify-between">
+                          <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white flex-1 pr-2">
+                            {response.user_profile?.full_name || 'Unknown User'}
+                          </Text>
+                          <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${tone}1F` }}>
+                            <Text className="font-sans-bold text-[11px]" style={{ color: tone }}>
+                              {response.response_type === 'attending' ? 'Attending' :
+                               response.response_type === 'interested' ? 'Interested' : 'Unavailable'}
+                            </Text>
+                          </View>
+                        </View>
+                        {response.notes && (
+                          <Text className="font-sans text-[13px] text-gray-600 dark:text-gray-300 mt-1.5">“{response.notes}”</Text>
+                        )}
+                        <Text className="font-sans text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">
+                          {new Date(response.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            )}
+
+            {/* Volunteer summary for parish admins */}
+            {isParishAdmin && selectedEvent.event_type === 'volunteer' && (
+              <View className="pt-4 mt-2 border-t border-gray-100 dark:border-white/[0.06]">
+                {renderVolunteerProgress(selectedEvent)}
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text className="font-display text-[22px] text-gray-900 dark:text-white">Volunteers</Text>
+                  {loadingResponses && <ActivityIndicator size="small" color={colors.textMuted} />}
+                </View>
+                {eventResponses.length === 0 ? (
+                  !loadingResponses && <EmptyState compact icon="people-outline" title="No volunteers yet" />
+                ) : (
+                  eventResponses.map((response, index) => (
+                    <View key={index} className="rounded-2xl p-4 mb-2 bg-gray-50 dark:bg-white/[0.04]">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white flex-1 pr-2">
+                          {response.user_profile?.full_name || 'Unknown User'}
+                        </Text>
+                        <View className="rounded-full px-2.5 py-1 bg-emerald-500/15">
+                          <Text className="font-sans-bold text-[11px] text-emerald-600 dark:text-emerald-400">Volunteer</Text>
+                        </View>
+                      </View>
+                      {response.notes && (
+                        <Text className="font-sans text-[13px] text-gray-600 dark:text-gray-300 mt-1.5">Notes: “{response.notes}”</Text>
+                      )}
+                      <Text className="font-sans text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">
+                        {new Date(response.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
           </View>
-        </View>
-      </Modal>
+        )}
+      </Sheet>
     </View>
   );
 }
