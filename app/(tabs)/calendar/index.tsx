@@ -1,17 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, LayoutChangeEvent, Pressable, RefreshControl, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { FadeIn, FadeInLeft, FadeInRight, runOnJS } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeInLeft,
+  FadeInRight,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventDetailSheet } from "../../../components/liturgical/EventDetailSheet";
 import { FastingBadge } from "../../../components/liturgical/FastingBadge";
 import { ReadingSheet } from "../../../components/liturgical/ReadingSheet";
 import { ReadingsCarousel } from "../../../components/liturgical/ReadingsCarousel";
 import { TimelineItem } from "../../../components/liturgical/TimelineItem";
-import ParishCalendarSetup from "../../../components/ParishCalendarSetup";
+import ParishCalendarSetup, { CalendarSetupCallout } from "../../../components/ParishCalendarSetup";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { PressableScale } from "../../../components/ui/PressableScale";
@@ -20,12 +29,13 @@ import { SectionHeader } from "../../../components/ui/SectionHeader";
 import { SegmentedControl } from "../../../components/ui/SegmentedControl";
 import { SkeletonRows } from "../../../components/ui/Skeleton";
 import { useThemeColors } from "../../../components/ui/useThemeColors";
-import { contentBottomPadding, entrance, fastingStyle, getFastingKind, palette } from "../../../constants/theme";
+import { contentBottomPadding, entrance, fastingStyle, getFastingKind, palette, springs } from "../../../constants/theme";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useCalendarTradition } from "../../../contexts/CalendarTraditionContext";
 import { useNotifications } from "../../../contexts/NotificationContext";
 import { BulletinEvent, BulletinService } from "../../../services/bulletinService";
 import {
+  Commemoration,
   fetchOrthodoxCalendarData,
   fetchParishEventsForMultipleDays,
   fetchParishEventsForToday,
@@ -49,6 +59,106 @@ type PersonalItem = {
 };
 
 type ViewMode = 'month' | 'week';
+
+const DAY_DOT_SIZE = 40;
+
+/**
+ * Selection circle that moves between day cells.
+ * Mount only with valid x/y so shared values never initialize off-cell (which flashed on day 1).
+ * - slide: spring between cells (week view)
+ * - grid: enter from off-screen on month change / first tap (keeping prior Y), then spring
+ */
+function MovingDayDot({
+  x,
+  y,
+  size = DAY_DOT_SIZE,
+  moveMode = 'slide',
+  popOnMount = false,
+  enterFrom = null,
+  enterY = -1,
+  trackWidth = 0,
+}: {
+  x: number;
+  y: number;
+  size?: number;
+  moveMode?: 'slide' | 'grid';
+  popOnMount?: boolean;
+  enterFrom?: 'left' | 'right' | null;
+  enterY?: number;
+  trackWidth?: number;
+}) {
+  const startX =
+    enterFrom === 'left' ? -size : enterFrom === 'right' ? Math.max(trackWidth, x) + size : x;
+  const startY = enterFrom && enterY >= 0 ? enterY : y;
+
+  const translateX = useSharedValue(startX);
+  const translateY = useSharedValue(startY);
+  const scale = useSharedValue(1);
+  // enter → placed (quiet mount) → interactive
+  const phase = useRef<'enter' | 'placed' | 'interactive'>('enter');
+
+  useEffect(() => {
+    if (phase.current === 'enter') {
+      if (enterFrom) {
+        translateX.value = withSpring(x, springs.snappy);
+        translateY.value = withSpring(y, springs.snappy);
+        scale.value = withSequence(withSpring(1.12, springs.snappy), withSpring(1, springs.gentle));
+        phase.current = 'interactive';
+        return;
+      }
+
+      translateX.value = x;
+      translateY.value = y;
+      if (moveMode === 'slide' || popOnMount) {
+        scale.value = withSequence(withSpring(1.14, springs.snappy), withSpring(1, springs.snappy));
+        phase.current = 'interactive';
+      } else {
+        scale.value = 1;
+        phase.current = 'placed';
+      }
+      return;
+    }
+
+    if (phase.current === 'placed') {
+      translateX.value = x;
+      translateY.value = y;
+      scale.value = withSequence(withSpring(1.14, springs.snappy), withSpring(1, springs.snappy));
+      phase.current = 'interactive';
+      return;
+    }
+
+    translateX.value = withSpring(x, springs.snappy);
+    translateY.value = withSpring(y, springs.snappy);
+    scale.value = withSequence(withSpring(1.12, springs.snappy), withSpring(1, springs.gentle));
+  }, [x, y, moveMode, popOnMount, enterFrom]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: palette.accent,
+          zIndex: 0,
+        },
+        style,
+      ]}
+    />
+  );
+}
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const localDateKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -102,7 +212,7 @@ export default function Calendar() {
   const [parishEvents, setParishEvents] = useState<ParishEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedSaint, setSelectedSaint] = useState<{ title: string; story: string } | null>(null);
+  const [selectedSaint, setSelectedSaint] = useState<Commemoration | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedReading, setSelectedReading] = useState<{ display: string; passage: string } | null>(null);
   const [readingModalVisible, setReadingModalVisible] = useState(false);
@@ -125,6 +235,14 @@ export default function Calendar() {
   const [weekAnchor, setWeekAnchor] = useState(new Date());
   const [activeEvent, setActiveEvent] = useState<ParishEvent | null>(null);
   const [eventSheetVisible, setEventSheetVisible] = useState(false);
+  const [monthGridWidth, setMonthGridWidth] = useState(0);
+  const [weekStripWidth, setWeekStripWidth] = useState(0);
+  const [weekDotY, setWeekDotY] = useState(-1);
+  const prevMonthKeyRef = useRef<string | null>(null);
+  const monthOpenedWithoutSelection = useRef(false);
+  const lastMonthDotY = useRef(-1);
+  const monthEnterFrom = useRef<'left' | 'right' | null>(null);
+  const monthEnterY = useRef(-1);
 
   const { user } = useAuth();
   const { tradition } = useCalendarTradition();
@@ -707,6 +825,51 @@ export default function Calendar() {
   const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long' });
   const yearLabel = currentMonth.getFullYear();
 
+  const monthCellWidth = monthGridWidth > 0 ? monthGridWidth / 7 : 0;
+  const monthSelectedIndex = calendarDays.findIndex((day) => day.isSelected);
+  const monthDotX =
+    monthSelectedIndex >= 0 && monthCellWidth > 0
+      ? (monthSelectedIndex % 7) * monthCellWidth + (monthCellWidth - DAY_DOT_SIZE) / 2
+      : -1;
+  const monthDotY =
+    monthSelectedIndex >= 0 && monthCellWidth > 0
+      ? Math.floor(monthSelectedIndex / 7) * 50 + 3
+      : -1;
+  const monthDotReady = monthDotX >= 0 && monthDotY >= 0;
+
+  // On month page change: prepare a slide-in from the off-screen side, keeping the previous Y.
+  // Applies both when the selection carries over and on the first tap in the new month.
+  if (prevMonthKeyRef.current !== monthKey) {
+    const isFirstMonth = prevMonthKeyRef.current === null;
+    prevMonthKeyRef.current = monthKey;
+    monthOpenedWithoutSelection.current = monthSelectedIndex < 0;
+    if (!isFirstMonth && lastMonthDotY.current >= 0) {
+      // Page carry-over follows the grid transition; first tap enters from the opposite side.
+      const withPage = monthDirection === 'next' ? 'right' : 'left';
+      const againstPage = monthDirection === 'next' ? 'left' : 'right';
+      monthEnterFrom.current = monthOpenedWithoutSelection.current ? againstPage : withPage;
+      monthEnterY.current = lastMonthDotY.current;
+    } else {
+      monthEnterFrom.current = null;
+      monthEnterY.current = -1;
+    }
+  }
+  if (monthDotReady) {
+    lastMonthDotY.current = monthDotY;
+  }
+  const monthDotEnterFrom = monthEnterFrom.current;
+  const monthDotEnterY = monthEnterY.current;
+  // Pop only when we have no slide entrance to use (e.g. first launch).
+  const popMonthDotOnMount = monthOpenedWithoutSelection.current && !monthDotEnterFrom;
+
+  const weekCellWidth = weekStripWidth > 0 ? weekStripWidth / 7 : 0;
+  const weekSelectedIndex = weekDays.findIndex((date) => date.toDateString() === selectedDate.toDateString());
+  const weekDotX =
+    weekSelectedIndex >= 0 && weekCellWidth > 0 && weekDotY >= 0
+      ? weekSelectedIndex * weekCellWidth + (weekCellWidth - DAY_DOT_SIZE) / 2
+      : -1;
+  const weekDotReady = weekDotX >= 0 && weekDotY >= 0;
+
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <CompactHeader title={formatDate(selectedDate)} scrollY={scrollY} />
@@ -798,8 +961,10 @@ export default function Calendar() {
               <Animated.View
                 key={`week-${weekKey}`}
                 entering={(monthDirection === 'next' ? FadeInRight : FadeInLeft).duration(260)}
-                style={{ flexDirection: 'row', marginTop: 14 }}
+                onLayout={(e: LayoutChangeEvent) => setWeekStripWidth(e.nativeEvent.layout.width)}
+                style={{ flexDirection: 'row', marginTop: 14, position: 'relative' }}
               >
+                {weekDotReady && <MovingDayDot key={`week-dot-${weekKey}`} x={weekDotX} y={weekDotY} />}
                 {weekDays.map((date) => {
                   const key = localDateKey(date);
                   const isSelected = date.toDateString() === selectedDate.toDateString();
@@ -817,6 +982,7 @@ export default function Calendar() {
                       accessibilityState={{ selected: isSelected }}
                       accessibilityLabel={`${formatDate(date)}${count ? `, ${count} parish event${count > 1 ? 's' : ''}` : ''}${fastingKind !== 'none' ? `, ${fasting.label}` : ''}`}
                       className="flex-1 items-center py-1"
+                      style={{ zIndex: 1 }}
                     >
                       <Text
                         className={`font-sans-bold text-[11px] ${
@@ -825,13 +991,13 @@ export default function Calendar() {
                       >
                         {daysOfWeek[date.getDay()]}
                       </Text>
-                      <View className="h-10 w-10 mt-2 items-center justify-center">
-                        {isSelected && (
-                          <Animated.View
-                            entering={entrance.pop()}
-                            style={{ position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: palette.accent }}
-                          />
-                        )}
+                      <View
+                        className="h-10 w-10 mt-2 items-center justify-center"
+                        onLayout={(e: LayoutChangeEvent) => {
+                          const nextY = e.nativeEvent.layout.y;
+                          if (nextY !== weekDotY) setWeekDotY(nextY);
+                        }}
+                      >
                         {isToday && !isSelected && (
                           <View style={{ position: 'absolute', width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: palette.accentSoft }} />
                         )}
@@ -888,8 +1054,21 @@ export default function Calendar() {
             <Animated.View
               key={monthKey}
               entering={(monthDirection === 'next' ? FadeInRight : FadeInLeft).duration(260)}
-              style={{ flexDirection: 'row', flexWrap: 'wrap' }}
+              onLayout={(e: LayoutChangeEvent) => setMonthGridWidth(e.nativeEvent.layout.width)}
+              style={{ flexDirection: 'row', flexWrap: 'wrap', position: 'relative' }}
             >
+              {monthDotReady && (
+                <MovingDayDot
+                  key={`month-dot-${monthKey}`}
+                  x={monthDotX}
+                  y={monthDotY}
+                  moveMode="grid"
+                  popOnMount={popMonthDotOnMount}
+                  enterFrom={monthDotEnterFrom}
+                  enterY={monthDotEnterY}
+                  trackWidth={monthGridWidth}
+                />
+              )}
               {calendarDays.map((day, index) => {
                 const dateKey = day.date.toISOString().split('T')[0];
                 const fastingKind = getFastingKind(fastingData[dateKey] || '');
@@ -903,22 +1082,9 @@ export default function Calendar() {
                     accessibilityRole="button"
                     accessibilityState={{ selected: day.isSelected }}
                     accessibilityLabel={`${formatDate(day.date)}${fastingKind !== 'none' ? `, ${fasting.label}` : ''}`}
-                    style={{ width: '14.2857%', height: 50 }}
+                    style={{ width: '14.2857%', height: 50, zIndex: 1 }}
                     className="items-center justify-center"
                   >
-                    {day.isSelected && (
-                      <Animated.View
-                        entering={entrance.pop()}
-                        style={{
-                          position: 'absolute',
-                          width: 40,
-                          height: 40,
-                          borderRadius: 20,
-                          backgroundColor: palette.accent,
-                          top: 3,
-                        }}
-                      />
-                    )}
                     {day.isToday && !day.isSelected && (
                       <View
                         style={{ position: 'absolute', width: 40, height: 40, borderRadius: 20, top: 3, borderWidth: 1.5, borderColor: palette.accentSoft }}
@@ -985,12 +1151,8 @@ export default function Calendar() {
             />
 
             {isParishAdmin && !parishHasCalendar && (
-              <View className="rounded-3xl p-5 mb-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
-                <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">Set up your parish calendar</Text>
-                <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
-                  Connect your Google Calendar to display parish events in the app.
-                </Text>
-                <Button label="Set up calendar" size="sm" onPress={() => setShowCalendarSetup(true)} className="mt-3 self-start" />
+              <View className="mb-4">
+                <CalendarSetupCallout onPress={() => setShowCalendarSetup(true)} />
               </View>
             )}
 
@@ -1007,6 +1169,11 @@ export default function Calendar() {
                         ? "Set up your parish calendar to see events here."
                         : "Your parish hasn't set up their calendar yet.")
                     : "No parish events scheduled this week."
+                }
+                action={
+                  isParishAdmin && !parishHasCalendar ? (
+                    <Button label="Set up calendar" icon="link-outline" size="sm" onPress={() => setShowCalendarSetup(true)} />
+                  ) : undefined
                 }
               />
             ) : (
@@ -1105,30 +1272,39 @@ export default function Calendar() {
             <View className="px-5 mt-8">
               <SectionHeader title="Commemorations" caption={`${calendarData.saintsFull.length} remembered today`} />
               <View className="rounded-3xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden">
-                {calendarData.saintsFull.map((saint, index) => {
-                  const hasStory = !!saint.story && saint.story.length > 0;
+                {calendarData.saintsFull.map((item, index) => {
+                  const hasStory = !!item.story && item.story.length > 0;
+                  const isFeast = item.kind === 'feast';
+                  const icon = isFeast ? 'star' : 'sparkles';
+                  const iconColor = isFeast ? palette.accent : palette.amber;
+                  const iconTint = isFeast ? palette.accentMuted : 'rgba(245, 158, 11, 0.12)';
+                  const actionLabel = isFeast ? 'Read about the feast' : 'Read the life';
                   return (
                     <Pressable
-                      key={index}
+                      key={`${item.kind}-${item.title}-${index}`}
                       disabled={!hasStory}
                       onPress={() => {
                         if (hasStory) {
-                          setSelectedSaint(saint);
+                          setSelectedSaint(item);
                           setModalVisible(true);
                         }
                       }}
                       accessibilityRole={hasStory ? 'button' : 'text'}
+                      accessibilityLabel={hasStory ? `${item.title}. ${actionLabel}` : item.title}
                       className={`flex-row items-center px-4 py-3.5 active:bg-gray-50 dark:active:bg-white/5 ${
                         index > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
                       }`}
                     >
-                      <View className="h-9 w-9 rounded-full bg-amber-500/10 items-center justify-center mr-3">
-                        <Ionicons name="sparkles" size={15} color={palette.amber} />
+                      <View
+                        className="h-9 w-9 rounded-full items-center justify-center mr-3"
+                        style={{ backgroundColor: iconTint }}
+                      >
+                        <Ionicons name={icon} size={15} color={iconColor} />
                       </View>
                       <View className="flex-1">
-                        <Text className="font-serif text-[18px] leading-[23px] text-gray-900 dark:text-white">{saint.title}</Text>
+                        <Text className="font-serif text-[18px] leading-[23px] text-gray-900 dark:text-white">{item.title}</Text>
                         {hasStory && (
-                          <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 mt-0.5">Read the life</Text>
+                          <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 mt-0.5">{actionLabel}</Text>
                         )}
                       </View>
                       {hasStory && <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />}
@@ -1151,12 +1327,8 @@ export default function Calendar() {
             />
 
             {isParishAdmin && !parishHasCalendar && (
-              <View className="rounded-3xl p-5 mb-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
-                <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">Set up your parish calendar</Text>
-                <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
-                  Connect your Google Calendar to display parish events in the app.
-                </Text>
-                <Button label="Set up calendar" size="sm" onPress={() => setShowCalendarSetup(true)} className="mt-3 self-start" />
+              <View className="mb-4">
+                <CalendarSetupCallout onPress={() => setShowCalendarSetup(true)} />
               </View>
             )}
 
@@ -1190,6 +1362,11 @@ export default function Calendar() {
                         ? "Set up your parish calendar to see events here."
                         : "Your administrator hasn't set up the parish calendar yet.")
                     : "No events scheduled for this day."
+                }
+                action={
+                  isParishAdmin && !parishHasCalendar ? (
+                    <Button label="Set up calendar" icon="link-outline" size="sm" onPress={() => setShowCalendarSetup(true)} />
+                  ) : undefined
                 }
               />
             )}
@@ -1250,7 +1427,7 @@ export default function Calendar() {
       <ReadingSheet
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        eyebrow="Synaxarion"
+        eyebrow={selectedSaint?.kind === 'feast' ? 'Feast day' : 'Synaxarion'}
         title={selectedSaint?.title}
         body={selectedSaint?.story}
       />

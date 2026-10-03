@@ -9,11 +9,18 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<SignUpResult>;
+  signIn: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
+
+export type SignUpResult =
+  | 'needs_otp'
+  | 'needs_onboarding'
+  | 'already_complete'
+  | 'already_registered'
+  | 'error';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -89,47 +96,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string): Promise<SignUpResult> => {
     try {
       // Check if user is already authenticated
       if (user) {
         const onboardingComplete = await isOnboardingComplete(user.id);
-        
+
         if (!onboardingComplete) {
-          // User is authenticated but hasn't completed onboarding
-          // Skip OTP and go directly to onboarding
-          router.push('/(auth)/onboarding/user-type');
-          return;
-        } else {
-          // User is authenticated and has completed onboarding
-          // This shouldn't happen in normal flow, but handle gracefully
-          return;
+          return 'needs_onboarding';
         }
+        return 'already_complete';
       }
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
-      
-      if (error) throw error;
-      
-      // Redirect to OTP confirmation screen
-      router.push(`/(auth)/confirm-otp?email=${encodeURIComponent(email)}`);
+
+      if (error) {
+        const alreadyRegistered =
+          error.message?.toLowerCase().includes('already registered') ||
+          error.message?.toLowerCase().includes('already been registered') ||
+          (error as { code?: string }).code === 'user_already_exists' ||
+          (error as { code?: string }).code === 'email_exists';
+
+        if (alreadyRegistered) {
+          Alert.alert(
+            'Account already exists',
+            'An account with this email is already registered. Please sign in instead.',
+          );
+          return 'already_registered';
+        }
+
+        throw error;
+      }
+
+      // With email confirmation enabled, Supabase returns a fake user (empty identities)
+      // for an existing confirmed email instead of an error — treat that as already registered.
+      if (data.user && (data.user.identities?.length ?? 0) === 0) {
+        Alert.alert(
+          'Account already exists',
+          'An account with this email is already registered. Please sign in instead.',
+        );
+        return 'already_registered';
+      }
+
+      return 'needs_otp';
     } catch (error: any) {
       Alert.alert('Error', error.message);
+      return 'error';
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      
+
       if (error) throw error;
-      
+
       // Check if user has completed onboarding
       if (data.user) {
         const onboardingComplete = await isOnboardingComplete(data.user.id);
@@ -138,8 +165,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('User signed in, onboarding complete:', onboardingComplete);
         }
       }
+      return true;
     } catch (error: any) {
       Alert.alert('Error', error.message);
+      return false;
     }
   };
 

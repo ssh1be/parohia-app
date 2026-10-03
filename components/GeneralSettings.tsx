@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { entrance, palette } from '../constants/theme';
@@ -9,7 +9,28 @@ import { CalendarTradition, useCalendarTradition } from '../contexts/CalendarTra
 import { ThemePreference, useTheme } from '../contexts/ThemeContext';
 import { PressableScale } from './ui/PressableScale';
 import { SegmentedControl } from './ui/SegmentedControl';
-import { SettingsGroup } from './ui/Settings';
+import { SettingsGroup, SettingsRow } from './ui/Settings';
+
+const SUPPORT_EMAIL = 'support@parohia.app';
+
+async function openSupportEmail() {
+  const subject = encodeURIComponent('Parohia feedback');
+  const body = encodeURIComponent(
+    '\n\n---\nApp version: ' + (Constants.expoConfig?.version ?? '1.0.0') + '\n'
+  );
+  const url = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+
+  try {
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unable to open email', `Please email us at ${SUPPORT_EMAIL}`);
+      return;
+    }
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('Unable to open email', `Please email us at ${SUPPORT_EMAIL}`);
+  }
+}
 
 const LIGHT = { bg: '#F9FAFB', card: '#FFFFFF', line: '#E5E7EB', text: '#111827' };
 const DARK = { bg: '#000000', card: '#1A1A1E', line: '#2A2A30', text: '#F9FAFB' };
@@ -146,7 +167,27 @@ export default function GeneralSettings() {
         </SettingsGroup>
       </Animated.View>
 
-      <Animated.View entering={entrance.card(80)} style={{ alignItems: 'center', marginTop: 40 }}>
+      <Animated.View entering={entrance.card(80)}>
+        <SettingsGroup
+          title="Support"
+          footer="Send feedback, ideas, or bug reports. We'll get back to you as soon as we can."
+        >
+          <SettingsRow
+            first
+            icon="mail-outline"
+            iconColor={palette.blue}
+            title="Contact support"
+            subtitle={SUPPORT_EMAIL}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              openSupportEmail();
+            }}
+            right={<Ionicons name="chevron-forward" size={16} color={palette.gray400} />}
+          />
+        </SettingsGroup>
+      </Animated.View>
+
+      <Animated.View entering={entrance.card(120)} style={{ alignItems: 'center', marginTop: 40 }}>
         <Text className="font-display text-[20px] text-gray-400 dark:text-gray-600">Parohia</Text>
         <Text className="font-sans text-xs text-gray-400 dark:text-gray-600 mt-0.5">
           Version {Constants.expoConfig?.version ?? '1.0.0'}

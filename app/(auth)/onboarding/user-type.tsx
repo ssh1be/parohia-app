@@ -1,98 +1,90 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useColorScheme } from 'nativewind';
-import { useOnboarding, UserType } from '../../../contexts/OnboardingContext';
+import { Text, View } from 'react-native';
+import { AuthHeader, AuthScaffold, OnboardingProgress } from '../../../components/auth/AuthChrome';
+import { Button } from '../../../components/ui/Button';
+import { PressableScale } from '../../../components/ui/PressableScale';
+import { Reveal } from '../../../components/ui/Reveal';
+import { palette } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useOnboarding, UserType } from '../../../contexts/OnboardingContext';
+
+const OPTIONS: {
+  type: UserType;
+  title: string;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  {
+    type: 'regular_user',
+    title: 'Parishioner',
+    description: 'Connect with your parish and community',
+    icon: 'person-outline',
+  },
+  {
+    type: 'parish_admin',
+    title: 'Parish Administrator',
+    description: "Manage your parish's profile, schedule, and events",
+    icon: 'business-outline',
+  },
+];
 
 export default function UserTypeScreen() {
-  const { data, updateData, nextStep } = useOnboarding();
+  const { updateData, nextStep } = useOnboarding();
   const { signOut } = useAuth();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
   const handleUserTypeSelect = (userType: UserType) => {
-    console.log('User type selected:', userType);
     updateData({ userType });
-    console.log('Data updated, calling nextStep with userType:', userType);
     nextStep(userType);
   };
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black">
-      <View className="flex-1 px-6 pt-12">
-        {/* Back and Title */}
-        <View className="flex-row items-center mb-6">
-          <Pressable 
-            className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
-            onPress={() => router.push('/(auth)/welcome')}
-          >
-            <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
-          </Pressable>
-          <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">Create Account</Text>
-        </View>
-        
-        {/* Progress Indicator */}
-        <View className="flex-row items-center justify-between mb-8">
-          <View className="flex-1 h-1 rounded-full bg-red-600" />
-          <View className="flex-1 h-1 rounded-full mx-1 bg-gray-200 dark:bg-gray-700" />
-          <View className="flex-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
-        </View>
-        
-        <Text className="text-gray-900 dark:text-white text-lg font-bold mb-6">I am a...</Text>
-        
-        {/* User Type Selection */}
-        <View className="space-y-4 mt-8">
-          <Pressable 
-            className="w-full py-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 shadow-md mb-4 active:opacity-70"
-            onPress={() => handleUserTypeSelect('regular_user')}
-          >
-            <View className="flex-row items-center px-4">
-              <View className="h-12 w-12 rounded-full flex items-center justify-center mr-4 bg-red-600">
-                <Ionicons name="person" size={24} color="white" />
-              </View>
-              <View className="flex-1">
-                <Text className="font-semibold text-base text-gray-900 dark:text-white">Parishioner</Text>
-                <Text className="text-xs opacity-70 text-gray-900 dark:text-white">Connect with your parish and community</Text>
-              </View>
-            </View>
-          </Pressable>
-          
-          <Pressable 
-            className="w-full py-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 shadow-md mb-4 active:opacity-70"
-            onPress={() => handleUserTypeSelect('parish_admin')}
-          >
-            <View className="flex-row items-center px-4">
-              <View className="h-12 w-12 rounded-full flex items-center justify-center mr-4 bg-red-600">
-                <Ionicons name="business" size={24} color="white" />
-              </View>
-              <View className="flex-1">
-                <Text className="font-semibold text-base text-gray-900 dark:text-white">Parish Administrator</Text>
-                <Text className="text-xs opacity-70 text-gray-900 dark:text-white">Manage your parish's profile, schedule and events</Text>
-              </View>
-            </View>
-          </Pressable>
-        </View>
-        
-        {/* Bottom Text */}
-        <View className="absolute bottom-8 left-0 right-0 flex justify-center px-6">
-          <Text className="text-gray-900 dark:text-white opacity-50 text-xs text-center mb-4">
+    <AuthScaffold
+      scroll={false}
+      bottom={
+        <Reveal index={5}>
+          <Text className="font-sans text-[12px] leading-[18px] text-gray-400 dark:text-gray-500 text-center mb-4 px-2">
             Select the option that best describes how you plan to use Parohia
           </Text>
-          
-          <Pressable
-            className="w-full py-3 rounded-xl border border-gray-300 dark:border-gray-600 active:opacity-70"
-            onPress={signOut}
-          >
-            <Text className="text-gray-900 dark:text-white text-center opacity-70">Sign Out</Text>
-          </Pressable>
-        </View>
+          <Button label="Sign Out" variant="secondary" fullWidth onPress={signOut} />
+        </Reveal>
+      }
+    >
+      <AuthHeader
+        eyebrow="Step 1 of 3"
+        title="I am a…"
+        subtitle="Choose how you'll use Parohia."
+        onBack={() => router.push('/(auth)/welcome')}
+      />
+
+      <OnboardingProgress step={1} />
+
+      <View>
+        {OPTIONS.map((option, index) => (
+          <Reveal key={option.type} index={index + 2}>
+            <PressableScale
+              onPress={() => handleUserTypeSelect(option.type)}
+              haptic
+              className="mb-3 rounded-3xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] p-4"
+            >
+              <View className="flex-row items-center">
+                <View className="h-14 w-14 rounded-[18px] bg-red-600 items-center justify-center mr-4">
+                  <Ionicons name={option.icon} size={24} color="#FFFFFF" />
+                </View>
+                <View className="flex-1 pr-2">
+                  <Text className="font-sans-semibold text-[16px] text-gray-900 dark:text-white">
+                    {option.title}
+                  </Text>
+                  <Text className="font-sans text-[13px] leading-[18px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    {option.description}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={palette.gray400} />
+              </View>
+            </PressableScale>
+          </Reveal>
+        ))}
       </View>
-    </View>
+    </AuthScaffold>
   );
-} 
+}

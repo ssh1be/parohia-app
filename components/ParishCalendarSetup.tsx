@@ -1,18 +1,13 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  Linking,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from 'nativewind';
-import { updateParishCalendarId, getParishByAdminId } from '../services/parishService';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useState } from 'react';
+import { Alert, Linking, Pressable, Text, View } from 'react-native';
+import { palette } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
+import { getParishByAdminId, updateParishCalendarId } from '../services/parishService';
+import { Button } from './ui/Button';
+import { Field } from './ui/Field';
+import { Sheet } from './ui/Sheet';
 
 interface ParishCalendarSetupProps {
   visible: boolean;
@@ -20,12 +15,19 @@ interface ParishCalendarSetupProps {
   onSuccess: () => void;
 }
 
+const HELP_URL = 'https://xfanatical.com/blog/how-to-find-your-google-calendar-id/';
+
 export default function ParishCalendarSetup({ visible, onClose, onSuccess }: ParishCalendarSetupProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const [calendarId, setCalendarId] = useState('');
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (!visible) {
+      setCalendarId('');
+      setLoading(false);
+    }
+  }, [visible]);
 
   const handleSubmit = async () => {
     if (!calendarId.trim()) {
@@ -40,31 +42,19 @@ export default function ParishCalendarSetup({ visible, onClose, onSuccess }: Par
 
     try {
       setLoading(true);
-      
-      // Get the parish for this admin
+
       const parish = await getParishByAdminId(user.id);
       if (!parish) {
         Alert.alert('Error', 'Parish not found');
         return;
       }
 
-      // Update the calendar ID
       const result = await updateParishCalendarId(parish.id, calendarId.trim());
-      
+
       if (result.success) {
-        Alert.alert(
-          'Success',
-          'Calendar ID updated successfully! Your parish events will now appear in the app.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                onSuccess();
-                onClose();
-              }
-            }
-          ]
-        );
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        onSuccess();
+        onClose();
       } else {
         Alert.alert('Error', result.error || 'Failed to update calendar ID');
       }
@@ -76,83 +66,106 @@ export default function ParishCalendarSetup({ visible, onClose, onSuccess }: Par
     }
   };
 
-  const openHelpArticle = () => {
-    Linking.openURL('https://xfanatical.com/blog/how-to-find-your-google-calendar-id/');
-  };
-
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 justify-center items-center bg-black/40 dark:bg-black/80 px-4">
-        <View className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-lg border border-gray-200 dark:border-gray-700">
-          <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl text-gray-900 dark:text-white font-bold">Set Up Parish Calendar</Text>
-            <Pressable className="active:opacity-70" onPress={onClose}>
-              <Ionicons name="close" size={24} color={isDark ? 'white' : '#374151'} />
-            </Pressable>
-          </View>
-
-          <Text className="text-gray-900 dark:text-white text-sm mb-4 leading-5">
-            To display your parish events, you need to provide your Google Calendar ID. 
-            This should be the email address associated with your parish's Google Calendar.
-          </Text>
-
-          <Text className="text-gray-600 dark:text-gray-300 text-xs mb-2">Google Calendar ID (email address)</Text>
-          <TextInput
-            className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-3 rounded-lg mb-4 border border-gray-300 dark:border-gray-600"
-            placeholder="e.g., parish@example.com"
-            placeholderTextColor="#9CA3AF"
-            value={calendarId}
-            onChangeText={setCalendarId}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
+      onClose={onClose}
+      eyebrow="Parish admin"
+      title="Connect calendar"
+      subtitle="Link your parish Google Calendar so events appear for everyone."
+      dismissible={!loading}
+      footer={
+        <View className="flex-row">
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={onClose}
+            disabled={loading}
+            style={{ flex: 1, marginRight: 8 }}
           />
-
-          <Text className="text-gray-500 dark:text-gray-400 text-xs mb-4 leading-4">
-            Make sure your Google Calendar is public or shared with the appropriate permissions.
-          </Text>
-
-          <Pressable 
-            className="mb-6 flex-row items-center justify-center active:opacity-70"
-            onPress={openHelpArticle}
-          >
-            <Ionicons name="help-circle-outline" size={16} color="#3B82F6" />
-            <Text className="text-blue-400 text-xs ml-2 underline">
-              How to find your Google Calendar ID
+          <Button
+            label="Save calendar"
+            icon="checkmark"
+            loading={loading}
+            onPress={handleSubmit}
+            style={{ flex: 1 }}
+          />
+        </View>
+      }
+    >
+      <View className="rounded-3xl p-4 mb-5 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20">
+        <View className="flex-row items-start">
+          <View className="h-10 w-10 rounded-2xl bg-red-600/15 items-center justify-center">
+            <Ionicons name="calendar-outline" size={18} color={palette.accent} />
+          </View>
+          <View className="flex-1 ml-3">
+            <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white">
+              Use your calendar’s email ID
             </Text>
-          </Pressable>
-
-          <View className="flex-row space-x-3">
-            <Pressable
-              className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-lg py-3 mr-2 active:opacity-70"
-              onPress={onClose}
-              disabled={loading}
-            >
-              <Text className="text-gray-900 dark:text-white text-center font-medium">Cancel</Text>
-            </Pressable>
-            
-            <Pressable
-              className="flex-1 bg-blue-600 rounded-lg py-3 flex-row items-center justify-center active:opacity-70"
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Ionicons name="checkmark" size={20} color="white" />
-              )}
-              <Text className="text-white text-center font-medium ml-2">
-                {loading ? 'Saving...' : 'Save'}
-              </Text>
-            </Pressable>
+            <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
+              This is usually an address like{' '}
+              <Text className="font-sans-semibold">parish@example.com</Text>
+              {' '}or a long{' '}
+              <Text className="font-sans-semibold">…@group.calendar.google.com</Text>
+              {' '}ID.
+            </Text>
           </View>
         </View>
       </View>
-    </Modal>
+
+      <Field
+        label="Google Calendar ID"
+        required
+        placeholder="parish@example.com"
+        value={calendarId}
+        onChangeText={setCalendarId}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
+        helper="Calendar must be public or shared so the app can read events."
+      />
+
+      <Pressable
+        onPress={() => Linking.openURL(HELP_URL)}
+        className="flex-row items-center self-start rounded-full px-3.5 h-9 bg-gray-100 dark:bg-white/10 active:opacity-70 mt-1 mb-2"
+        accessibilityRole="link"
+        accessibilityLabel="How to find your Google Calendar ID"
+      >
+        <Ionicons name="help-circle-outline" size={16} color={palette.accent} />
+        <Text className="font-sans-semibold text-[13px] text-red-600 dark:text-red-400 ml-1.5">
+          How to find your Calendar ID
+        </Text>
+      </Pressable>
+    </Sheet>
   );
-} 
+}
+
+/** Compact admin prompt used on Home and Calendar when no calendar is connected. */
+export function CalendarSetupCallout({ onPress }: { onPress: () => void }) {
+  return (
+    <View className="rounded-3xl p-5 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20">
+      <View className="flex-row items-start">
+        <View className="h-10 w-10 rounded-2xl bg-red-600/15 items-center justify-center">
+          <Ionicons name="calendar-outline" size={18} color={palette.accent} />
+        </View>
+        <View className="flex-1 ml-3">
+          <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">
+            Set up your parish calendar
+          </Text>
+          <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
+            Connect your Google Calendar to display parish events in the app.
+          </Text>
+          <Button
+            label="Set up calendar"
+            icon="link-outline"
+            size="sm"
+            onPress={onPress}
+            className="mt-3 self-start"
+          />
+        </View>
+      </View>
+    </View>
+  );
+}

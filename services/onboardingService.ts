@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { OnboardingData, UserType } from '../contexts/OnboardingContext';
+import { ChannelService } from './channelService';
 
 export interface SaveOnboardingResult {
   success: boolean;
@@ -69,6 +70,8 @@ export const saveOnboardingData = async (
 
       parishId = parishData.id;
       console.log('Parish saved:', parishData);
+      // Safety net if DB trigger has not run yet
+      await ChannelService.ensureGeneralChannel(parishId, userId);
     } else if (data.userType === 'regular_user' && data.selectedParishId) {
       await supabase
         .from('user_parish_connections')
@@ -88,6 +91,8 @@ export const saveOnboardingData = async (
       }
 
       parishId = data.selectedParishId;
+      // Safety net if DB trigger has not run yet
+      await ChannelService.ensureGeneralSubscription(userId, parishId);
       console.log('User connected to parish:', data.selectedParishId);
     }
 

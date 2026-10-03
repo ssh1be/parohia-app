@@ -1,8 +1,10 @@
 import { supabase } from '../config/supabase';
+import { ChannelService } from './channelService';
 
 export interface BulletinEvent {
   id: string;
   parish_id: string;
+  channel_id: string;
   created_by: string;
   title: string;
   description?: string;
@@ -15,6 +17,11 @@ export interface BulletinEvent {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  channel?: {
+    id: string;
+    name: string;
+    is_default: boolean;
+  };
   created_by_profile?: {
     full_name: string;
     email: string;
@@ -31,6 +38,7 @@ export interface CreateEventData {
   title: string;
   description?: string;
   event_type: 'announcement' | 'volunteer' | 'event';
+  channel_id: string;
   event_date?: string;
   event_time?: string;
   location?: string;
@@ -44,17 +52,30 @@ export interface EventResponse {
 }
 
 export class BulletinService {
-  static async getParishEvents(parishId: string, userId?: string): Promise<BulletinEvent[]> {
+  static async getParishEvents(
+    parishId: string,
+    userId?: string,
+    options?: { isParishAdmin?: boolean }
+  ): Promise<BulletinEvent[]> {
     try {
       let query = supabase
         .from('bulletin_events')
         .select(`
           *,
+          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_archived),
           created_by_profile:user_profiles!bulletin_events_created_by_fkey(full_name, email)
         `)
         .eq('parish_id', parishId)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
+
+      if (!options?.isParishAdmin && userId) {
+        const subscribedIds = await ChannelService.getSubscribedChannelIds(userId, parishId);
+        if (subscribedIds.length === 0) {
+          return [];
+        }
+        query = query.in('channel_id', subscribedIds);
+      }
 
       const { data, error } = await query;
 
@@ -63,34 +84,34 @@ export class BulletinService {
         throw error;
       }
 
-      // If user is provided, fetch their responses for these events
-      if (userId && data) {
-        const eventIds = data.map(event => event.id);
+      // Hide posts from archived channels for everyone
+      const activeData = (data || []).filter((event: any) => !event.channel?.is_archived);
+
+      if (userId && activeData.length > 0) {
+        const eventIds = activeData.map((event) => event.id);
         const { data: responses } = await supabase
           .from('bulletin_responses')
           .select('event_id, response_type, notes')
           .eq('user_id', userId)
           .in('event_id', eventIds);
 
-        // Merge responses with events
         const responseMap = new Map();
-        responses?.forEach(response => {
+        responses?.forEach((response) => {
           responseMap.set(response.event_id, {
             response_type: response.response_type,
-            notes: response.notes
+            notes: response.notes,
           });
         });
 
-        data.forEach(event => {
+        activeData.forEach((event) => {
           event.user_response = responseMap.get(event.id);
         });
       }
 
-      // Get volunteer counts for volunteer events
-      if (data) {
-        const volunteerEventIds = data
-          .filter(event => event.event_type === 'volunteer')
-          .map(event => event.id);
+      if (activeData.length > 0) {
+        const volunteerEventIds = activeData
+          .filter((event) => event.event_type === 'volunteer')
+          .map((event) => event.id);
 
         if (volunteerEventIds.length > 0) {
           const { data: volunteerResponses } = await supabase
@@ -99,14 +120,13 @@ export class BulletinService {
             .in('event_id', volunteerEventIds)
             .eq('response_type', 'volunteer');
 
-          // Create a map of event_id to volunteer count
           const volunteerCountMap = new Map();
-          volunteerResponses?.forEach(response => {
+          volunteerResponses?.forEach((response) => {
             const count = volunteerCountMap.get(response.event_id) || 0;
             volunteerCountMap.set(response.event_id, count + 1);
           });
 
-          data.forEach(event => {
+          activeData.forEach((event) => {
             if (event.event_type === 'volunteer') {
               event.volunteer_count = volunteerCountMap.get(event.id) || 0;
             }
@@ -114,23 +134,34 @@ export class BulletinService {
         }
       }
 
-      return data || [];
+      return activeData as BulletinEvent[];
     } catch (error) {
       console.error('Error in getParishEvents:', error);
       throw error;
     }
   }
 
-  static async createEvent(parishId: string, userId: string, eventData: CreateEventData): Promise<{ success: boolean; event?: BulletinEvent; error?: string }> {
+  static async createEvent(
+    parishId: string,
+    userId: string,
+    eventData: CreateEventData & { notify?: boolean }
+  ): Promise<{ success: boolean; event?: BulletinEvent; error?: string }> {
     try {
+      if (!eventData.channel_id) {
+        return { success: false, error: 'Channel is required' };
+      }
+
       const { data, error } = await supabase
         .from('bulletin_events')
         .insert({
           parish_id: parishId,
           created_by: userId,
-          ...eventData
+          ...eventData,
         })
-        .select()
+        .select(`
+          *,
+          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default)
+        `)
         .single();
 
       if (error) {
@@ -145,13 +176,16 @@ export class BulletinService {
     }
   }
 
-  static async updateEvent(eventId: string, eventData: Partial<CreateEventData>): Promise<{ success: boolean; error?: string }> {
+  static async updateEvent(
+    eventId: string,
+    eventData: Partial<CreateEventData>
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabase
         .from('bulletin_events')
         .update({
           ...eventData,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', eventId);
 
@@ -169,7 +203,6 @@ export class BulletinService {
 
   static async deleteEvent(eventId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // First, delete all responses for this event
       const { error: responsesError } = await supabase
         .from('bulletin_responses')
         .delete()
@@ -180,7 +213,6 @@ export class BulletinService {
         return { success: false, error: responsesError.message };
       }
 
-      // Then, soft delete the event
       const { error: eventError } = await supabase
         .from('bulletin_events')
         .update({ is_active: false })
@@ -198,16 +230,18 @@ export class BulletinService {
     }
   }
 
-  static async respondToEvent(eventId: string, userId: string, response: EventResponse): Promise<{ success: boolean; error?: string }> {
+  static async respondToEvent(
+    eventId: string,
+    userId: string,
+    response: EventResponse
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('bulletin_responses')
-        .upsert({
-          event_id: eventId,
-          user_id: userId,
-          response_type: response.response_type,
-          notes: response.notes
-        });
+      const { error } = await supabase.from('bulletin_responses').upsert({
+        event_id: eventId,
+        user_id: userId,
+        response_type: response.response_type,
+        notes: response.notes,
+      });
 
       if (error) {
         console.error('Error responding to event:', error);
@@ -221,7 +255,10 @@ export class BulletinService {
     }
   }
 
-  static async removeResponse(eventId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  static async removeResponse(
+    eventId: string,
+    userId: string
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabase
         .from('bulletin_responses')
@@ -241,7 +278,9 @@ export class BulletinService {
     }
   }
 
-  static async getEventResponses(eventId: string): Promise<{ success: boolean; responses?: any[]; error?: string }> {
+  static async getEventResponses(
+    eventId: string
+  ): Promise<{ success: boolean; responses?: any[]; error?: string }> {
     try {
       const { data, error } = await supabase
         .from('bulletin_responses')
@@ -266,7 +305,6 @@ export class BulletinService {
 
   static async getUserPersonalEvents(userId: string, date?: Date): Promise<BulletinEvent[]> {
     try {
-      // Get all events where the user has responded with 'attending' or 'volunteer'
       let query = supabase
         .from('bulletin_responses')
         .select(`
@@ -277,6 +315,7 @@ export class BulletinService {
           bulletin_events!inner(
             id,
             parish_id,
+            channel_id,
             created_by,
             title,
             description,
@@ -289,6 +328,7 @@ export class BulletinService {
             is_active,
             created_at,
             updated_at,
+            channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default),
             created_by_profile:user_profiles!bulletin_events_created_by_fkey(full_name, email)
           )
         `)
@@ -296,7 +336,6 @@ export class BulletinService {
         .in('response_type', ['attending', 'volunteer'])
         .eq('bulletin_events.is_active', true);
 
-      // If a specific date is provided, filter by that date (use local date to avoid UTC offset issues)
       if (date) {
         const dateStr =
           date.getFullYear() +
@@ -307,20 +346,19 @@ export class BulletinService {
         query = query.eq('bulletin_events.event_date', dateStr);
       }
 
-      const { data, error } = await query as any;
+      const { data, error } = (await query) as any;
 
       if (error) {
         console.error('Error fetching user personal events:', error);
         throw error;
       }
 
-      // Transform the data to match BulletinEvent interface
       const events: BulletinEvent[] = (data ?? []).map((item: any) => ({
         ...(item.bulletin_events as BulletinEvent),
         user_response: {
           response_type: item.response_type,
-          notes: item.notes
-        }
+          notes: item.notes,
+        },
       }));
 
       return events;
@@ -329,4 +367,4 @@ export class BulletinService {
       throw error;
     }
   }
-} 
+}

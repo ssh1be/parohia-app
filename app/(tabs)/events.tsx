@@ -1,22 +1,51 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Switch, Text, View } from "react-native";
-import Animated, { FadeIn, FadeInDown, LinearTransition, ZoomIn } from "react-native-reanimated";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Switch,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import ConfettiCannon from "react-native-confetti-cannon";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  ZoomIn,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  BulletinFeedHeader,
+  BulletinTimeFilter,
+  isWithinBulletinTimeRange,
+} from "../../components/BulletinFeedHeader";
+import { ChannelsSheet } from "../../components/ChannelsSheet";
 import CustomDateTimePicker from "../../components/DateTimePicker";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Field } from "../../components/ui/Field";
+import { Portal } from "../../components/ui/Portal";
 import { PressableScale } from "../../components/ui/PressableScale";
+import { CompactHeader, LargeHeader, useScrollHeader } from "../../components/ui/ScreenHeader";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
-import { Sheet } from "../../components/ui/Sheet";
+import { Sheet, SHEET_EXIT_DURATION } from "../../components/ui/Sheet";
 import { Skeleton, SkeletonRows } from "../../components/ui/Skeleton";
 import { useThemeColors } from "../../components/ui/useThemeColors";
 import { contentBottomPadding, entrance, eventKindStyle, palette, TAB_BAR_GAP, TAB_BAR_HEIGHT } from "../../constants/theme";
 import { supabase } from "../../config/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "../../services/bulletinService";
+import { BulletinChannel, ChannelService } from "../../services/channelService";
 import { ConfessionService, DaySchedule, TimeSlot } from "../../services/confessionService";
 import { notificationService } from "../../services/notificationService";
 import { getUserProfile } from "../../services/onboardingService";
@@ -24,13 +53,7 @@ import { getParishByAdminId, getParishByUserId } from "../../services/parishServ
 
 type TabType = 'confession' | 'bulletin';
 type BulletinFilter = 'all' | 'announcement' | 'event' | 'volunteer';
-
-const FILTERS: { key: BulletinFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'announcement', label: 'Announcements' },
-  { key: 'event', label: 'Events' },
-  { key: 'volunteer', label: 'Volunteer' },
-];
+type ChannelFilter = 'all' | string;
 
 const RESPONSE_LABEL: Record<string, string> = {
   interested: 'Interested',
@@ -39,6 +62,66 @@ const RESPONSE_LABEL: Record<string, string> = {
   volunteer: 'Volunteering',
 };
 
+/** Duration of the volunteer bar update ease — keep in sync with close stagger on remove. */
+const VOLUNTEER_PROGRESS_MS = 320;
+const VOLUNTEER_CLOSE_STAGGER_MS = 140;
+
+const CONFETTI_COLORS = [
+  palette.accent,
+  palette.accentSoft,
+  palette.green,
+  palette.amber,
+  palette.blue,
+  '#FFFFFF',
+];
+
+/** Animated emerald fill for volunteer signup progress. */
+function VolunteerProgressFill({
+  ratio,
+  height = 8,
+  animateFromZero = false,
+}: {
+  ratio: number;
+  height?: number;
+  /** When true, starts empty and fills on mount (detail sheet). */
+  animateFromZero?: boolean;
+}) {
+  const clamped = Math.min(1, Math.max(0, ratio));
+  const [trackWidth, setTrackWidth] = useState(0);
+  const fillWidth = useSharedValue(0);
+  const hasMounted = useSharedValue(false);
+
+  useEffect(() => {
+    if (trackWidth <= 0) return;
+    const target = clamped * trackWidth;
+    if (!hasMounted.value) {
+      hasMounted.value = true;
+      fillWidth.value = animateFromZero
+        ? withTiming(target, { duration: 520, easing: Easing.out(Easing.cubic) })
+        : target;
+      return;
+    }
+    fillWidth.value = withTiming(target, {
+      duration: VOLUNTEER_PROGRESS_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [clamped, trackWidth, animateFromZero]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: fillWidth.value,
+  }));
+
+  return (
+    <View
+      className="rounded-full bg-emerald-500/15 overflow-hidden"
+      style={{ height }}
+      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+    >
+      <Animated.View className="h-full rounded-full bg-emerald-500" style={fillStyle} />
+    </View>
+  );
+}
+
 const parseLocalDate = (dateString: string) => {
   const [year, month, day] = dateString.split('-').map(Number);
   return new Date(year, month - 1, day);
@@ -46,12 +129,21 @@ const parseLocalDate = (dateString: string) => {
 
 export default function Events() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const colors = useThemeColors();
   const { user, session } = useAuth();
+  const { scrollY, onScroll } = useScrollHeader();
+  const [showVolunteerConfetti, setShowVolunteerConfetti] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('bulletin');
   const [bulletinFilter, setBulletinFilter] = useState<BulletinFilter>('all');
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
+  const [timeFilter, setTimeFilter] = useState<BulletinTimeFilter>('all');
+  const [channels, setChannels] = useState<BulletinChannel[]>([]);
+  const [subscribedChannels, setSubscribedChannels] = useState<BulletinChannel[]>([]);
+  const [showChannelsSheet, setShowChannelsSheet] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  const [slotsExpanded, setSlotsExpanded] = useState(false);
   const [weekSchedule, setWeekSchedule] = useState<DaySchedule[]>([]);
   const [parishId, setParishId] = useState<string | null>(null);
   const [parish, setParish] = useState<any>(null);
@@ -80,6 +172,7 @@ export default function Events() {
     title: '',
     description: '',
     event_type: 'announcement',
+    channel_id: '',
     event_date: '',
     event_time: '',
     location: '',
@@ -92,6 +185,7 @@ export default function Events() {
     notes: ''
   });
   const [respondingToEvent, setRespondingToEvent] = useState(false);
+  const [removingResponse, setRemovingResponse] = useState(false);
   const [eventResponses, setEventResponses] = useState<any[]>([]);
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [notifyParishioners, setNotifyParishioners] = useState(false);
@@ -191,19 +285,67 @@ export default function Events() {
     }
   };
 
-  const loadBulletinEvents = async () => {
-    if (!parishId) return;
+  const loadChannels = async () => {
+    if (!parishId || !user) return [];
+    try {
+      if (!isParishAdmin) {
+        await ChannelService.ensureGeneralSubscription(user.id, parishId);
+      } else {
+        await ChannelService.ensureGeneralChannel(parishId, user.id);
+      }
+
+      const list = await ChannelService.listChannels(parishId, { userId: user.id });
+      setChannels(list);
+      const subscribed = isParishAdmin
+        ? list
+        : list.filter((c) => c.is_subscribed || c.is_default);
+      setSubscribedChannels(subscribed);
+
+      // Keep create form defaulted to General
+      const general = list.find((c) => c.is_default);
+      if (general && !createEventData.channel_id) {
+        setCreateEventData((prev) => ({ ...prev, channel_id: general.id }));
+      }
+
+      // Reset filter if selected channel disappeared
+      if (
+        channelFilter !== 'all' &&
+        !subscribed.some((c) => c.id === channelFilter) &&
+        !(isParishAdmin && list.some((c) => c.id === channelFilter))
+      ) {
+        setChannelFilter('all');
+      }
+
+      return list;
+    } catch (error) {
+      console.error('Error loading channels:', error);
+      return [];
+    }
+  };
+
+  const loadBulletinEvents = async (): Promise<BulletinEvent[]> => {
+    if (!parishId) return [];
     
     try {
       setLoadingBulletin(true);
-      const events = await BulletinService.getParishEvents(parishId, user?.id);
+      await loadChannels();
+      const events = await BulletinService.getParishEvents(parishId, user?.id, {
+        isParishAdmin,
+      });
       setBulletinEvents(events);
+      return events;
     } catch (error) {
       console.error('Error loading bulletin events:', error);
       Alert.alert('Error', 'Failed to load bulletin events');
+      return [];
     } finally {
       setLoadingBulletin(false);
     }
+  };
+
+  const syncSelectedEvent = (events: BulletinEvent[], eventId: string) => {
+    const updated = events.find((event) => event.id === eventId);
+    if (updated) setSelectedEvent(updated);
   };
 
   const handleTimeSlotPress = async (daySchedule: DaySchedule, timeSlot: TimeSlot) => {
@@ -481,10 +623,12 @@ export default function Events() {
   };
 
   const resetCreateForm = () => {
+    const generalId = channels.find((c) => c.is_default)?.id || '';
     setCreateEventData({
       title: '',
       description: '',
       event_type: 'announcement',
+      channel_id: generalId,
       event_date: '',
       event_time: '',
       location: '',
@@ -498,14 +642,19 @@ export default function Events() {
   const handleSaveEvent = async () => {
     if (!parishId || !user) return;
     
+    if (!createEventData.channel_id) {
+      Alert.alert('Error', 'Please choose a channel for this post');
+      return;
+    }
+
     try {
       setCreatingEvent(true);
-      
-      // Prepare event data, only including date/time/location if they have values
+
       const eventData: CreateEventData & { notify?: boolean } = {
         title: createEventData.title,
         description: createEventData.description,
         event_type: createEventData.event_type,
+        channel_id: createEventData.channel_id,
         contact_info: createEventData.contact_info
       };
       
@@ -554,7 +703,11 @@ export default function Events() {
           try {
             if (notifyParishioners && result.event?.id) {
               await supabase.functions.invoke('send-bulletin-push', {
-                body: { parishId, eventId: result.event.id },
+                body: {
+                  parishId,
+                  eventId: result.event.id,
+                  channelId: result.event.channel_id || createEventData.channel_id,
+                },
                 headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
               });
             }
@@ -588,14 +741,36 @@ export default function Events() {
       
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        Alert.alert('Success', 'Response submitted successfully!');
-        setShowEventDetailsModal(false);
+        const eventId = selectedEvent.id;
+        const isVolunteerPost = selectedEvent.event_type === 'volunteer';
+        const justVolunteered =
+          isVolunteerPost &&
+          responseData.response_type === 'volunteer' &&
+          !selectedEvent.user_response;
+
+        // Optimistic update so the sheet flips to the confirmed state immediately.
+        setSelectedEvent({
+          ...selectedEvent,
+          user_response: {
+            response_type: responseData.response_type,
+            notes: responseData.notes || undefined,
+          },
+          volunteer_count:
+            justVolunteered
+              ? (selectedEvent.volunteer_count || 0) + 1
+              : selectedEvent.volunteer_count,
+        });
         setResponseData({
           response_type: 'attending',
           notes: ''
         });
-        await loadBulletinEvents();
-        // Refresh scheduled notifications after RSVP/volunteer
+
+        if (justVolunteered) {
+          setShowVolunteerConfetti(true);
+        }
+
+        const events = await loadBulletinEvents();
+        syncSelectedEvent(events, eventId);
         try { await notificationService.refreshEventNotifications(user.id); } catch {}
       } else {
         Alert.alert('Error', result.error || 'Failed to submit response');
@@ -609,17 +784,41 @@ export default function Events() {
   };
 
   const handleRemoveResponse = async (eventId: string) => {
-    if (!user) return;
+    if (!user || !selectedEvent || removingResponse) return;
     
     try {
+      setRemovingResponse(true);
       const result = await BulletinService.removeResponse(eventId, user.id);
       
       if (result.success) {
-        Alert.alert('Success', 'Response removed successfully!');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+        const isVolunteerPost = selectedEvent.event_type === 'volunteer';
+        const wasVolunteer = selectedEvent.user_response?.response_type === 'volunteer';
+
+        // Volunteer posts: ease the progress bar down first, then dismiss.
+        if (isVolunteerPost && wasVolunteer) {
+          setSelectedEvent({
+            ...selectedEvent,
+            volunteer_count: Math.max(0, (selectedEvent.volunteer_count || 0) - 1),
+          });
+          await new Promise((resolve) =>
+            setTimeout(resolve, VOLUNTEER_PROGRESS_MS + VOLUNTEER_CLOSE_STAGGER_MS),
+          );
+        }
+
         setShowEventDetailsModal(false);
-        await loadBulletinEvents();
-        // Refresh scheduled notifications after removing response
-        try { await notificationService.refreshEventNotifications(user.id); } catch {}
+        void loadBulletinEvents();
+        void notificationService.refreshEventNotifications(user.id).catch(() => {});
+        setTimeout(() => {
+          setSelectedEvent(null);
+          setResponseData({
+            response_type: 'attending',
+            notes: '',
+          });
+          setRemovingResponse(false);
+        }, SHEET_EXIT_DURATION + 40);
+        return;
       } else {
         Alert.alert('Error', result.error || 'Failed to remove response');
       }
@@ -627,6 +826,7 @@ export default function Events() {
       console.error('Error removing response:', error);
       Alert.alert('Error', 'Failed to remove response');
     }
+    setRemovingResponse(false);
   };
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -691,6 +891,7 @@ export default function Events() {
       title: selectedEvent.title || '',
       description: selectedEvent.description || '',
       event_type: selectedEvent.event_type,
+      channel_id: selectedEvent.channel_id || channels.find((c) => c.is_default)?.id || '',
       event_date: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_date || '') : '',
       event_time: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_time || '') : '',
       location: selectedEvent.event_type !== 'announcement' ? (selectedEvent.location || '') : '',
@@ -705,11 +906,10 @@ export default function Events() {
   };
 
   const canSubmitPost =
-    !creatingEvent && !!createEventData.title.trim() && !(createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed);
-
-  const refreshControl = (
-    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textMuted} colors={[palette.accent]} />
-  );
+    !creatingEvent &&
+    !!createEventData.title.trim() &&
+    !!createEventData.channel_id &&
+    !(createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed);
 
   const renderVolunteerProgress = (event: BulletinEvent) => {
     const count = event.volunteer_count || 0;
@@ -728,8 +928,8 @@ export default function Events() {
           </View>
           <Text className="font-sans-bold text-sm text-emerald-700 dark:text-emerald-400">{Math.round(ratio * 100)}%</Text>
         </View>
-        <View className="h-2 rounded-full bg-emerald-500/15 mt-3 overflow-hidden">
-          <View className="h-2 rounded-full bg-emerald-500" style={{ width: `${ratio * 100}%` }} />
+        <View className="mt-3">
+          <VolunteerProgressFill ratio={ratio} height={8} animateFromZero />
         </View>
         <View className="flex-row items-center mt-2.5">
           {reached && <Ionicons name="checkmark-circle" size={14} color={palette.green} style={{ marginRight: 4 }} />}
@@ -763,15 +963,13 @@ export default function Events() {
   const renderConfessionTab = () => {
     const selectedDaySchedule = weekSchedule.find(day => day.date.toDateString() === selectedDay.toDateString());
     const slots = selectedDaySchedule?.timeSlots ?? [];
+    const INITIAL_VISIBLE_SLOTS = 9; // 3x3 grid
+    const hasMoreSlots = slots.length > INITIAL_VISIBLE_SLOTS;
+    const visibleSlots = slotsExpanded || !hasMoreSlots ? slots : slots.slice(0, INITIAL_VISIBLE_SLOTS);
 
     return (
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: contentBottomPadding(insets.bottom) }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={refreshControl}
-      >
-        <View className="px-5 pt-5">
+      <View>
+        <View className="px-5 pt-4">
           <View className="rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex-row items-center">
             <View className="h-12 w-12 rounded-2xl bg-red-600/10 items-center justify-center mr-4">
               <Ionicons name="time" size={22} color={palette.accent} />
@@ -803,6 +1001,7 @@ export default function Events() {
                 key={index}
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
+                  setSlotsExpanded(false);
                   setSelectedDay(daySchedule.date);
                 }}
                 accessibilityRole="button"
@@ -863,122 +1062,138 @@ export default function Events() {
           {slots.length === 0 ? (
             <EmptyState compact icon="time-outline" title="No times listed" message="There are no confession times for this day." />
           ) : (
-            <Animated.View key={selectedDay.toDateString()} entering={FadeIn.duration(220)} style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              {slots.map((timeSlot) => {
-                const slotStatus = getSlotStatus(selectedDaySchedule!, timeSlot);
-                const isPassed = isTimeSlotPassed(selectedDaySchedule!, timeSlot);
-                const isReservedByCurrentUser = !!timeSlot.reservationId && userReservations.has(timeSlot.reservationId);
-                const showAsPassed = isPassed && !isReservedByCurrentUser;
-                const isDisabled =
-                  (!isParishAdmin && slotStatus === 'reserved' && !isReservedByCurrentUser) ||
-                  (!isParishAdmin && slotStatus === 'unavailable') ||
-                  (!isParishAdmin && isPassed && !isReservedByCurrentUser);
+            <>
+              <Animated.View
+                key={selectedDay.toDateString()}
+                entering={FadeIn.duration(220)}
+                layout={LinearTransition.duration(220)}
+                style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}
+              >
+                {visibleSlots.map((timeSlot) => {
+                  const slotStatus = getSlotStatus(selectedDaySchedule!, timeSlot);
+                  const isPassed = isTimeSlotPassed(selectedDaySchedule!, timeSlot);
+                  const isReservedByCurrentUser = !!timeSlot.reservationId && userReservations.has(timeSlot.reservationId);
+                  const showAsPassed = isPassed && !isReservedByCurrentUser;
+                  const isDisabled =
+                    (!isParishAdmin && slotStatus === 'reserved' && !isReservedByCurrentUser) ||
+                    (!isParishAdmin && slotStatus === 'unavailable') ||
+                    (!isParishAdmin && isPassed && !isReservedByCurrentUser);
 
-                let caption = '';
-                let captionClass = 'text-gray-500 dark:text-gray-400';
-                let containerClass = 'bg-white dark:bg-white/[0.04] border-gray-100 dark:border-white/[0.06]';
-                let icon: keyof typeof Ionicons.glyphMap = 'time-outline';
-                let iconColor = palette.gray400;
+                  let caption = '';
+                  let captionClass = 'text-gray-500 dark:text-gray-400';
+                  let containerClass = 'bg-white dark:bg-white/[0.04] border-gray-100 dark:border-white/[0.06]';
+                  let icon: keyof typeof Ionicons.glyphMap = 'time-outline';
+                  let iconColor = palette.gray400;
 
-                if (isReservedByCurrentUser) {
-                  caption = 'Yours';
-                  captionClass = 'text-red-600 dark:text-red-400';
-                  containerClass = 'bg-red-600/[0.08] border-red-500/30';
-                  icon = 'person';
-                  iconColor = palette.accentSoft;
-                } else if (showAsPassed) {
-                  caption = 'Passed';
-                  containerClass = 'bg-transparent border-gray-200 dark:border-white/[0.06] opacity-50';
-                  icon = 'remove-circle-outline';
-                } else if (slotStatus === 'reserved') {
-                  caption = 'Reserved';
-                  containerClass = 'bg-gray-100 dark:bg-white/[0.06] border-transparent';
-                  icon = 'person';
-                } else if (slotStatus === 'available') {
-                  caption = 'Open';
-                  captionClass = 'text-emerald-600 dark:text-emerald-400';
-                  containerClass = 'bg-white dark:bg-white/[0.04] border-emerald-500/30';
-                  icon = 'checkmark-circle';
-                  iconColor = palette.green;
-                } else {
-                  caption = isParishAdmin ? 'Tap to open' : 'Closed';
-                  containerClass = 'bg-transparent border-dashed border-gray-300 dark:border-white/10';
-                  icon = 'close-circle-outline';
-                }
+                  if (isReservedByCurrentUser) {
+                    caption = 'Yours';
+                    captionClass = 'text-red-600 dark:text-red-400';
+                    containerClass = 'bg-red-600/[0.08] border-red-500/30';
+                    icon = 'person';
+                    iconColor = palette.accentSoft;
+                  } else if (showAsPassed) {
+                    caption = 'Passed';
+                    containerClass = 'bg-transparent border-gray-200 dark:border-white/[0.06] opacity-50';
+                    icon = 'remove-circle-outline';
+                  } else if (slotStatus === 'reserved') {
+                    caption = 'Reserved';
+                    containerClass = 'bg-gray-100 dark:bg-white/[0.06] border-transparent';
+                    icon = 'person';
+                  } else if (slotStatus === 'available') {
+                    caption = 'Open';
+                    captionClass = 'text-emerald-600 dark:text-emerald-400';
+                    containerClass = 'bg-white dark:bg-white/[0.04] border-emerald-500/30';
+                    icon = 'checkmark-circle';
+                    iconColor = palette.green;
+                  } else {
+                    caption = isParishAdmin ? 'Tap to open' : 'Closed';
+                    containerClass = 'bg-transparent border-dashed border-gray-300 dark:border-white/10';
+                    icon = 'close-circle-outline';
+                  }
 
-                return (
-                  <PressableScale
-                    key={timeSlot.id}
-                    onPress={() => handleTimeSlotPress(selectedDaySchedule!, timeSlot)}
-                    disabled={isDisabled}
-                    scaleTo={0.94}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${timeSlot.time}, ${caption}`}
-                    style={{ width: '31.5%', marginBottom: 10 }}
-                    className={`rounded-2xl border py-3.5 items-center ${containerClass}`}
-                  >
-                    <Ionicons name={icon} size={16} color={iconColor} />
-                    <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white mt-1">{timeSlot.displayTime}</Text>
-                    <Text className={`font-sans-medium text-[11px] mt-0.5 ${captionClass}`}>{caption}</Text>
-                  </PressableScale>
-                );
-              })}
-            </Animated.View>
+                  return (
+                    <PressableScale
+                      key={timeSlot.id}
+                      onPress={() => handleTimeSlotPress(selectedDaySchedule!, timeSlot)}
+                      disabled={isDisabled}
+                      scaleTo={0.94}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${timeSlot.time}, ${caption}`}
+                      style={{ width: '31.5%', marginBottom: 10 }}
+                      className={`rounded-2xl border py-3.5 items-center ${containerClass}`}
+                    >
+                      <Ionicons name={icon} size={16} color={iconColor} />
+                      <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white mt-1">{timeSlot.displayTime}</Text>
+                      <Text className={`font-sans-medium text-[11px] mt-0.5 ${captionClass}`}>{caption}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </Animated.View>
+
+              {hasMoreSlots && (
+                <PressableScale
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setSlotsExpanded((prev) => !prev);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={slotsExpanded ? 'Show fewer times' : 'Show all times'}
+                  scaleTo={0.97}
+                  className="mt-1 mb-2 py-3 rounded-2xl border border-gray-100 dark:border-white/[0.06] bg-white dark:bg-white/[0.04] flex-row items-center justify-center"
+                >
+                  <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white mr-1.5">
+                    {slotsExpanded ? 'Show fewer' : 'Show all times'}
+                  </Text>
+                  <Ionicons
+                    name={slotsExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={colors.icon}
+                  />
+                </PressableScale>
+              )}
+            </>
           )}
         </View>
-      </ScrollView>
+      </View>
     );
   };
 
-  const filteredBulletin = bulletinFilter === 'all'
-    ? bulletinEvents
-    : bulletinEvents.filter(e => e.event_type === bulletinFilter);
+  const channelChipSource = isParishAdmin ? channels : subscribedChannels;
+  const timeFilteredEvents = bulletinEvents.filter((e) =>
+    isWithinBulletinTimeRange(e.created_at, timeFilter)
+  );
+  const channelScopedEvents =
+    channelFilter === 'all'
+      ? timeFilteredEvents
+      : timeFilteredEvents.filter((e) => e.channel_id === channelFilter);
+  const filteredBulletin =
+    bulletinFilter === 'all'
+      ? channelScopedEvents
+      : channelScopedEvents.filter((e) => e.event_type === bulletinFilter);
+
+  const countsByChannel = channelChipSource.reduce<Record<string, number>>((acc, channel) => {
+    acc[channel.id] = timeFilteredEvents.filter((e) => e.channel_id === channel.id).length;
+    return acc;
+  }, {});
 
   const renderBulletinTab = () => (
-    <View className="flex-1">
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: contentBottomPadding(insets.bottom) + (isParishAdmin ? 56 : 0) }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={refreshControl}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}
-        >
-          {FILTERS.map((filter) => {
-            const active = bulletinFilter === filter.key;
-            const count = filter.key === 'all' ? bulletinEvents.length : bulletinEvents.filter(e => e.event_type === filter.key).length;
-            return (
-              <Pressable
-                key={filter.key}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setBulletinFilter(filter.key);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                className={`h-9 px-4 mr-2 rounded-full flex-row items-center border ${
-                  active
-                    ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white'
-                    : 'bg-transparent border-gray-200 dark:border-white/10'
-                }`}
-              >
-                <Text className={`font-sans-semibold text-[13px] ${active ? 'text-white dark:text-gray-900' : 'text-gray-600 dark:text-gray-300'}`}>
-                  {filter.label}
-                </Text>
-                {count > 0 && (
-                  <Text className={`font-sans-semibold text-[12px] ml-1.5 ${active ? 'text-white/60 dark:text-gray-500' : 'text-gray-400'}`}>
-                    {count}
-                  </Text>
-                )}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+    <View>
+      <BulletinFeedHeader
+        channels={channelChipSource}
+        channelFilter={channelFilter}
+        onChannelChange={setChannelFilter}
+        typeFilter={bulletinFilter}
+        onTypeChange={setBulletinFilter}
+        timeFilter={timeFilter}
+        onTimeChange={setTimeFilter}
+        countsByChannel={countsByChannel}
+        visibleCount={filteredBulletin.length}
+        totalCount={timeFilteredEvents.length}
+        isParishAdmin={isParishAdmin}
+        onOpenChannels={() => setShowChannelsSheet(true)}
+      />
 
-        <View className="px-5 pt-3">
+      <View className="px-5 pt-1">
           {loadingBulletin ? (
             [0, 1, 2].map((i) => (
               <View key={i} className="rounded-3xl p-5 mb-3 bg-white dark:bg-white/[0.04]">
@@ -1001,6 +1216,7 @@ export default function Events() {
               const kind = eventKindStyle[event.event_type];
               const isDated = (event.event_type === 'volunteer' || event.event_type === 'event') && !!event.event_date;
               const hasMeta = (event.event_type === 'volunteer' || event.event_type === 'event') && (!!event.event_time || !!event.location);
+              const channelName = event.channel?.name;
 
               return (
                 <Animated.View
@@ -1016,19 +1232,27 @@ export default function Events() {
                     style={{ marginBottom: 12 }}
                     className="rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06]"
                   >
-                    <View className="flex-row items-center justify-between mb-3">
-                      <View className="flex-row items-center">
+                    <View className="flex-row items-start justify-between mb-3">
+                      <View
+                        className="flex-row items-center flex-wrap"
+                        style={{ flex: 1, paddingRight: 8, rowGap: 6, columnGap: 6 }}
+                      >
                         <View className="flex-row items-center rounded-full pl-1.5 pr-2.5 py-1" style={{ backgroundColor: kind.tint }}>
                           <Ionicons name={kind.icon as keyof typeof Ionicons.glyphMap} size={11} color={kind.color} />
                           <Text className="font-sans-bold text-[11px] ml-1" style={{ color: kind.color }}>{kind.label}</Text>
                         </View>
+                        {!!channelName && (
+                          <View className="rounded-full px-2.5 py-1 bg-gray-100 dark:bg-white/10">
+                            <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300">{channelName}</Text>
+                          </View>
+                        )}
                         {event.created_by === user?.id && (
-                          <View className="rounded-full px-2.5 py-1 ml-1.5 bg-gray-100 dark:bg-white/10">
+                          <View className="rounded-full px-2.5 py-1 bg-gray-100 dark:bg-white/10">
                             <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300">Your post</Text>
                           </View>
                         )}
                       </View>
-                      <Text className="font-sans text-xs text-gray-400 dark:text-gray-500">{formatRelativeTime(event.created_at)}</Text>
+                      <Text className="font-sans text-xs text-gray-400 dark:text-gray-500 mt-0.5">{formatRelativeTime(event.created_at)}</Text>
                     </View>
 
                     <View className="flex-row">
@@ -1075,10 +1299,11 @@ export default function Events() {
                             <Text className="font-sans-semibold text-xs text-emerald-600 dark:text-emerald-400 ml-1">
                               {event.volunteer_count || 0}/{event.volunteers_needed} volunteers
                             </Text>
-                            <View className="flex-1 h-1.5 rounded-full bg-emerald-500/15 ml-3 overflow-hidden">
-                              <View
-                                className="h-1.5 rounded-full bg-emerald-500"
-                                style={{ width: `${Math.min(100, ((event.volunteer_count || 0) / (event.volunteers_needed || 1)) * 100)}%` }}
+                            <View className="flex-1 ml-3">
+                              <VolunteerProgressFill
+                                ratio={Math.min(1, (event.volunteer_count || 0) / (event.volunteers_needed || 1))}
+                                height={6}
+                                animateFromZero
                               />
                             </View>
                           </View>
@@ -1090,14 +1315,80 @@ export default function Events() {
               );
             })
           )}
-        </View>
-      </ScrollView>
+      </View>
+    </View>
+  );
 
-      {/* Floating action button for parish admins */}
-      {isParishAdmin && (
+  if (loading && weekSchedule.length === 0 && bulletinEvents.length === 0) {
+    return (
+      <View className="flex-1 bg-gray-50 dark:bg-black">
+        <CompactHeader title="Events" scrollY={scrollY} />
+        <View style={{ paddingTop: insets.top }}>
+          <LargeHeader
+            scrollY={scrollY}
+            title="Events"
+            subtitle="Parish events and announcements"
+          />
+          <View className="px-5 mt-2">
+            <Skeleton height={44} radius={22} />
+            <View className="mt-6"><SkeletonRows rows={4} /></View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  const selectedKind = selectedEvent ? eventKindStyle[selectedEvent.event_type] : null;
+  const fabBottom = Math.max(insets.bottom, TAB_BAR_GAP) + TAB_BAR_HEIGHT + 16;
+
+  return (
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <CompactHeader title="Events" scrollY={scrollY} />
+
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingTop: insets.top,
+          paddingBottom: contentBottomPadding(insets.bottom) + (isParishAdmin && activeTab === 'bulletin' ? 56 : 0),
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.textMuted}
+            colors={[palette.accent]}
+            progressViewOffset={insets.top}
+          />
+        }
+      >
+        <LargeHeader
+          scrollY={scrollY}
+          title="Events"
+          subtitle={parish?.name ? `News and confession at ${parish.name}` : 'Parish events and announcements'}
+        />
+
+        <View className="px-5 pt-2 pb-1">
+          <SegmentedControl
+            value={activeTab}
+            onChange={setActiveTab}
+            segments={[
+              { key: 'bulletin', label: 'Bulletin Board', icon: activeTab === 'bulletin' ? 'pin' : 'pin-outline' },
+              { key: 'confession', label: 'Confession', icon: activeTab === 'confession' ? 'time' : 'time-outline' },
+            ]}
+          />
+        </View>
+
+        <Animated.View key={activeTab} entering={FadeIn.duration(220)}>
+          {activeTab === 'confession' ? renderConfessionTab() : renderBulletinTab()}
+        </Animated.View>
+      </Animated.ScrollView>
+
+      {isParishAdmin && activeTab === 'bulletin' && (
         <Animated.View
           entering={entrance.pop()}
-          style={{ position: 'absolute', right: 20, bottom: Math.max(insets.bottom, TAB_BAR_GAP) + TAB_BAR_HEIGHT + 16 }}
+          style={{ position: 'absolute', right: 20, bottom: fabBottom }}
         >
           <PressableScale
             onPress={() => {
@@ -1116,50 +1407,6 @@ export default function Events() {
           </PressableScale>
         </Animated.View>
       )}
-    </View>
-  );
-
-  const header = (
-    <View className="px-6 pt-4 pb-4">
-      <Text className="font-display text-[40px] leading-[44px] text-gray-900 dark:text-white" accessibilityRole="header">Events</Text>
-      <Text className="font-sans text-[15px] text-gray-500 dark:text-gray-400 mt-1">
-        {parish?.name ? `News and confession at ${parish.name}` : 'Parish events and announcements'}
-      </Text>
-    </View>
-  );
-
-  if (loading && weekSchedule.length === 0 && bulletinEvents.length === 0) {
-    return (
-      <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-        {header}
-        <View className="px-5">
-          <Skeleton height={44} radius={22} />
-          <View className="mt-6"><SkeletonRows rows={4} /></View>
-        </View>
-      </View>
-    );
-  }
-
-  const selectedKind = selectedEvent ? eventKindStyle[selectedEvent.event_type] : null;
-
-  return (
-    <View className="flex-1 bg-gray-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-      {header}
-
-      <View className="px-5">
-        <SegmentedControl
-          value={activeTab}
-          onChange={setActiveTab}
-          segments={[
-            { key: 'bulletin', label: 'Bulletin Board', icon: activeTab === 'bulletin' ? 'pin' : 'pin-outline' },
-            { key: 'confession', label: 'Confession', icon: activeTab === 'confession' ? 'time' : 'time-outline' },
-          ]}
-        />
-      </View>
-
-      <Animated.View key={activeTab} entering={FadeIn.duration(220)} style={{ flex: 1 }}>
-        {activeTab === 'confession' ? renderConfessionTab() : renderBulletinTab()}
-      </Animated.View>
 
       {/* Reservation sheet */}
       <Sheet
@@ -1308,6 +1555,49 @@ export default function Events() {
           </View>
         )}
 
+        <View className="mb-5">
+          <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300 mb-2">Channel</Text>
+          {channels.length === 0 ? (
+            <Text className="font-sans text-sm text-gray-500 dark:text-gray-400">
+              No channels available. Run the channels migration or create one first.
+            </Text>
+          ) : (
+            <View className="flex-row flex-wrap" style={{ marginHorizontal: -4 }}>
+              {channels.map((channel) => {
+                const active = createEventData.channel_id === channel.id;
+                return (
+                  <Pressable
+                    key={channel.id}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setCreateEventData({ ...createEventData, channel_id: channel.id });
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    className={`h-9 px-3.5 m-1 rounded-full flex-row items-center border ${
+                      active
+                        ? 'bg-red-600 border-red-600'
+                        : 'bg-gray-100 dark:bg-white/5 border-transparent'
+                    }`}
+                  >
+                    {channel.is_default && (
+                      <Ionicons
+                        name="home"
+                        size={12}
+                        color={active ? 'white' : palette.gray400}
+                        style={{ marginRight: 5 }}
+                      />
+                    )}
+                    <Text className={`font-sans-semibold text-[13px] ${active ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
+                      {channel.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
         <Field
           label="Title"
           required
@@ -1389,8 +1679,10 @@ export default function Events() {
             <Ionicons name="notifications" size={16} color={palette.accent} />
           </View>
           <View className="flex-1 pr-3">
-            <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Notify parishioners</Text>
-            <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">Send a push notification when published</Text>
+            <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Notify channel subscribers</Text>
+            <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Push only to people subscribed to this channel
+            </Text>
           </View>
           <Switch
             value={notifyParishioners}
@@ -1422,11 +1714,20 @@ export default function Events() {
       >
         {selectedEvent && (
           <View>
-            {selectedEvent.created_by === user?.id && (
-              <View className="self-start rounded-full px-2.5 py-1 mb-3 bg-gray-100 dark:bg-white/10">
-                <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300">Your post</Text>
-              </View>
-            )}
+            <View className="flex-row flex-wrap mb-3" style={{ rowGap: 6, columnGap: 6 }}>
+              {!!selectedEvent.channel?.name && (
+                <View className="self-start rounded-full px-2.5 py-1 bg-red-600/10">
+                  <Text className="font-sans-semibold text-[11px] text-red-700 dark:text-red-300">
+                    {selectedEvent.channel.name}
+                  </Text>
+                </View>
+              )}
+              {selectedEvent.created_by === user?.id && (
+                <View className="self-start rounded-full px-2.5 py-1 bg-gray-100 dark:bg-white/10">
+                  <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300">Your post</Text>
+                </View>
+              )}
+            </View>
 
             {!!selectedEvent.description && (
               <Text className="font-sans text-[16px] leading-[25px] text-gray-700 dark:text-gray-200">
@@ -1473,22 +1774,42 @@ export default function Events() {
             {!isParishAdmin && selectedEvent.event_type === 'event' && (
               <View className="pt-4 mt-2 border-t border-gray-100 dark:border-white/[0.06]">
                 {selectedEvent.user_response ? (
-                  <View>
-                    <View className="flex-row items-center rounded-2xl p-4 bg-emerald-500/[0.08]">
-                      <Ionicons name="checkmark-circle" size={20} color={palette.green} />
-                      <View className="flex-1 ml-2.5">
-                        <Text className="font-sans-semibold text-sm text-emerald-700 dark:text-emerald-400">
+                  <Animated.View entering={FadeInDown.duration(360).springify().damping(26).stiffness(175)}>
+                    <View className="flex-row items-center rounded-2xl p-4 bg-emerald-500/[0.08] border border-emerald-500/20 overflow-hidden">
+                      <Animated.View entering={ZoomIn.delay(80).springify().damping(18).stiffness(210)}>
+                        <View className="h-10 w-10 rounded-full bg-emerald-500/15 items-center justify-center">
+                          <Ionicons name="checkmark-circle" size={22} color={palette.green} />
+                        </View>
+                      </Animated.View>
+                      <Animated.View
+                        entering={FadeIn.delay(140).duration(280)}
+                        className="flex-1 ml-3"
+                      >
+                        <Text className="font-sans-semibold text-[11px] tracking-[1.2px] uppercase text-emerald-700/80 dark:text-emerald-400/90">
+                          Confirmed
+                        </Text>
+                        <Text className="font-sans-semibold text-[15px] text-emerald-700 dark:text-emerald-400 mt-0.5">
                           You responded: {RESPONSE_LABEL[selectedEvent.user_response.response_type] ?? 'Attending'}
                         </Text>
                         {selectedEvent.user_response.notes && (
-                          <Text className="font-sans text-[13px] text-gray-600 dark:text-gray-300 mt-0.5">
+                          <Text className="font-sans text-[13px] text-gray-600 dark:text-gray-300 mt-1">
                             Your notes: “{selectedEvent.user_response.notes}”
                           </Text>
                         )}
-                      </View>
+                      </Animated.View>
                     </View>
-                    <Button label="Remove response" variant="danger" onPress={() => handleRemoveResponse(selectedEvent.id)} fullWidth className="mt-3" />
-                  </View>
+                    <Animated.View entering={FadeIn.delay(220).duration(280)}>
+                      <Button
+                        label={removingResponse ? 'Removing…' : 'Remove response'}
+                        variant="danger"
+                        loading={removingResponse}
+                        disabled={removingResponse}
+                        onPress={() => handleRemoveResponse(selectedEvent.id)}
+                        fullWidth
+                        className="mt-3"
+                      />
+                    </Animated.View>
+                  </Animated.View>
                 ) : (
                   <View>
                     <Text className="font-display text-[22px] text-gray-900 dark:text-white mb-3">Will you be there?</Text>
@@ -1563,7 +1884,15 @@ export default function Events() {
                         )}
                       </View>
                     </View>
-                    <Button label="Remove response" variant="danger" onPress={() => handleRemoveResponse(selectedEvent.id)} fullWidth className="mt-3" />
+                    <Button
+                      label={removingResponse ? 'Removing…' : 'Remove response'}
+                      variant="danger"
+                      loading={removingResponse}
+                      disabled={removingResponse}
+                      onPress={() => handleRemoveResponse(selectedEvent.id)}
+                      fullWidth
+                      className="mt-3"
+                    />
                   </View>
                 ) : (
                   <View>
@@ -1708,6 +2037,48 @@ export default function Events() {
           </View>
         )}
       </Sheet>
+
+      {parishId && user && (
+        <ChannelsSheet
+          visible={showChannelsSheet}
+          onClose={() => setShowChannelsSheet(false)}
+          parishId={parishId}
+          userId={user.id}
+          isParishAdmin={isParishAdmin}
+          onChanged={() => {
+            loadBulletinEvents();
+          }}
+        />
+      )}
+
+      {/* Above the event sheet so volunteer confirmations celebrate on top */}
+      {showVolunteerConfetti && (
+        <Portal>
+          {/* Taller than the screen so pieces settle below the fold instead of pooling on-screen */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: windowHeight + 200,
+              overflow: 'hidden',
+            }}
+          >
+            <ConfettiCannon
+              count={180}
+              origin={{ x: windowWidth / 2, y: -20 }}
+              fadeOut
+              autoStart
+              explosionSpeed={1100}
+              fallSpeed={3200}
+              colors={CONFETTI_COLORS}
+              onAnimationEnd={() => setShowVolunteerConfetti(false)}
+            />
+          </View>
+        </Portal>
+      )}
     </View>
   );
 }

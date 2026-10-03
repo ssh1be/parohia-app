@@ -13,6 +13,15 @@ interface CalendarEvent {
   location?: string;
 }
 
+/** Orthocal lists commemorations under separate `feasts` and `saints` arrays. */
+export type CommemorationKind = 'feast' | 'saint';
+
+export interface Commemoration {
+  title: string;
+  story: string;
+  kind: CommemorationKind;
+}
+
 export interface OrthodoxCalendarData {
   date: string;
   title: string;
@@ -20,7 +29,7 @@ export interface OrthodoxCalendarData {
   saintsFeasts: string;
   readings: string[];
   readingsFull: { display: string; passage: string }[];
-  saintsFull: { title: string; story: string }[];
+  saintsFull: Commemoration[];
   readingsLink?: string;
   events: CalendarEvent[];
 }
@@ -45,6 +54,114 @@ export type CalendarTradition = 'greek' | 'slavic';
 /** Orthocal path segment for a tradition on the Gregorian (new) calendar. */
 export function orthocalTraditionPath(tradition: CalendarTradition): string {
   return tradition === 'greek' ? 'greek/gregorian' : 'slavic/gregorian';
+}
+
+/** Turn Orthocal `fast_abstentions` into a short note when no exception text is provided. */
+function formatFastAbstentions(raw: unknown): string {
+  const items = (Array.isArray(raw) ? raw : typeof raw === 'string' && raw ? [raw] : [])
+    .map((item) => String(item).trim().toLowerCase())
+    .filter(Boolean);
+  if (items.length === 0) return '';
+  if (items.length === 1) return `Abstain from ${items[0]}`;
+  if (items.length === 2) return `Abstain from ${items[0]} and ${items[1]}`;
+  return `Abstain from ${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+const TITLE_STOP_WORDS = new Set([
+  'a', 'an', 'and', 'according', 'ever', 'flesh', 'god', 'holy', 'jesus', 'lady',
+  'lord', 'most', 'of', 'our', 'savior', 'saviour', 'the', 'to', 'virgin',
+]);
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length > 1 && !TITLE_STOP_WORDS.has(word)),
+  );
+}
+
+/** Score how well a story title matches a feast/saint title (Orthocal often rephrases feast names). */
+function titleMatchScore(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.toLowerCase() === b.toLowerCase()) return 0.99;
+
+  const tokensA = titleTokens(a);
+  const tokensB = titleTokens(b);
+  if (tokensA.size === 0 || tokensB.size === 0) return 0;
+
+  let overlap = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) overlap += 1;
+  }
+  return overlap / Math.min(tokensA.size, tokensB.size);
+}
+
+function findMatchingStory(
+  title: string,
+  stories: { title: string; story: string }[],
+  used: Set<string>,
+): string {
+  let bestScore = 0;
+  let bestStory = '';
+  let bestKey = '';
+
+  for (const entry of stories) {
+    if (used.has(entry.title)) continue;
+    const score = titleMatchScore(title, entry.title);
+    if (score > bestScore) {
+      bestScore = score;
+      bestStory = entry.story;
+      bestKey = entry.title;
+    }
+  }
+
+  // Exact/near-exact, or enough shared significant words (e.g. "Dormition … Theotokos")
+  if (bestScore >= 0.6 && bestKey) {
+    used.add(bestKey);
+    return bestStory;
+  }
+  return '';
+}
+
+function buildCommemorations(
+  feastTitles: string[],
+  saintTitles: string[],
+  rawStories: { title?: string; story?: string }[],
+): Commemoration[] {
+  const stories = rawStories
+    .filter((entry): entry is { title: string; story: string } => !!entry?.title)
+    .map((entry) => ({
+      title: entry.title,
+      story: typeof entry.story === 'string' ? entry.story.replace(/<[^>]*>/g, '').trim() : '',
+    }));
+  const usedStories = new Set<string>();
+
+  const commemorations: Commemoration[] = [
+    ...feastTitles.map((title) => ({
+      title,
+      kind: 'feast' as const,
+      story: findMatchingStory(title, stories, usedStories),
+    })),
+    ...saintTitles.map((title) => ({
+      title,
+      kind: 'saint' as const,
+      story: findMatchingStory(title, stories, usedStories),
+    })),
+  ];
+
+  // Leftover stories that didn't match a listed feast/saint
+  for (const entry of stories) {
+    if (usedStories.has(entry.title)) continue;
+    commemorations.push({
+      title: entry.title,
+      kind: 'saint',
+      story: entry.story,
+    });
+  }
+
+  return commemorations;
 }
 
 export const fetchOrthodoxCalendarData = async (
@@ -74,28 +191,30 @@ export const fetchOrthodoxCalendarData = async (
       }));
     }
     
-    // Get saints/feasts titles
-    const feastTitles = Array.isArray(data.feasts) ? data.feasts : [];
-    const saintTitles = Array.isArray(data.saints) ? data.saints : [];
-    const combinedSaintsFeasts = [...feastTitles, ...saintTitles].filter(Boolean);
-    const saintsFeasts = combinedSaintsFeasts.join(' • ');
+    // Orthocal separates liturgical feasts from saint commemorations
+    const feastTitles = (Array.isArray(data.feasts) ? data.feasts : []).filter(Boolean);
+    const saintTitles = (Array.isArray(data.saints) ? data.saints : []).filter(Boolean);
+    const saintsFeasts = [...feastTitles, ...saintTitles].join(' • ');
 
-    // Get fasting description (fast_level_desc + fast_exception_desc)
+    // Fasting: prefer Orthocal's exception text (what's allowed); otherwise list abstentions
     let fasting = '';
     if (data.fast_level_desc) {
       fasting = data.fast_level_desc;
       if (data.fast_exception_desc) {
         fasting += ' — ' + data.fast_exception_desc;
+      } else {
+        const abstentionNote = formatFastAbstentions(data.fast_abstentions);
+        if (abstentionNote) {
+          fasting += ' — ' + abstentionNote;
+        }
       }
     }
 
-    let saintsFull: { title: string; story: string }[] = [];
-    if (data.stories && Array.isArray(data.stories)) {
-      saintsFull = data.stories.map((story: any) => ({
-        title: story.title,
-        story: story.story.replace(/<[^>]*>/g, '').trim()
-      }));
-    }
+    const saintsFull = buildCommemorations(
+      feastTitles,
+      saintTitles,
+      Array.isArray(data.stories) ? data.stories : [],
+    );
 
     return {
       date: date.toISOString().split('T')[0],

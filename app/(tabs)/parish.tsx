@@ -7,6 +7,7 @@ import { Alert, Linking, Modal, Platform, Pressable, RefreshControl, Text, TextI
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import GeneralSettings from "../../components/GeneralSettings";
+import ParishCalendarSetup from "../../components/ParishCalendarSetup";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Field } from "../../components/ui/Field";
@@ -18,9 +19,10 @@ import { SettingsHeader } from "../../components/ui/Settings";
 import { Sheet } from "../../components/ui/Sheet";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { useThemeColors } from "../../components/ui/useThemeColors";
-import { contentBottomPadding, entrance, palette } from "../../constants/theme";
 import { supabase } from "../../config/supabase";
+import { contentBottomPadding, entrance, palette } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { ChannelService } from "../../services/channelService";
 import { getParishes, getUserProfile } from "../../services/onboardingService";
 import { getParishByAdminId, getParishByUserId, updateParishDonationSettings, updateParishPriestInfo } from "../../services/parishService";
 import { PayPalService } from "../../services/paypalService";
@@ -69,6 +71,7 @@ export default function Parish() {
   const [isParishAdmin, setIsParishAdmin] = useState(false);
   const [showParishSelector, setShowParishSelector] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showCalendarSetup, setShowCalendarSetup] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [showGeneralSettings, setShowGeneralSettings] = useState(false);
   
@@ -182,6 +185,9 @@ export default function Parish() {
         });
       
       if (error) throw error;
+
+      // Safety net if DB trigger has not run yet
+      await ChannelService.ensureGeneralSubscription(user.id, selectedParishId);
       
       // Refresh parish data
       const newParish = await getParishByUserId(user.id);
@@ -589,20 +595,42 @@ export default function Parish() {
                 {parish.email && (
                   <InfoRow icon="mail-outline" label="Email" value={parish.email} onPress={() => handleEmail(parish.email!)} />
                 )}
-                <View className="flex-row items-center justify-between px-4 py-3.5 border-t border-gray-100 dark:border-white/[0.06]">
+                <PressableScale
+                  onPress={
+                    isParishAdmin
+                      ? () => {
+                          if (parish.parish_calendar_id) {
+                            setShowEditModal(true);
+                          } else {
+                            setShowCalendarSetup(true);
+                          }
+                        }
+                      : undefined
+                  }
+                  disabled={!isParishAdmin}
+                  className="flex-row items-center justify-between px-4 py-3.5 border-t border-gray-100 dark:border-white/[0.06]"
+                >
                   <Text className="font-sans-medium text-[13px] text-gray-500 dark:text-gray-400">Parish calendar</Text>
                   {parish.parish_calendar_id ? (
                     <View className="flex-row items-center rounded-full px-2.5 py-1 bg-emerald-500/10">
                       <Ionicons name="checkmark-circle" size={13} color={palette.green} />
                       <Text className="font-sans-bold text-[11px] text-emerald-600 dark:text-emerald-400 ml-1">Connected</Text>
+                      {isParishAdmin ? (
+                        <Ionicons name="chevron-forward" size={12} color={palette.green} style={{ marginLeft: 4 }} />
+                      ) : null}
                     </View>
                   ) : (
                     <View className="flex-row items-center rounded-full px-2.5 py-1 bg-amber-500/10">
                       <Ionicons name="alert-circle" size={13} color={palette.amber} />
-                      <Text className="font-sans-bold text-[11px] text-amber-600 dark:text-amber-400 ml-1">Not set up</Text>
+                      <Text className="font-sans-bold text-[11px] text-amber-600 dark:text-amber-400 ml-1">
+                        {isParishAdmin ? 'Set up' : 'Not set up'}
+                      </Text>
+                      {isParishAdmin ? (
+                        <Ionicons name="chevron-forward" size={12} color={palette.amber} style={{ marginLeft: 4 }} />
+                      ) : null}
                     </View>
                   )}
-                </View>
+                </PressableScale>
               </View>
             </Reveal>
 
@@ -835,7 +863,8 @@ export default function Parish() {
           onChangeText={(text) => setEditForm({...editForm, parish_calendar_id: text})}
           placeholder="parish@example.com"
           autoCapitalize="none"
-          helper="Email address associated with your parish's Google Calendar"
+          keyboardType="email-address"
+          helper="Email or group ID for your parish Google Calendar. Leave blank to disconnect."
         />
       </Sheet>
 
@@ -912,6 +941,15 @@ export default function Parish() {
           </Animated.View>
         )}
       </Sheet>
+
+      {/* Calendar setup for admins */}
+      <ParishCalendarSetup
+        visible={showCalendarSetup}
+        onClose={() => setShowCalendarSetup(false)}
+        onSuccess={() => {
+          fetchParishData();
+        }}
+      />
 
       {/* General settings */}
       <Modal

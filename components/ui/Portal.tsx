@@ -33,7 +33,8 @@ export function PortalHost({ children }: { children: ReactNode }) {
   return (
     <PortalContext.Provider value={api}>
       {children}
-      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {/* box-none so an empty overlay never blocks tab/card presses after sheets unmount */}
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFill} collapsable={false}>
         {Object.entries(nodes).map(([key, node]) => (
           <Fragment key={key}>{node}</Fragment>
         ))}
@@ -47,10 +48,13 @@ export function Portal({ children }: { children: ReactNode }) {
   const key = useId();
 
   useEffect(() => {
+    if (children == null || children === false) {
+      api?.unmount(key);
+      return;
+    }
     api?.mount(key, children);
-  });
-
-  useEffect(() => () => api?.unmount(key), [api, key]);
+    return () => api?.unmount(key);
+  }, [api, key, children]);
 
   return null;
 }

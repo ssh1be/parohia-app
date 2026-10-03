@@ -1,20 +1,8 @@
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Modal,
-  Alert,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from 'nativewind';
-
-interface AddressComponent {
-  long_name: string;
-  short_name: string;
-  types: string[];
-}
+import { useRef, useState } from 'react';
+import { Pressable, Text, TextInput, View } from 'react-native';
+import { palette } from '../constants/theme';
+import { useThemeColors } from './ui/useThemeColors';
 
 interface AddressData {
   street_number?: string;
@@ -34,23 +22,21 @@ interface AddressAutocompleteProps {
   onClear?: () => void;
 }
 
-export default function AddressAutocomplete({ 
-  onAddressSelect, 
-  placeholder = "Enter address",
-  className = "",
+export default function AddressAutocomplete({
+  onAddressSelect,
+  placeholder = 'Enter address',
+  className = '',
   value,
   onChangeText,
-  onClear
 }: AddressAutocompleteProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const colors = useThemeColors();
   const [internalAddress, setInternalAddress] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [focused, setFocused] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  
-  // Use controlled value if provided, otherwise use internal state
+
   const address = value !== undefined ? value : internalAddress;
   const setAddress = onChangeText || setInternalAddress;
 
@@ -62,14 +48,12 @@ export default function AddressAutocomplete({
     }
 
     setIsLoading(true);
-    
+
     try {
-      // Using a free geocoding service (Nominatim) for demo purposes
-      // In production, you'd want to use Google Places API or similar
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=us&limit=5`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=us&limit=5`,
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         setSuggestions(data);
@@ -84,13 +68,11 @@ export default function AddressAutocomplete({
 
   const handleAddressChange = (text: string) => {
     setAddress(text);
-    
-    // Clear previous timeout
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    
-    // Debounce the search
+
     timeoutRef.current = setTimeout(() => {
       searchAddresses(text);
     }, 300);
@@ -100,18 +82,16 @@ export default function AddressAutocomplete({
     setAddress(suggestion.display_name);
     setShowSuggestions(false);
     setSuggestions([]);
-    
+
     try {
-      // Get detailed address information
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${suggestion.lat}&lon=${suggestion.lon}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${suggestion.lat}&lon=${suggestion.lon}`,
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         const addressData: AddressData = {};
-        
-        // Parse address components
+
         if (data.address) {
           addressData.street_number = data.address.house_number || '';
           addressData.route = data.address.road || '';
@@ -120,12 +100,11 @@ export default function AddressAutocomplete({
           addressData.postal_code = data.address.postcode || '';
           addressData.country = data.address.country || '';
         }
-        
+
         onAddressSelect(addressData);
       }
     } catch (error) {
       console.error('Error getting address details:', error);
-      // Fallback: just use the display name
       onAddressSelect({
         route: suggestion.display_name,
         locality: '',
@@ -135,50 +114,47 @@ export default function AddressAutocomplete({
     }
   };
 
-  const handleClear = () => {
-    setAddress('');
-    setShowSuggestions(false);
-    setSuggestions([]);
-    if (onClear) {
-      onClear();
-    }
-  };
-
   return (
     <View className={`relative ${className}`}>
-      <View className="relative">
+      <View
+        className={`flex-row items-center h-12 rounded-2xl bg-gray-100 dark:bg-white/5 border px-4 ${
+          focused ? 'border-red-500/70' : 'border-transparent dark:border-white/5'
+        }`}
+      >
         <TextInput
-          className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pr-10"
+          className="flex-1 font-sans text-[15px] text-gray-900 dark:text-white"
           placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={palette.gray400}
           value={address}
           onChangeText={handleAddressChange}
           onFocus={() => {
-            if (suggestions.length > 0) {
-              setShowSuggestions(true);
-            }
+            setFocused(true);
+            if (suggestions.length > 0) setShowSuggestions(true);
           }}
+          onBlur={() => setFocused(false)}
         />
         {isLoading && (
-          <View className="absolute right-3 top-3">
-            <Ionicons name="refresh" size={16} color={isDark ? 'white' : '#374151'} style={{ opacity: 0.5 }} />
-          </View>
+          <Ionicons name="refresh" size={16} color={colors.textMuted} style={{ opacity: 0.6 }} />
         )}
       </View>
-      
+
       {showSuggestions && suggestions.length > 0 && (
-        <View className="absolute top-full left-0 right-0 z-50 mt-1 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 max-h-48">
+        <View className="absolute top-full left-0 right-0 z-50 mt-1.5 rounded-2xl overflow-hidden bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 max-h-48">
           {suggestions.map((item, index) => (
             <Pressable
               key={item.place_id || index}
-              className="py-3 px-4 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 first:rounded-t-xl last:rounded-b-xl last:border-b-0 active:opacity-70"
+              className={`py-3 px-4 active:opacity-70 ${
+                index < suggestions.length - 1 ? 'border-b border-gray-100 dark:border-white/5' : ''
+              }`}
               onPress={() => handleAddressSelect(item)}
             >
-              <Text className="text-gray-900 dark:text-white text-sm">{item.display_name}</Text>
+              <Text className="font-sans text-[13px] leading-[18px] text-gray-900 dark:text-white">
+                {item.display_name}
+              </Text>
             </Pressable>
           ))}
         </View>
       )}
     </View>
   );
-} 
+}

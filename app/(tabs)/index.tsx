@@ -11,7 +11,7 @@ import { FastingBadge } from "../../components/liturgical/FastingBadge";
 import { ReadingSheet } from "../../components/liturgical/ReadingSheet";
 import { ReadingsCarousel } from "../../components/liturgical/ReadingsCarousel";
 import { TimelineItem } from "../../components/liturgical/TimelineItem";
-import ParishCalendarSetup from '../../components/ParishCalendarSetup';
+import ParishCalendarSetup, { CalendarSetupCallout } from '../../components/ParishCalendarSetup';
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PressableScale } from "../../components/ui/PressableScale";
@@ -496,20 +496,7 @@ export default function Index() {
         {/* Calendar setup prompt for parish admins */}
         {isParishAdmin && !parishHasCalendar && (
           <Reveal index={2} style={{ paddingHorizontal: 20, marginTop: 16 }}>
-            <View className="rounded-3xl p-5 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
-              <View className="flex-row items-start">
-                <View className="h-10 w-10 rounded-2xl bg-blue-500/15 items-center justify-center">
-                  <Ionicons name="calendar-outline" size={18} color={palette.blue} />
-                </View>
-                <View className="flex-1 ml-3">
-                  <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">Set up your parish calendar</Text>
-                  <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
-                    Connect your Google Calendar to display parish events in the app.
-                  </Text>
-                  <Button label="Set up calendar" size="sm" onPress={() => setShowCalendarSetup(true)} className="mt-3 self-start" />
-                </View>
-              </View>
-            </View>
+            <CalendarSetupCallout onPress={() => setShowCalendarSetup(true)} />
           </Reveal>
         )}
 
@@ -545,6 +532,11 @@ export default function Index() {
                       ? "Set up your parish calendar to see events here."
                       : "Your administrator hasn't set up the parish calendar yet.")
                   : "No events scheduled for today."
+              }
+              action={
+                isParishAdmin && !parishHasCalendar ? (
+                  <Button label="Set up calendar" icon="link-outline" size="sm" onPress={() => setShowCalendarSetup(true)} />
+                ) : undefined
               }
             />
           )}

@@ -2,16 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
-  KeyboardAvoidingView,
+  Keyboard,
+  KeyboardEvent,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   Extrapolation,
@@ -43,11 +43,21 @@ interface SheetProps {
 const DISMISS_DISTANCE = 120;
 const DISMISS_VELOCITY = 900;
 const ENTER_DURATION = 500;
-const EXIT_DURATION = 300;
-// Approximates the iOS sheet presentation curve: quick departure, long gentle settle.
+/** Shared so callers can wait for dismiss to finish before clearing selection. */
+export const SHEET_EXIT_DURATION = 620;
+const EXIT_DURATION = SHEET_EXIT_DURATION;
 const SHEET_EASING = Easing.bezier(0.32, 0.72, 0, 1);
-// iOS keeps sheet presentation motion under Reduce Motion, so these do too; Reanimated would otherwise jump to the end.
 const SHEET_MOTION = ReduceMotion.Never;
+const TOP_GAP = 24;
+
+function keyboardTiming(event: KeyboardEvent) {
+  const duration = Platform.OS === 'ios' ? Math.max(event.duration ?? 250, 1) : 220;
+  return {
+    duration,
+    easing: Platform.OS === 'ios' ? Easing.bezier(0.17, 0.59, 0.4, 0.77) : Easing.out(Easing.cubic),
+    reduceMotion: SHEET_MOTION,
+  } as const;
+}
 
 export function Sheet({
   visible,
@@ -64,18 +74,36 @@ export function Sheet({
   const { height } = useWindowDimensions();
   const colors = useThemeColors();
   const [mounted, setMounted] = useState(visible);
+  const [keyboardDocked, setKeyboardDocked] = useState(false);
   const translateY = useSharedValue(height);
   const backdrop = useSharedValue(0);
+  const keyboardHeight = useSharedValue(0);
 
   const pendingEnter = useRef(false);
+  const visibleRef = useRef(visible);
+  const unmountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  visibleRef.current = visible;
+
+  const clearUnmountTimer = () => {
+    if (unmountTimer.current) {
+      clearTimeout(unmountTimer.current);
+      unmountTimer.current = null;
+    }
+  };
+
+  const finishUnmount = () => {
+    clearUnmountTimer();
+    // Skip if the sheet was reopened while the exit animation was in flight.
+    if (visibleRef.current) return;
+    setMounted(false);
+  };
 
   const enter = () => {
+    clearUnmountTimer();
     translateY.value = withTiming(0, { duration: ENTER_DURATION, easing: SHEET_EASING, reduceMotion: SHEET_MOTION });
     backdrop.value = withTiming(1, { duration: 320, reduceMotion: SHEET_MOTION });
   };
 
-  // Portaled content mounts a commit after `mounted` flips (later when the parent is busy),
-  // so the entrance waits for the sheet's first layout instead of starting before it exists.
   const handleSheetLayout = () => {
     if (!pendingEnter.current) return;
     pendingEnter.current = false;
@@ -89,17 +117,54 @@ export function Sheet({
       } else {
         translateY.value = height;
         backdrop.value = 0;
+        keyboardHeight.value = 0;
+        setKeyboardDocked(false);
         pendingEnter.current = true;
         setMounted(true);
       }
     } else if (mounted) {
+      Keyboard.dismiss();
+      setKeyboardDocked(false);
+      keyboardHeight.value = withTiming(0, { duration: 180, reduceMotion: SHEET_MOTION });
       backdrop.value = withTiming(0, { duration: 240, reduceMotion: SHEET_MOTION });
-      translateY.value = withTiming(height, { duration: EXIT_DURATION, easing: SHEET_EASING, reduceMotion: SHEET_MOTION }, (finished) => {
-        if (finished) runOnJS(setMounted)(false);
-      });
+      translateY.value = withTiming(
+        height,
+        { duration: EXIT_DURATION, easing: SHEET_EASING, reduceMotion: SHEET_MOTION },
+        (finished) => {
+          if (finished) runOnJS(finishUnmount)();
+        },
+      );
+      // Backup if the animation callback never fires (common after ScrollView + gesture interaction).
+      clearUnmountTimer();
+      unmountTimer.current = setTimeout(finishUnmount, EXIT_DURATION + 80);
     }
+    return () => clearUnmountTimer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (event: KeyboardEvent) => {
+      const next = Math.max(0, event.endCoordinates.height);
+      setKeyboardDocked(true);
+      keyboardHeight.value = withTiming(next, keyboardTiming(event));
+    };
+    const onHide = (event: KeyboardEvent) => {
+      setKeyboardDocked(false);
+      keyboardHeight.value = withTiming(0, keyboardTiming(event));
+    };
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [mounted, keyboardHeight]);
 
   const requestClose = () => {
     if (dismissible) onClose();
@@ -116,7 +181,9 @@ export function Sheet({
   }, [visible, dismissible, onClose]);
 
   const pan = Gesture.Pan()
-    .enabled(dismissible)
+    .enabled(dismissible && visible)
+    .activeOffsetY(8)
+    .failOffsetX([-24, 24])
     .onUpdate((e) => {
       translateY.value = Math.max(0, e.translationY);
     })
@@ -128,8 +195,21 @@ export function Sheet({
       }
     });
 
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+  // Only animate margin/maxHeight — never force height:'auto' (collapses ScrollView children).
+  // When keyboard is up, minHeight expands the sheet to fill space above it.
+  const sheetStyle = useAnimatedStyle(() => {
+    const kb = Math.max(0, keyboardHeight.value);
+    const maxH = Math.max(280, height - insets.top - TOP_GAP - kb);
+    return {
+      transform: [{ translateY: translateY.value }],
+      marginBottom: kb,
+      maxHeight: maxH,
+      minHeight: kb > 8 ? maxH : 0,
+    };
+  });
+
+  const footerPadStyle = useAnimatedStyle(() => ({
+    paddingBottom: keyboardHeight.value > 8 ? 12 : Math.max(insets.bottom, 16),
   }));
 
   const backdropStyle = useAnimatedStyle(() => ({
@@ -137,100 +217,129 @@ export function Sheet({
   }));
 
   const hasHeader = !!(title || subtitle || eyebrow);
+  const restingMaxHeight = height - insets.top - TOP_GAP;
 
   return (
     <Portal>
       {mounted && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}
-          pointerEvents={visible ? 'auto' : 'none'}
-        >
-          <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={requestClose} accessibilityLabel="Dismiss" />
-          </Animated.View>
-
-          <Animated.View
-            onLayout={handleSheetLayout}
-            accessibilityViewIsModal
-            style={[
-              styles.sheet,
-              { maxHeight: height - insets.top - 24, backgroundColor: colors.isDark ? '#0B0F17' : '#FFFFFF' },
-              sheetStyle,
-            ]}
+        // Portals need their own GH root or scroll/pan can leave the overlay eating touches after dismiss.
+        <GestureHandlerRootView style={StyleSheet.absoluteFill} pointerEvents={visible ? 'auto' : 'box-none'}>
+          <View
+            style={[StyleSheet.absoluteFill, styles.host]}
+            pointerEvents={visible ? 'auto' : 'none'}
           >
-            <GestureDetector gesture={pan}>
-              <View className="px-6 pt-3 pb-3">
-                <View className="self-center h-1 w-10 rounded-full bg-gray-300 dark:bg-white/20 mb-4" />
-                {hasHeader && (
-                  <View className="flex-row items-start justify-between">
-                    <View className="flex-1 pr-4">
-                      {eyebrow && (
-                        <Text className="font-sans-semibold text-[11px] tracking-[1.6px] uppercase text-red-600 dark:text-red-400 mb-1">
-                          {eyebrow}
-                        </Text>
-                      )}
-                      {title && (
-                        <Text className="font-display text-[28px] leading-[32px] text-gray-900 dark:text-white">
-                          {title}
-                        </Text>
-                      )}
-                      {subtitle && (
-                        <Text className="font-sans text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</Text>
+            <Animated.View
+              style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
+              pointerEvents={visible ? 'auto' : 'none'}
+            >
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  requestClose();
+                }}
+                accessibilityLabel="Dismiss"
+              />
+            </Animated.View>
+
+            <Animated.View
+              onLayout={handleSheetLayout}
+              accessibilityViewIsModal
+              pointerEvents={visible ? 'auto' : 'none'}
+              style={[
+                styles.sheet,
+                {
+                  maxHeight: restingMaxHeight,
+                  backgroundColor: colors.isDark ? '#0B0F17' : '#FFFFFF',
+                },
+                sheetStyle,
+              ]}
+            >
+              <GestureDetector gesture={pan}>
+                <View className="px-6 pt-3 pb-3">
+                  <View className="self-center h-1 w-10 rounded-full bg-gray-300 dark:bg-white/20 mb-4" />
+                  {hasHeader && (
+                    <View className="flex-row items-start justify-between">
+                      <View className="flex-1 pr-4">
+                        {eyebrow && (
+                          <Text className="font-sans-semibold text-[11px] tracking-[1.6px] uppercase text-red-600 dark:text-red-400 mb-1">
+                            {eyebrow}
+                          </Text>
+                        )}
+                        {title && (
+                          <Text className="font-display text-[28px] leading-[32px] text-gray-900 dark:text-white">
+                            {title}
+                          </Text>
+                        )}
+                        {subtitle && (
+                          <Text className="font-sans text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</Text>
+                        )}
+                      </View>
+                      {dismissible && (
+                        <Pressable
+                          onPress={requestClose}
+                          hitSlop={12}
+                          accessibilityRole="button"
+                          accessibilityLabel="Close"
+                          className="h-9 w-9 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center active:opacity-70"
+                        >
+                          <Ionicons name="close" size={18} color={colors.icon} />
+                        </Pressable>
                       )}
                     </View>
-                    {dismissible && (
-                      <Pressable
-                        onPress={requestClose}
-                        hitSlop={12}
-                        accessibilityRole="button"
-                        accessibilityLabel="Close"
-                        className="h-9 w-9 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center active:opacity-70"
-                      >
-                        <Ionicons name="close" size={18} color={colors.icon} />
-                      </Pressable>
-                    )}
-                  </View>
-                )}
-              </View>
-            </GestureDetector>
+                  )}
+                </View>
+              </GestureDetector>
 
-            {scrollable ? (
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: 24,
-                  paddingTop: 4,
-                  paddingBottom: footer ? 16 : Math.max(insets.bottom, 16) + 16,
-                }}
-              >
-                {children}
-              </ScrollView>
-            ) : (
-              <View
-                style={{ paddingHorizontal: 24, paddingBottom: footer ? 16 : Math.max(insets.bottom, 16) + 16 }}
-              >
-                {children}
-              </View>
-            )}
+              {scrollable ? (
+                <ScrollView
+                  // flex:1 only when sheet has a definite expanded height; otherwise it collapses to 0.
+                  style={keyboardDocked ? { flex: 1 } : undefined}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="interactive"
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                  nestedScrollEnabled
+                  contentContainerStyle={{
+                    paddingHorizontal: 24,
+                    paddingTop: 4,
+                    paddingBottom: footer ? 16 : Math.max(insets.bottom, 16) + 16,
+                  }}
+                >
+                  {children}
+                </ScrollView>
+              ) : (
+                <View
+                  style={{
+                    flexGrow: keyboardDocked ? 1 : undefined,
+                    paddingHorizontal: 24,
+                    paddingBottom: footer ? 16 : Math.max(insets.bottom, 16) + 16,
+                  }}
+                >
+                  {children}
+                </View>
+              )}
 
-            {footer && (
-              <View
-                className="px-6 pt-3 border-t border-gray-100 dark:border-white/5"
-                style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-              >
-                {footer}
-              </View>
-            )}
-          </Animated.View>
-        </KeyboardAvoidingView>
+              {footer && (
+                <Animated.View
+                  className="px-6 pt-3 border-t border-gray-100 dark:border-white/5"
+                  style={footerPadStyle}
+                >
+                  {footer}
+                </Animated.View>
+              )}
+            </Animated.View>
+          </View>
+        </GestureHandlerRootView>
       )}
     </Portal>
   );
 }
 
 const styles = StyleSheet.create({
+  host: {
+    justifyContent: 'flex-end',
+  },
   backdrop: {
     backgroundColor: 'rgba(3, 7, 18, 0.55)',
   },
@@ -238,5 +347,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     overflow: 'hidden',
+    width: '100%',
   },
 });

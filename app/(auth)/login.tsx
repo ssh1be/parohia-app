@@ -1,20 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useColorScheme } from 'nativewind';
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  Pressable,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, Text, View } from 'react-native';
+import { AuthHeader, AuthScaffold } from '../../components/auth/AuthChrome';
+import { Button } from '../../components/ui/Button';
+import { Field } from '../../components/ui/Field';
+import { Reveal } from '../../components/ui/Reveal';
+import { useThemeColors } from '../../components/ui/useThemeColors';
 import { useAuth } from '../../contexts/AuthContext';
 import { isOnboardingComplete } from '../../utils/onboardingStorage';
 
@@ -23,27 +15,43 @@ export default function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(params.mode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Remount native TextInputs to clear stuck iOS Password Autofill / yellow lock state.
+  const [fieldEpoch, setFieldEpoch] = useState(0);
   const { signIn, signUp, resetPassword, user } = useAuth();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const colors = useThemeColors();
 
-  // Redirect to main app if user is authenticated and onboarding is complete
+  useEffect(() => {
+    setIsSignUp(params.mode === 'signup');
+  }, [params.mode]);
+
   useEffect(() => {
     let isMounted = true;
     const checkAndRedirect = async () => {
       if (user) {
         const complete = await isOnboardingComplete(user.id);
         if (complete && isMounted) {
-          console.log('User authenticated and onboarding complete, redirecting to main app');
           router.replace('/');
         }
       }
     };
     checkAndRedirect();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
+  // When leaving the screen (back, navigate away), remount fields so a frozen
+  // autofilled password input can't persist in the native view pool.
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setShowPassword(false);
+        setFieldEpoch((n) => n + 1);
+      };
+    }, []),
+  );
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -54,7 +62,19 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (isSignUp) {
-        await signUp(email, password);
+        const result = await signUp(email, password);
+        if (result === 'needs_otp') {
+          router.push(`/(auth)/confirm-otp?email=${encodeURIComponent(email.trim())}`);
+        } else if (result === 'needs_onboarding') {
+          router.push('/(auth)/onboarding/user-type');
+        } else if (result === 'already_complete') {
+          router.replace('/');
+        } else if (result === 'already_registered') {
+          // Stay on this screen; switch to sign-in so they can continue easily.
+          setIsSignUp(false);
+          setShowPassword(false);
+          setFieldEpoch((n) => n + 1);
+        }
       } else {
         await signIn(email, password);
       }
@@ -71,135 +91,123 @@ export default function LoginScreen() {
     await resetPassword(email);
   };
 
-  const handleGoogleSignIn = async () => {
-    console.log('Google sign in button pressed');
-    // TODO: Implement Google sign in
+  const toggleShowPassword = () => {
+    setShowPassword((v) => !v);
+    // Remount when flipping secureTextEntry — toggling in place freezes after iOS autofill.
+    setFieldEpoch((n) => n + 1);
   };
 
+  const switchMode = () => {
+    setIsSignUp((v) => !v);
+    setShowPassword(false);
+    setFieldEpoch((n) => n + 1);
+  };
+
+  // Sign-in: username + password pairs with Keychain autofill.
+  // Sign-up: avoid textContentType="newPassword" — it triggers iOS Strong Password
+  // which can lock the field yellow and leak that state to later screens (RN Fabric).
+  const emailContentType = isSignUp ? 'emailAddress' : 'username';
+  const passwordContentType = isSignUp ? 'none' : 'password';
+  const emailAutoComplete = isSignUp ? 'email' : 'username';
+  const passwordAutoComplete = isSignUp ? 'new-password' : 'password';
+
   return (
-    <KeyboardAvoidingView 
-      className="flex-1 bg-gray-50 dark:bg-black"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView 
-          className="flex-1"
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="flex-1 px-6 pt-12 pb-8">
-        {/* Back and Title */}
-        <View className="flex-row items-center mb-6">
-          <Pressable 
-            className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
-          </Pressable>
-          <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">
-            {isSignUp ? 'Create Account' : 'Sign In'}
-          </Text>
-        </View>
-        
-        {/* Sign In/Up Form */}
-        <View className="mt-6">
-          <View className="mb-5">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Email</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="your-email@example.com"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-          
-          <View className="mb-6">
-            <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-gray-900 dark:text-white text-sm font-medium">Password</Text>
-              {!isSignUp && (
-                <Pressable className="active:opacity-70" onPress={handleResetPassword}>
-                  <Text className="text-blue-400 text-xs">Forgot Password?</Text>
-                </Pressable>
-              )}
-            </View>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="••••••••"
-              placeholderTextColor="#9CA3AF"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-          </View>
-          
-          {/* Sign In/Up Button */}
-          <Pressable
-            className={`w-full py-3.5 rounded-xl text-white font-medium shadow-md mt-4 flex-row items-center justify-center active:opacity-70 ${
-              loading 
-                ? 'bg-gray-600' 
-                : 'bg-red-600'
-            }`}
-            onPress={handleAuth}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Ionicons
-                name={isSignUp ? 'person-add' : 'log-in'}
-                size={20}
-                color="white"
-                style={{ marginRight: 8 }}
-              />
-            )}
-            <Text className="text-white font-medium">
-              {loading ? 'Loading...' : isSignUp ? 'Create Account' : 'Sign In'}
-            </Text>
-          </Pressable>
-          
-          {/* Divider */}
-          {/* <View className="flex-row items-center justify-center mt-8 mb-8">
-            <View className="h-px flex-grow bg-gray-700" />
-            <Text className="text-white opacity-60 text-xs px-4">or</Text>
-            <View className="h-px flex-grow bg-gray-700" />
-          </View> */}
-          
-          {/* Google Sign In Button */}
-          {/* <TouchableOpacity 
-            className="w-full py-3.5 rounded-xl text-sm text-white opacity-70 border border-white border-opacity-20 flex-row items-center justify-center"
-            onPress={handleGoogleSignIn}
-          >
-            <Ionicons name="logo-google" size={16} color="white" style={{ marginRight: 8 }} />
-            <Text className="text-white opacity-70">Continue with Google</Text>
-          </TouchableOpacity> */}
-        </View>
-        
-        {/* Sign Up/Sign In Link */}
-        <View className="absolute bottom-8 left-0 right-0 flex justify-center px-6">
-          <View className="flex-row justify-center">
-            <Text className="text-gray-900 dark:text-white opacity-70 text-sm">
+    <AuthScaffold
+      bottom={
+        <Reveal index={5}>
+          <View className="flex-row justify-center items-center">
+            <Text className="font-sans text-[14px] text-gray-500 dark:text-gray-400">
               {isSignUp ? 'Already have an account?' : "Don't have an account?"}
             </Text>
-            <Pressable
-              className="ml-1 active:opacity-70"
-              onPress={() => setIsSignUp(!isSignUp)}
-            >
-              <Text className="text-blue-400 text-sm">
+            <Pressable className="ml-1.5 active:opacity-70" onPress={switchMode}>
+              <Text className="font-sans-semibold text-[14px] text-red-600 dark:text-red-400">
                 {isSignUp ? 'Sign In' : 'Create One'}
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Reveal>
+      }
+    >
+      <AuthHeader
+        eyebrow={isSignUp ? 'Join Parohia' : 'Welcome back'}
+        title={isSignUp ? 'Create Account' : 'Sign In'}
+        subtitle={
+          isSignUp
+            ? 'Enter your email and a password to begin.'
+            : 'Sign in to continue to your parish.'
+        }
+        onBack={() => router.back()}
+      />
+
+      <Reveal index={2}>
+        <View className="mt-8">
+          <Field
+            remountKey={`email-${fieldEpoch}-${isSignUp ? 'up' : 'in'}`}
+            label="Email"
+            required
+            placeholder="your-email@example.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete={emailAutoComplete}
+            textContentType={emailContentType}
+          />
+
+          <View>
+            {!isSignUp && (
+              <Pressable
+                className="absolute right-0 top-0 z-10 active:opacity-70"
+                onPress={handleResetPassword}
+                hitSlop={8}
+              >
+                <Text className="font-sans-semibold text-[12px] text-red-600 dark:text-red-400">
+                  Forgot Password?
+                </Text>
+              </Pressable>
+            )}
+            <Field
+              remountKey={`password-${fieldEpoch}-${showPassword ? 'shown' : 'hidden'}`}
+              label="Password"
+              required
+              placeholder="••••••••"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              autoComplete={passwordAutoComplete}
+              textContentType={passwordContentType}
+              rightAccessory={
+                <Pressable
+                  onPress={toggleShowPassword}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              }
+            />
           </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+
+          <Button
+            label={isSignUp ? 'Create Account' : 'Sign In'}
+            icon={isSignUp ? 'person-add-outline' : 'log-in-outline'}
+            size="lg"
+            fullWidth
+            loading={loading}
+            onPress={handleAuth}
+            className="mt-2"
+          />
+        </View>
+      </Reveal>
+    </AuthScaffold>
   );
-} 
+}

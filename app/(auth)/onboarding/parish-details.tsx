@@ -1,29 +1,16 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useColorScheme } from 'nativewind';
-import { useOnboarding } from '../../../contexts/OnboardingContext';
+import { useState } from 'react';
+import { Alert, Text, View } from 'react-native';
 import AddressAutocomplete from '../../../components/AddressAutocomplete';
-
-
+import { AuthHeader, AuthScaffold, OnboardingProgress } from '../../../components/auth/AuthChrome';
+import { Button } from '../../../components/ui/Button';
+import { Field } from '../../../components/ui/Field';
+import { Reveal } from '../../../components/ui/Reveal';
+import { useOnboarding } from '../../../contexts/OnboardingContext';
 
 export default function ParishDetailsScreen() {
   const { data, updateData, previousStep } = useOnboarding();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  
+
   const [parishName, setParishName] = useState(data.parishName || '');
   const [jurisdiction, setJurisdiction] = useState(data.jurisdiction || '');
   const [address, setAddress] = useState(data.address || '');
@@ -35,24 +22,15 @@ export default function ParishDetailsScreen() {
   const [parishEmail, setParishEmail] = useState(data.parishEmail || '');
 
   const handleAddressSelect = (addressData: any) => {
-    // Auto-fill the address fields based on the selected address
     if (addressData.street_number && addressData.route) {
       setAddress(`${addressData.street_number} ${addressData.route}`);
     } else if (addressData.route) {
       setAddress(addressData.route);
     }
-    
-    if (addressData.locality) {
-      setCity(addressData.locality);
-    }
-    
-    if (addressData.administrative_area_level_1) {
-      setState(addressData.administrative_area_level_1);
-    }
-    
-    if (addressData.postal_code) {
-      setZipCode(addressData.postal_code);
-    }
+
+    if (addressData.locality) setCity(addressData.locality);
+    if (addressData.administrative_area_level_1) setState(addressData.administrative_area_level_1);
+    if (addressData.postal_code) setZipCode(addressData.postal_code);
   };
 
   const clearAddressFields = () => {
@@ -67,22 +45,22 @@ export default function ParishDetailsScreen() {
       Alert.alert('Error', 'Please enter your parish name');
       return;
     }
-    
+
     if (!address.trim()) {
       Alert.alert('Error', 'Please enter your parish address');
       return;
     }
-    
+
     if (!city.trim()) {
       Alert.alert('Error', 'Please enter your city');
       return;
     }
-    
+
     if (!state.trim()) {
       Alert.alert('Error', 'Please enter your state');
       return;
     }
-    
+
     updateData({
       parishName: parishName.trim(),
       jurisdiction,
@@ -94,179 +72,127 @@ export default function ParishDetailsScreen() {
       parishWebsite: parishWebsite.trim(),
       parishEmail: parishEmail.trim(),
     });
-    
-    router.push('/onboarding/welcome-complete');
+
+    router.push('/(auth)/onboarding/welcome-complete');
   };
 
   return (
-    <KeyboardAvoidingView 
-      className="flex-1 bg-gray-50 dark:bg-black"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView 
-          className="flex-1"
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="flex-1 px-6 pt-12 pb-8">
-        {/* Back and Title */}
-        <View className="flex-row items-center mb-6">
-          <Pressable 
-            className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
-            onPress={previousStep}
-          >
-            <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
-          </Pressable>
-          <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">Parish Details</Text>
+    <AuthScaffold>
+      <AuthHeader
+        eyebrow="Step 3 of 3"
+        title="Parish Details"
+        subtitle="Register your community on Parohia."
+        onBack={previousStep}
+      />
+
+      <OnboardingProgress step={3} />
+
+      <Reveal index={2}>
+        <Field
+          label="Parish Name"
+          required
+          placeholder="St. Mary Orthodox Church"
+          value={parishName}
+          onChangeText={setParishName}
+        />
+
+        <Field
+          label="Jurisdiction"
+          placeholder="Orthodox Church in America (OCA)"
+          value={jurisdiction}
+          onChangeText={setJurisdiction}
+        />
+
+        <View className="mb-4">
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300">
+              Street Address
+              <Text className="text-red-600 dark:text-red-400"> *</Text>
+            </Text>
+            {(address || city || state || zipCode) && (
+              <Button label="Clear" variant="ghost" size="sm" onPress={clearAddressFields} />
+            )}
+          </View>
+          <AddressAutocomplete
+            onAddressSelect={handleAddressSelect}
+            placeholder="123 Main St"
+            value={address}
+            onChangeText={setAddress}
+            onClear={clearAddressFields}
+          />
         </View>
-        
-        {/* Progress Indicator */}
-        <View className="flex-row items-center justify-between mb-8">
-          <View className="flex-1 h-1 rounded-full bg-red-600" />
-          <View className="flex-1 h-1 rounded-full mx-1 bg-red-600" />
-          <View className="flex-1 h-1 rounded-full bg-red-600" />
-        </View>
-        
-        <Text className="text-gray-900 dark:text-white text-lg font-bold mb-6">Parish Information</Text>
-        {/* Parish Form */}
-        <View className="space-y-4">
-          <View className="mb-2">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Name</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="St. Mary Orthodox Church"
-              placeholderTextColor="#9CA3AF"
-              value={parishName}
-              onChangeText={setParishName}
-            />
+
+        <View className="flex-row">
+          <View className="flex-1 mr-2">
+            <Field label="City" required placeholder="Portland" value={city} onChangeText={setCity} />
           </View>
-          
-          <View className="mb-2">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Jurisdiction</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="Orthodox Church in America (OCA)"
-              placeholderTextColor="#9CA3AF"
-              value={jurisdiction}
-              onChangeText={setJurisdiction}
-            />
-          </View>
-          
-          <View className="">
-            <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-gray-900 dark:text-white text-sm font-medium">Street Address</Text>
-              {(address || city || state || zipCode) && (
-                <Pressable
-                  onPress={clearAddressFields}
-                  className="px-2 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 active:opacity-70"
-                >
-                  <Text className="text-xs text-gray-900 dark:text-white opacity-70">Clear</Text>
-                </Pressable>
-              )}
-            </View>
-            <AddressAutocomplete
-              onAddressSelect={handleAddressSelect}
-              placeholder="123 Main St"
-              className="mb-2"
-              value={address}
-              onChangeText={setAddress}
-              onClear={clearAddressFields}
-            />
-          </View>
-          
-          <View className="flex-row space-x-3 mb-2">
-            <View className="flex-1 mr-2">
-              <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">City</Text>
-              <TextInput
-                className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-                placeholder="Portland"
-                placeholderTextColor="#9CA3AF"
-                value={city}
-                onChangeText={setCity}
-              />
-            </View>
-            <View className="flex-1">
-              <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">State</Text>
-              <TextInput
-                className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-                placeholder="OR"
-                placeholderTextColor="#9CA3AF"
-                value={state}
-                onChangeText={setState}
-                maxLength={2}
-                autoCapitalize="characters"
-              />
-            </View>
-          </View>
-          
-          <View className="mb-2">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">ZIP Code</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="97201"
-              placeholderTextColor="#9CA3AF"
-              value={zipCode}
-              onChangeText={setZipCode}
-              keyboardType="numeric"
-              maxLength={10}
-            />
-          </View>
-          
-          <View className="mb-2">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Phone Number (Optional)</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="(503) 123-4567"
-              placeholderTextColor="#9CA3AF"
-              value={parishPhoneNumber}
-              onChangeText={setParishPhoneNumber}
-              keyboardType="phone-pad"
-            />
-          </View>
-          
-          <View className="mb-2">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Website (Optional)</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="https://www.stmaryorthodox.org"
-              placeholderTextColor="#9CA3AF"
-              value={parishWebsite}
-              onChangeText={setParishWebsite}
-              keyboardType="url"
-              autoCapitalize="none"
-            />
-          </View>
-          
-          <View className="mb-2">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Parish Email (Optional)</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="info@stmaryorthodox.org"
-              placeholderTextColor="#9CA3AF"
-              value={parishEmail}
-              onChangeText={setParishEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
+          <View className="w-24">
+            <Field
+              label="State"
+              required
+              placeholder="OR"
+              value={state}
+              onChangeText={setState}
+              maxLength={2}
+              autoCapitalize="characters"
             />
           </View>
         </View>
-        
-        <Text className="text-xs text-gray-900 dark:text-white opacity-70 mt-6 mb-6">
-          Your parish will need to be verified before you can fully access administrator features. We'll guide you through this process after registration.
-        </Text>
-        
-        <Pressable
-          className="w-full py-3.5 rounded-xl text-white font-medium bg-red-600 shadow-md mb-8 active:opacity-70"
+
+        <Field
+          label="ZIP Code"
+          placeholder="97201"
+          value={zipCode}
+          onChangeText={setZipCode}
+          keyboardType="numeric"
+          maxLength={10}
+        />
+
+        <Field
+          label="Parish Phone"
+          helper="Optional"
+          placeholder="(503) 123-4567"
+          value={parishPhoneNumber}
+          onChangeText={setParishPhoneNumber}
+          keyboardType="phone-pad"
+        />
+
+        <Field
+          label="Parish Website"
+          helper="Optional"
+          placeholder="https://www.stmaryorthodox.org"
+          value={parishWebsite}
+          onChangeText={setParishWebsite}
+          keyboardType="url"
+          autoCapitalize="none"
+        />
+
+        <Field
+          label="Parish Email"
+          helper="Optional"
+          placeholder="info@stmaryorthodox.org"
+          value={parishEmail}
+          onChangeText={setParishEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        <View className="rounded-3xl p-4 mb-6 bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20">
+          <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300">
+            Your parish will need to be verified before you can fully access administrator features.
+            We'll guide you through this after registration.
+          </Text>
+        </View>
+
+        <Button
+          label="Complete Registration"
+          icon="checkmark-circle-outline"
+          size="lg"
+          fullWidth
           onPress={handleComplete}
-        >
-          <Text className="text-white font-medium text-center">Complete Registration</Text>
-        </Pressable>
-          </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+          className="mb-4"
+        />
+      </Reveal>
+    </AuthScaffold>
   );
-} 
+}

@@ -1,27 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from 'nativewind';
 import { useState } from 'react';
-import {
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  ScrollView,
-  Switch,
-  Text,
-  TextInput,
-  Pressable,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import { Alert, Linking, Text, View } from 'react-native';
+import { AuthHeader, AuthScaffold, OnboardingProgress } from '../../../components/auth/AuthChrome';
+import { Button } from '../../../components/ui/Button';
+import { Field } from '../../../components/ui/Field';
+import { PressableScale } from '../../../components/ui/PressableScale';
+import { Reveal } from '../../../components/ui/Reveal';
 import { useOnboarding } from '../../../contexts/OnboardingContext';
 
 export default function UserInfoScreen() {
   const { data, updateData, nextStep, previousStep } = useOnboarding();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  
   const [fullName, setFullName] = useState(data.fullName || '');
   const [phoneNumber, setPhoneNumber] = useState(data.phoneNumber || '');
   const [termsAccepted, setTermsAccepted] = useState(data.termsAccepted || false);
@@ -31,107 +19,90 @@ export default function UserInfoScreen() {
       Alert.alert('Error', 'Please enter your full name');
       return;
     }
-    
+
     if (!termsAccepted) {
       Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy');
       return;
     }
-    
+
     updateData({
       fullName: fullName.trim(),
       phoneNumber: phoneNumber.trim(),
       termsAccepted,
     });
-    
+
     nextStep();
   };
 
   return (
-    <KeyboardAvoidingView 
-      className="flex-1 bg-gray-50 dark:bg-black"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView 
-          className="flex-1"
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <AuthScaffold>
+      <AuthHeader
+        eyebrow="Step 2 of 3"
+        title="Your Information"
+        subtitle="Tell us a little about yourself."
+        onBack={previousStep}
+      />
+
+      <OnboardingProgress step={2} />
+
+      <Reveal index={2}>
+        <Field
+          label="Full Name"
+          required
+          placeholder="John Doe"
+          value={fullName}
+          onChangeText={setFullName}
+          autoCapitalize="words"
+          autoCorrect={false}
+          textContentType="name"
+        />
+
+        <Field
+          label="Phone Number"
+          helper="Optional — used by your parish if they need to reach you."
+          placeholder="(503) 123-4567"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+        />
+
+        <PressableScale
+          onPress={() => setTermsAccepted((v) => !v)}
+          haptic
+          className="flex-row items-start mb-6 mt-1"
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: termsAccepted }}
         >
-          <View className="flex-1 px-6 pt-12 pb-8">
-        {/* Back and Title */}
-        <View className="flex-row items-center mb-6">
-          <Pressable 
-            className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:opacity-70"
-            onPress={previousStep}
+          <View
+            className={`h-6 w-6 rounded-lg items-center justify-center mr-3 mt-0.5 border ${
+              termsAccepted
+                ? 'bg-red-600 border-red-600'
+                : 'bg-gray-100 dark:bg-white/5 border-gray-300 dark:border-white/15'
+            }`}
           >
-            <Ionicons name="arrow-back" size={16} color={isDark ? 'white' : '#374151'} />
-          </Pressable>
-          <Text className="ml-4 text-xl font-bold text-gray-900 dark:text-white">Create Account</Text>
-        </View>
-        
-        {/* Progress Indicator */}
-        <View className="flex-row items-center justify-between mb-8">
-          <View className="flex-1 h-1 rounded-full bg-red-600" />
-          <View className="flex-1 h-1 rounded-full mx-1 bg-red-600" />
-          <View className="flex-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
-        </View>
-        
-        <Text className="text-gray-900 dark:text-white text-lg font-bold mb-6">Your Information</Text>
-        
-        {/* User Information Form */}
-        <View className="flex-1">
-          <View className="mb-4">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Full Name</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="John Doe"
-              placeholderTextColor="#9CA3AF"
-              value={fullName}
-              onChangeText={setFullName}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
+            {termsAccepted ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
           </View>
-          
-          <View className="mb-4">
-            <Text className="text-gray-900 dark:text-white text-sm font-medium mb-2">Phone Number (Optional)</Text>
-            <TextInput
-              className="w-full py-3 px-4 rounded-xl text-gray-900 dark:text-white font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              placeholder="(503) 123-4567"
-              placeholderTextColor="#9CA3AF"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              keyboardType="phone-pad"
-            />
-          </View>
-          
-          <View className="flex-row items-center mb-6">
-            <Switch
-              value={termsAccepted}
-              onValueChange={setTermsAccepted}
-              trackColor={{ false: isDark ? '#374151' : '#D1D5DB', true: '#ff0000' }}
-              thumbColor={termsAccepted ? '#ffffff' : '#9ca3af'}
-            />
-            <Text className="text-xs text-gray-900 dark:text-white opacity-70 ml-3 flex-1">
-              I agree to the{' '}
-              <Text className="text-blue-400" onPress={() => Linking.openURL('https://parohia.app/terms')}>Terms of Service</Text>
-              {' '}and{' '}
-              <Text className="text-blue-400" onPress={() => Linking.openURL('https://parohia.app/privacy')}>Privacy Policy</Text>
+          <Text className="flex-1 font-sans text-[13px] leading-[20px] text-gray-600 dark:text-gray-300">
+            I agree to the{' '}
+            <Text
+              className="text-red-600 dark:text-red-400 font-sans-semibold"
+              onPress={() => Linking.openURL('https://parohia.app/terms')}
+            >
+              Terms of Service
             </Text>
-          </View>
-          
-          <Pressable
-            className="w-full py-3.5 rounded-xl text-white font-medium bg-red-600 shadow-md mt-4 active:opacity-70"
-            onPress={handleContinue}
-          >
-            <Text className="text-white font-medium text-center">Continue</Text>
-          </Pressable>
-        </View>
-          </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+            {' '}and{' '}
+            <Text
+              className="text-red-600 dark:text-red-400 font-sans-semibold"
+              onPress={() => Linking.openURL('https://parohia.app/privacy')}
+            >
+              Privacy Policy
+            </Text>
+          </Text>
+        </PressableScale>
+
+        <Button label="Continue" icon="arrow-forward" size="lg" fullWidth onPress={handleContinue} />
+      </Reveal>
+    </AuthScaffold>
   );
-} 
+}

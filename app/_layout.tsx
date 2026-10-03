@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PortalHost } from "../components/ui/Portal";
+import { preloadBrandAssets } from "../constants/assets";
 import { AuthProvider } from "../contexts/AuthContext";
 import { CalendarTraditionProvider } from "../contexts/CalendarTraditionContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
@@ -58,19 +59,31 @@ function InitialLoadingScreen() {
 
   useEffect(() => {
     if (!fontsReady) return;
-    const hideSplashScreen = async () => {
+
+    let cancelled = false;
+
+    const prepare = async () => {
+      try {
+        await preloadBrandAssets();
+      } catch (error) {
+        console.warn('Error preloading brand assets:', error);
+      }
+
+      if (cancelled) return;
+
       try {
         await SplashScreen.hideAsync();
-        setAppIsReady(true);
       } catch (error) {
         console.warn('Error hiding splash screen:', error);
-        setAppIsReady(true);
       }
+
+      if (!cancelled) setAppIsReady(true);
     };
 
-    // Hide splash screen after a short delay
-    const timeoutId = setTimeout(hideSplashScreen, 1000);
-    return () => clearTimeout(timeoutId);
+    prepare();
+    return () => {
+      cancelled = true;
+    };
   }, [fontsReady]);
 
   if (!appIsReady) {
