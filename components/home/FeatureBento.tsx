@@ -15,7 +15,7 @@ const SEPTEMBER_14: LiturgicalDay = {
   weekday: "Sunday",
   title: "The Elevation of the Precious and Life-Giving Cross",
   saints: ["Repose of St. John Chrysostom, Archbishop of Constantinople"],
-  fasting: "Fast Day",
+  fasting: "Fast - Abstain from meat, fish, dairy, eggs, wine, and oil",
   fastingKind: "strict",
 };
 
@@ -193,6 +193,8 @@ function RemindersTile({
 }) {
   const id = useId();
   const notify = useDelayed(on, on ? 450 : 150);
+  // Hold paused until cards exit; clear it as soon as reminders turn on so it can ease out before they return.
+  const showPaused = useDelayed(!on && !notify, on ? 0 : 280);
   const delayedSlot = useDelayed(booked, 650);
   // A stale slot's reminder clears the moment the booking changes; only the new one waits.
   const notifiedSlot = delayedSlot === booked ? delayedSlot : null;
@@ -237,8 +239,16 @@ function RemindersTile({
           {notify && (
             <Notification key={`paraklesis-${notifiedLead}`} title="Paraklesis to St. John the Baptist" body={`Starts in ${LEAD_TEXT[notifiedLead]}`} />
           )}
-          {!notify && (
-            <motion.p key="off" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-6 text-center font-sans text-[13px] text-gray-500">
+          {showPaused && (
+            <motion.p
+              key="off"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4, transition: { duration: 0.28, ease: EASE } }}
+              transition={{ duration: 0.28, ease: EASE }}
+              className="flex items-center justify-center gap-1.5 pt-6 font-sans text-[13px] text-gray-500"
+            >
+              <Icon name="notifications-off-outline" size={15} color={palette.gray400} />
               Reminders paused
             </motion.p>
           )}

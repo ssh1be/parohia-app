@@ -588,15 +588,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
         initial={false}
         animate={{ opacity: outlined ? 1 : 0 }}
         transition={{ duration: 0.35 }}
-      >
-        {!reduce && (
-          <motion.span
-            className="absolute -inset-px rounded-[13px] border border-brand-red"
-            animate={{ opacity: [0.35, 0], scale: [1, 1.06] }}
-            transition={{ duration: 2.4, ease: "easeOut", repeat: Infinity }}
-          />
-        )}
-      </motion.div>
+      />
 
       <motion.svg
         aria-hidden

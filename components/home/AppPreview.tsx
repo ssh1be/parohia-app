@@ -223,26 +223,32 @@ function StaticPreview() {
   const step = (delta: number) => setTab(ORDER[(ORDER.indexOf(tab) + delta + ORDER.length) % ORDER.length]);
   return (
     <>
-      <div className="relative flex w-full justify-center lg:hidden">
-        <PhoneScreen tab={tab} onTab={setTab} className="[--s:0.85]" />
-        <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 flex w-[min(calc(100vw-0.5rem),calc(410px*0.85+7rem))] -translate-x-1/2 items-center justify-between">
-          <button
-            type="button"
-            aria-label="Previous screen"
-            onClick={() => step(-1)}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-800 shadow-[0_8px_20px_-12px_rgba(9,9,11,0.45)] outline-none transition active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/60 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100"
-          >
-            <Icon name="chevron-back" size={18} />
-          </button>
-          <button
-            type="button"
-            aria-label="Next screen"
-            onClick={() => step(1)}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-800 shadow-[0_8px_20px_-12px_rgba(9,9,11,0.45)] outline-none transition active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/60 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100"
-          >
-            <Icon name="chevron-forward" size={18} />
-          </button>
+      <div className="flex w-full flex-col items-center lg:hidden">
+        <div className="relative flex w-full justify-center">
+          <PhoneScreen tab={tab} onTab={setTab} className="[--s:0.85]" />
+          <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 flex w-[min(calc(100vw-0.5rem),calc(410px*0.85+7rem))] -translate-x-1/2 items-center justify-between">
+            <button
+              type="button"
+              aria-label="Previous screen"
+              onClick={() => step(-1)}
+              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-800 shadow-[0_8px_20px_-12px_rgba(9,9,11,0.45)] outline-none transition active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/60 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <Icon name="chevron-back" size={18} />
+            </button>
+            <button
+              type="button"
+              aria-label="Next screen"
+              onClick={() => step(1)}
+              className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-800 shadow-[0_8px_20px_-12px_rgba(9,9,11,0.45)] outline-none transition active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/60 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <Icon name="chevron-forward" size={18} />
+            </button>
+          </div>
         </div>
+        <p className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
+          <Icon name="hand-left-outline" size={15} />
+          Tap inside, or use the arrows to switch screens.
+        </p>
       </div>
       <div className="hidden items-center gap-20 lg:grid lg:grid-cols-[minmax(0,1fr)_auto]">
         <TabList tab={tab} onSelect={setTab} />

@@ -41,7 +41,7 @@ export const SEPTEMBER_10: LiturgicalDay = {
   weekday: "Wednesday",
   title: "Wednesday of the 13th Week after Pentecost",
   saints: ["Martyrs Menodora, Metrodora, and Nymphodora at Nicomedia (305-311)", "Apostles Apelles, Lucius, and Clement of the Seventy"],
-  fasting: "Fast Day",
+  fasting: "Fast - Abstain from meat, fish, dairy, eggs, wine, and oil",
   fastingKind: "strict",
   parish: [
     { id: "bible", kind: "parish", title: "Bible Study: Gospel of St. Matthew", time: "10:00 AM - 11:00 AM", meta: "Fellowship Hall", reminder: true },

@@ -23,7 +23,12 @@ import {
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const FASTING_TEXT = { none: "No Fast", fish: "Fast Day (Fish Allowed)", wine: "Fast Day (Wine and Oil Allowed)", strict: "Fast Day" } as const;
+const FASTING_TEXT = {
+  none: "No Fast",
+  fish: "Fast Day (Fish Allowed)",
+  wine: "Fast Day (Wine and Oil Allowed)",
+  strict: "Fast - Abstain from meat, fish, dairy, eggs, wine, and oil",
+} as const;
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
