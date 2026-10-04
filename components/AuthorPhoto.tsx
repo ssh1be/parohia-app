@@ -18,8 +18,9 @@ export default function AuthorPhoto({ src, alt, fallbackSrc, className }: Author
       src={currentSrc}
       alt={alt}
       width={800}
-      height={800}
-      sizes="(min-width: 768px) 320px, 256px"
+      height={1000}
+      sizes="(min-width: 768px) 384px, min(100vw - 48px, 384px)"
+      quality={90}
       priority
       className={className}
       onError={() => {
