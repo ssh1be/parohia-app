@@ -338,8 +338,8 @@ export function TabBar({ active, onChange, spot }: { active: TabKey; onChange?: 
   const id = useId();
   return (
     <>
-      {/* Lives with the tab bar so screen transitions cannot trap the bar under the frame blur. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] h-[130px] bg-gradient-to-t from-gray-50/90 from-25% to-gray-50/0 backdrop-blur-md [clip-path:inset(0_round_0_0_56px_56px)] [mask-image:linear-gradient(to_top,black_45%,transparent)] dark:from-black/90 dark:to-black/0" />
+      {/* Paired with the tab bar so transitions keep the bar above the fade, clipped by the screen. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] h-[130px] overflow-hidden bg-gradient-to-t from-gray-50/90 from-25% to-gray-50/0 backdrop-blur-md [mask-image:linear-gradient(to_top,black_45%,transparent)] dark:from-black/90 dark:to-black/0" />
       <div data-tabbar className="absolute inset-x-4 bottom-[34px] z-20 rounded-[26px] shadow-[0_10px_24px_rgba(3,7,18,0.10)] dark:shadow-[0_10px_24px_rgba(0,0,0,0.4)]" data-spot={spot}>
         <div className="glass relative flex h-16 overflow-hidden rounded-[26px] border border-white/70 px-1.5 dark:border-white/[0.14]">
           <div className="pointer-events-none absolute inset-0 rounded-[26px] bg-gradient-to-b from-white/50 via-white/10 to-transparent dark:from-white/10 dark:via-white/[0.02]" />
