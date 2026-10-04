@@ -37,7 +37,10 @@ export function PhoneFrame({ children, className = "", screenRef, statusTone = "
         >
           {children}
           {statusTone === "auto" && (
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] h-[62px] bg-gradient-to-b from-gray-50 from-50% to-gray-50/0 dark:from-black dark:to-black/0" />
+            <>
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] h-[62px] bg-gradient-to-b from-gray-50 from-50% to-gray-50/0 dark:from-black dark:to-black/0" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] h-[130px] bg-gradient-to-t from-gray-50/90 from-25% to-gray-50/0 backdrop-blur-md [clip-path:inset(0_round_0_0_56px_56px)] [mask-image:linear-gradient(to_top,black_45%,transparent)] dark:from-black/90 dark:to-black/0" />
+            </>
           )}
           <StatusBar tone={statusTone} />
           <div className="pointer-events-none absolute left-1/2 top-[11px] z-40 h-[35px] w-[122px] -translate-x-1/2 rounded-full bg-black" />

@@ -94,7 +94,7 @@ function PhoneScreen({ tab, onTab, className = "" }: { tab: TabKey; onTab: (tab:
           animate="center"
           exit="exit"
           transition={{ duration: 0.22, ease: [0.42, 0, 0.58, 1] }}
-          className="absolute inset-0 overflow-hidden bg-gray-50 dark:bg-black"
+          className="absolute inset-0 bg-gray-50 dark:bg-black"
         >
           {screen}
         </motion.div>

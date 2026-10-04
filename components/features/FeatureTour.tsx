@@ -465,7 +465,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: direction * -48 }}
                 transition={{ duration: 0.42, ease: EASE }}
-                className="absolute inset-0 overflow-hidden bg-gray-50 dark:bg-black"
+                className="absolute inset-0 bg-gray-50 dark:bg-black"
               >
                 {screens[screenIndex].render()}
               </motion.div>
