@@ -19,7 +19,7 @@ export function FeatureChapters() {
         <FeatureTour
           pinned={pinned}
           id="calendar-schedule"
-          title="The Church year and your parish, on one calendar"
+          title="The liturgical year and your parish, on one calendar"
           intro="Feasts, fasts, and saints sit right alongside your parish's own services, so every day reads at a glance."
           screens={[{ label: "Calendar", render: () => <CalendarScreen day={SEPTEMBER_10} /> }]}
           notes={[

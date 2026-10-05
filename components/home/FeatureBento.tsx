@@ -3,21 +3,11 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Icon } from "../Icon";
-import { AUGUST_30, SEPTEMBER_10, type LiturgicalDay } from "../phone/data";
+import { AUGUST_30, SEPTEMBER_10, SEPTEMBER_14, PARISH } from "../phone/data";
 import { PostCard, POSTS } from "../phone/screens/EventsScreen";
 import { palette, snappySpring } from "../phone/tokens";
 import { FastingBadge, Pressable, Switch } from "../phone/ui";
 import { Reveal } from "../Reveal";
-
-const SEPTEMBER_14: LiturgicalDay = {
-  ...SEPTEMBER_10,
-  day: 14,
-  weekday: "Sunday",
-  title: "The Elevation of the Precious and Life-Giving Cross",
-  saints: ["Repose of St. John Chrysostom, Archbishop of Constantinople"],
-  fasting: "Fast - Abstain from meat, fish, dairy, eggs, wine, and oil",
-  fastingKind: "strict",
-};
 
 const DAYS = [
   { label: "Sat 30", day: AUGUST_30 },
@@ -93,7 +83,7 @@ const PASSAGES = [
   {
     kind: "Epistle",
     display: "1 Corinthians 1:26-29",
-    text: "For ye see your calling, brethren, how that not many wise men after the flesh, not many mighty, not many noble, are called.",
+    text: "For ye see your calling, brethren, how that not many wise men after the flesh, not many mighty, not many noble, are called...",
   },
   {
     kind: "Gospel",
@@ -232,7 +222,7 @@ function RemindersTile({
           {notify && notifiedSlot && (
             <Notification
               key={`confession-${notifiedSlot}-${notifiedLead}`}
-              title="Confession with Fr. Gabriel Agoston"
+              title={`Confession with ${PARISH.priest}`}
               body={`Starts in ${LEAD_TEXT[notifiedLead]}, at ${notifiedSlot} AM`}
             />
           )}
@@ -308,7 +298,7 @@ function ParishLifeTile({ slot, onSlot, remindersOn }: { slot: string | null; on
               <>
                 <Icon name={remindersOn ? "notifications" : "checkmark-circle"} size={14} color={palette.green} />
                 <span className="ml-1.5">
-                  Booked {slot} AM{remindersOn ? ", reminder set" : " with Fr. Gabriel"}
+                  Booked {slot} AM{remindersOn ? ", reminder set" : ` with ${PARISH.priestShort}`}
                 </span>
               </>
             ) : (

@@ -82,7 +82,7 @@ export function ParishScreen({ onTab }: { onTab?: (tab: TabKey) => void }) {
         <Rise i={3} className="mt-7 px-5">
           <SectionHeader title="Clergy" />
           <div className="flex items-center rounded-3xl border border-gray-100 bg-white p-5 dark:border-white/[0.06] dark:bg-white/[0.04]">
-            <span className="mr-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-600/10 font-display text-[22px] text-red-600 dark:text-red-400">GA</span>
+            <span className="mr-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-600/10 font-display text-[22px] text-red-600 dark:text-red-400">{PARISH.priestInitials}</span>
             <span className="flex-1">
               <span className="block font-display text-[22px] leading-[26px] text-gray-900 dark:text-white">{PARISH.priest}</span>
               <span className="mt-0.5 block font-sans-medium text-xs text-gray-500 dark:text-gray-400">Parish priest</span>

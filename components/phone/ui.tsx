@@ -187,38 +187,42 @@ export function SegmentedControl<T extends string>({
   onChange?: (value: T) => void;
   className?: string;
 }) {
-  const id = useId();
+  const index = Math.max(0, segments.findIndex((segment) => segment.key === value));
+  const count = segments.length;
+
   return (
     <div role="tablist" className={`flex h-11 rounded-full bg-gray-200/70 p-1 dark:bg-white/[0.07] ${className}`}>
-      {segments.map((segment) => {
-        const active = segment.key === value;
-        return (
-          <button
-            key={segment.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange?.(segment.key)}
-            className="relative flex flex-1 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
-          >
-            {active && (
-              <motion.span
-                layoutId={`segment-${id}`}
-                transition={snappySpring}
-                className="absolute inset-0 rounded-full bg-white shadow-[0_2px_6px_rgba(17,24,39,0.08)] dark:bg-gray-800 dark:shadow-none"
-              />
-            )}
-            <span className="relative flex items-center">
-              {segment.icon && (
-                <Icon name={segment.icon} size={15} color={active ? palette.accent : undefined} className={`mr-1.5 ${active ? "" : "text-gray-500 dark:text-gray-400"}`} />
-              )}
-              <span className={`font-sans-semibold text-[13px] ${active ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>
-                {segment.label}
+      <div className="relative flex min-w-0 flex-1">
+        <motion.span
+          aria-hidden
+          className="absolute inset-y-0 rounded-full bg-white shadow-[0_2px_6px_rgba(17,24,39,0.08)] dark:bg-gray-800 dark:shadow-none"
+          initial={false}
+          animate={{ left: `${(index / count) * 100}%`, width: `${100 / count}%` }}
+          transition={snappySpring}
+        />
+        {segments.map((segment) => {
+          const active = segment.key === value;
+          return (
+            <button
+              key={segment.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange?.(segment.key)}
+              className="relative z-10 flex flex-1 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+            >
+              <span className="relative flex items-center">
+                {segment.icon && (
+                  <Icon name={segment.icon} size={15} color={active ? palette.accent : undefined} className={`mr-1.5 ${active ? "" : "text-gray-500 dark:text-gray-400"}`} />
+                )}
+                <span className={`font-sans-semibold text-[13px] ${active ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>
+                  {segment.label}
+                </span>
               </span>
-            </span>
-          </button>
-        );
-      })}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -297,6 +297,9 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     if (!container || !screen) return;
     const observer = new ResizeObserver(() => track(200));
     observer.observe(container);
+    // Re-aim when interactive spots remount (e.g. volunteer button → progress bar after submit).
+    const mutations = new MutationObserver(() => track(500));
+    mutations.observe(screen, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-spot"] });
     let pending = 0;
     const onScroll = () => {
       engagePhone(false);
@@ -312,6 +315,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     document.fonts?.ready.then(() => track(200));
     return () => {
       observer.disconnect();
+      mutations.disconnect();
       screen.removeEventListener("scroll", onScroll, { capture: true });
       screen.removeEventListener("pointerup", onPointerUp);
       if (pending) cancelAnimationFrame(pending);

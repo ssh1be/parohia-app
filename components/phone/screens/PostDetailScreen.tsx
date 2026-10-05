@@ -46,7 +46,7 @@ export function PostDetailScreen() {
           <p className="font-sans text-[16px] leading-[25px] text-gray-700 dark:text-gray-200">{post.description}</p>
           <div className="mt-5 overflow-hidden rounded-2xl bg-gray-50 dark:bg-white/[0.04]">
             {[
-              { icon: "calendar-outline" as const, text: "Saturday, August 30, 2025" },
+              { icon: "calendar-outline" as const, text: "Sunday, August 30, 2026" },
               { icon: "time-outline" as const, text: post.time! },
               { icon: "location-outline" as const, text: post.location! },
             ].map((row, i) => (
@@ -56,10 +56,13 @@ export function PostDetailScreen() {
               </div>
             ))}
           </div>
-          <p className="mb-2 mt-4 font-sans text-xs text-gray-400 dark:text-gray-500">Posted August 27, 2025 at 4:13 PM</p>
+          <p className="mb-2 mt-4 font-sans text-xs text-gray-400 dark:text-gray-500">Posted August 27, 2026 at 4:13 PM</p>
 
           <div className="mt-2 border-t border-gray-100 pt-4 dark:border-white/[0.06]">
-            <div data-spot="volunteer-progress" className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.08] p-4">
+            <div
+              data-spot={sent ? "volunteer-toggle" : "volunteer-progress"}
+              className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.08] p-4"
+            >
               <div className="flex items-end justify-between">
                 <div>
                   <p className="font-sans-semibold text-xs text-emerald-700 dark:text-emerald-400">Volunteers</p>
