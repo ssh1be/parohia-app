@@ -14,7 +14,7 @@ export function LockScreen() {
       <div className="relative flex flex-col items-center pt-[84px] text-white">
         <Icon name="lock-closed" size={20} className="opacity-90" />
         <p className="mt-3 font-sans-semibold text-[21px] text-white/85">Sunday, August 30</p>
-        <p className="-mt-1 font-sans-bold text-[104px] leading-[1.05] tracking-[-4px]">8:12</p>
+        <p className="-mt-1 font-sans-bold text-[104px] leading-[1.05] tracking-[-4px]">9:41</p>
       </div>
 
       <div className="absolute inset-x-3 bottom-[118px] space-y-2">
