@@ -1,16 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
+import { Keyboard, ScrollView, Text, TextInput, View } from 'react-native';
 import { AuthHeader, AuthScaffold, OnboardingProgress } from '../../../components/auth/AuthChrome';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { PressableScale } from '../../../components/ui/PressableScale';
 import { Reveal } from '../../../components/ui/Reveal';
+import { Spinner } from '../../../components/ui/Spinner';
 import { useThemeColors } from '../../../components/ui/useThemeColors';
 import { palette } from '../../../constants/theme';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useOnboarding } from '../../../contexts/OnboardingContext';
-import { getParishes } from '../../../services/onboardingService';
+import { NO_PARISH_ID } from '../../../constants/parishes';
+import { getParishes, getUserProfile } from '../../../services/onboardingService';
+import { filterParishesBySearch } from '../../../utils/parishSearch';
 
 interface Parish {
   id: string;
@@ -22,12 +26,14 @@ interface Parish {
 
 export default function ParishSelectionScreen() {
   const { data, updateData, previousStep } = useOnboarding();
+  const { user } = useAuth();
   const colors = useThemeColors();
   const [searchQuery, setSearchQuery] = useState('');
   const [parishes, setParishes] = useState<Parish[]>([]);
   const [loading, setLoading] = useState(true);
   const [focused, setFocused] = useState(false);
   const [selectedParishId, setSelectedParishId] = useState(data.selectedParishId || '');
+  const [isRejoin, setIsRejoin] = useState(false);
 
   useEffect(() => {
     const fetchParishes = async () => {
@@ -45,20 +51,41 @@ export default function ParishSelectionScreen() {
     fetchParishes();
   }, []);
 
+  // Members whose parish was deleted land here with an existing profile — hydrate context.
+  useEffect(() => {
+    const hydrateFromProfile = async () => {
+      if (!user || (data.fullName && data.userType)) return;
+      const profile = await getUserProfile(user.id);
+      if (!profile) return;
+      setIsRejoin(true);
+      updateData({
+        fullName: profile.full_name,
+        userType: profile.user_type,
+        phoneNumber: profile.phone_number || undefined,
+        email: profile.email || undefined,
+      });
+    };
+    hydrateFromProfile();
+  }, [user]);
+
   const handleComplete = () => {
-    updateData({ selectedParishId });
+    updateData({
+      selectedParishId,
+      userType: data.userType || 'regular_user',
+    });
     router.push('/(auth)/onboarding/welcome-complete');
   };
 
   const handleSkip = () => {
+    // Assign sentinel "No Parish" so auth routing doesn't bounce back to this screen.
+    updateData({
+      selectedParishId: NO_PARISH_ID,
+      userType: data.userType || 'regular_user',
+    });
     router.push('/(auth)/onboarding/welcome-complete');
   };
 
-  const filteredParishes = parishes.filter(
-    (parish) =>
-      parish.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `${parish.city}, ${parish.state}`.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredParishes = filterParishesBySearch(parishes, searchQuery);
 
   return (
     <AuthScaffold
@@ -95,22 +122,28 @@ export default function ParishSelectionScreen() {
       }
     >
       <AuthHeader
-        eyebrow="Step 3 of 3"
+        eyebrow={isRejoin ? 'Choose a parish' : 'Step 3 of 3'}
         title="Find Your Parish"
-        subtitle="Connect with your local Orthodox community."
-        onBack={previousStep}
+        subtitle={
+          isRejoin
+            ? 'Your previous parish is no longer available. Select a new one to continue.'
+            : 'Connect with your local Orthodox community.'
+        }
+        onBack={isRejoin ? undefined : previousStep}
       />
 
-      <OnboardingProgress step={3} />
+      {!isRejoin && <OnboardingProgress step={3} />}
 
       <Reveal index={2}>
         <View className="relative mb-4">
           <View
-            className={`flex-row items-center h-12 rounded-2xl bg-gray-100 dark:bg-white/5 border px-4 ${
-              focused ? 'border-red-500/70' : 'border-transparent dark:border-white/5'
+            className={`flex-row items-center h-12 rounded-full px-4 ${
+              focused
+                ? 'bg-gray-100/90 dark:bg-white/[0.08] border border-red-500/40'
+                : 'bg-gray-100/70 dark:bg-white/[0.05] border border-transparent'
             }`}
           >
-            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <Ionicons name="search" size={17} color={colors.textMuted} />
             <TextInput
               className="flex-1 font-sans text-[15px] text-gray-900 dark:text-white ml-2.5"
               placeholder="Search by name or location"
@@ -120,6 +153,7 @@ export default function ParishSelectionScreen() {
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               autoCorrect={false}
+              autoCapitalize="none"
             />
             {searchQuery.length > 0 && (
               <PressableScale onPress={() => setSearchQuery('')} haptic>
@@ -133,7 +167,7 @@ export default function ParishSelectionScreen() {
       <Reveal index={3} style={{ flex: 1, minHeight: 0 }}>
         {loading ? (
           <View className="flex-row items-center justify-center py-10">
-            <ActivityIndicator color={colors.textMuted} size="small" />
+            <Spinner size="sm" />
             <Text className="font-sans-medium text-[13px] text-gray-500 dark:text-gray-400 ml-2">
               Loading parishes…
             </Text>
@@ -156,14 +190,18 @@ export default function ParishSelectionScreen() {
           <ScrollView
             className="flex-1"
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="on-drag"
           >
             {filteredParishes.map((parish) => {
               const selected = selectedParishId === parish.id;
               return (
                 <PressableScale
                   key={parish.id}
-                  onPress={() => setSelectedParishId(parish.id)}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setSelectedParishId(parish.id);
+                  }}
                   haptic
                   className={`mb-2.5 rounded-3xl p-4 border ${
                     selected
@@ -177,23 +215,25 @@ export default function ParishSelectionScreen() {
                         <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">
                           {parish.name}
                         </Text>
-                        {parish.is_verified && (
-                          <View className="flex-row items-center ml-2">
-                            <Ionicons name="checkmark-circle" size={14} color={palette.green} />
-                            <Text className="font-sans-semibold text-[11px] text-emerald-600 dark:text-emerald-400 ml-1">
-                              Verified
-                            </Text>
-                          </View>
+                        {parish.is_verified ? (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={14}
+                            color={palette.green}
+                            style={{ marginLeft: 6 }}
+                          />
+                        ) : (
+                          <Ionicons
+                            name="alert-circle"
+                            size={14}
+                            color={palette.amber}
+                            style={{ marginLeft: 6 }}
+                          />
                         )}
                       </View>
                       <Text className="font-sans text-[13px] text-gray-500 dark:text-gray-400 mt-1">
                         {parish.city}, {parish.state}
                       </Text>
-                      {!parish.is_verified && (
-                        <Text className="font-sans-medium text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-                          Pending verification
-                        </Text>
-                      )}
                     </View>
                     <View
                       className={`h-6 w-6 rounded-full border-2 items-center justify-center ${

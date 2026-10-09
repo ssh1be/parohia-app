@@ -1,3 +1,4 @@
+import { isNoParishId } from '../constants/parishes';
 import { supabase } from '../config/supabase';
 
 export interface Parish {
@@ -49,10 +50,12 @@ export const getParishByAdminId = async (adminUserId: string): Promise<Parish | 
 // Get parish by user ID (for regular users)
 export const getParishByUserId = async (userId: string): Promise<Parish | null> => {
   try {
+    // Prefer a real parish if both a sentinel and a real connection somehow exist.
     const { data, error } = await supabase
       .from('user_parish_connections')
       .select(`
         parish_id,
+        created_at,
         parishes (
           id,
           name,
@@ -78,13 +81,20 @@ export const getParishByUserId = async (userId: string): Promise<Parish | null> 
         )
       `)
       .eq('user_id', userId)
-      .single();
+      .order('created_at', { ascending: false });
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw error;
     }
 
-    return (data?.parishes as any) || null;
+    const rows = data || [];
+    for (const row of rows) {
+      const parish = row.parishes as any;
+      if (parish && !isNoParishId(parish.id)) {
+        return parish;
+      }
+    }
+    return null;
   } catch (error: any) {
     console.error('Error fetching parish by user ID:', error);
     return null;
@@ -204,4 +214,125 @@ export const getParishCalendarId = async (userId: string): Promise<string | null
     console.error('Error getting parish calendar ID:', error);
     return null;
   }
-}; 
+};
+
+export type ParishMemberRole = 'admin' | 'manager' | 'member';
+
+export interface ParishMember {
+  user_id: string;
+  full_name: string;
+  email: string;
+  phone_number?: string | null;
+  role: ParishMemberRole;
+  joined_at?: string | null;
+}
+
+const ROLE_SORT: Record<ParishMemberRole, number> = {
+  admin: 0,
+  manager: 1,
+  member: 2,
+};
+
+/**
+ * Roster of parish members plus the parish admin.
+ * Prefer General-channel subscribers: admins can SELECT those under current RLS,
+ * while user_parish_connections is typically limited to the caller's own row.
+ * Role priority: admin > manager (any channel assignment) > member.
+ */
+export const getParishMembers = async (
+  parishId: string,
+  adminUserId: string
+): Promise<ParishMember[]> => {
+  try {
+    const joinedAtByUserId = new Map<string, string | null>();
+
+    // Connections may return only the caller's row (or none for admins) under RLS.
+    const { data: connections } = await supabase
+      .from('user_parish_connections')
+      .select('user_id, created_at')
+      .eq('parish_id', parishId);
+
+    for (const connection of connections || []) {
+      if (connection.user_id) {
+        joinedAtByUserId.set(connection.user_id, connection.created_at ?? null);
+      }
+    }
+
+    // General channel subscriptions are auto-created on join and readable by parish admins.
+    const { data: generalChannel } = await supabase
+      .from('bulletin_channels')
+      .select('id')
+      .eq('parish_id', parishId)
+      .eq('is_default', true)
+      .maybeSingle();
+
+    if (generalChannel?.id) {
+      const { data: subscriptions, error: subscriptionsError } = await supabase
+        .from('bulletin_channel_subscriptions')
+        .select('user_id, created_at')
+        .eq('channel_id', generalChannel.id);
+
+      if (subscriptionsError) {
+        throw subscriptionsError;
+      }
+
+      for (const subscription of subscriptions || []) {
+        if (subscription.user_id && !joinedAtByUserId.has(subscription.user_id)) {
+          joinedAtByUserId.set(subscription.user_id, subscription.created_at ?? null);
+        }
+      }
+    }
+
+    const { data: managerRows } = await supabase
+      .from('bulletin_channel_managers')
+      .select('user_id, bulletin_channels!inner(parish_id, is_archived)')
+      .eq('bulletin_channels.parish_id', parishId)
+      .eq('bulletin_channels.is_archived', false);
+
+    const managerUserIds = new Set(
+      (managerRows || []).map((row: any) => row.user_id).filter(Boolean) as string[]
+    );
+
+    const userIds = Array.from(
+      new Set([...joinedAtByUserId.keys(), adminUserId, ...managerUserIds])
+    );
+
+    const { data: profiles, error: profilesError } = await supabase
+      .from('user_profiles')
+      .select('id, full_name, email, phone_number')
+      .in('id', userIds);
+
+    if (profilesError) {
+      throw profilesError;
+    }
+
+    const members: ParishMember[] = (profiles || []).map((profile) => {
+      let role: ParishMemberRole = 'member';
+      if (profile.id === adminUserId) {
+        role = 'admin';
+      } else if (managerUserIds.has(profile.id)) {
+        role = 'manager';
+      }
+
+      return {
+        user_id: profile.id,
+        full_name: profile.full_name || 'Unknown',
+        email: profile.email || '',
+        phone_number: profile.phone_number ?? null,
+        role,
+        joined_at: joinedAtByUserId.get(profile.id) ?? null,
+      };
+    });
+
+    members.sort((a, b) => {
+      const roleDiff = ROLE_SORT[a.role] - ROLE_SORT[b.role];
+      if (roleDiff !== 0) return roleDiff;
+      return a.full_name.localeCompare(b.full_name);
+    });
+
+    return members;
+  } catch (error: any) {
+    console.error('Error fetching parish members:', error);
+    return [];
+  }
+};

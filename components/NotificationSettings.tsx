@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { entrance, palette } from '../constants/theme';
@@ -13,6 +13,7 @@ import { PressableScale } from './ui/PressableScale';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { SettingsGroup, SettingsHeader, SettingsRow, SettingsSwitch } from './ui/Settings';
 import { Skeleton } from './ui/Skeleton';
+import { Spinner } from './ui/Spinner';
 import { useThemeColors } from './ui/useThemeColors';
 
 export default function NotificationSettings() {
@@ -183,7 +184,7 @@ export default function NotificationSettings() {
                     )}
                   </View>
                   {updating ? (
-                    <ActivityIndicator size="small" color={colors.textMuted} style={{ marginRight: 8 }} />
+                    <Spinner size="sm" style={{ marginRight: 8 }} />
                   ) : null}
                   <SettingsSwitch
                     value={preferences.enabled}

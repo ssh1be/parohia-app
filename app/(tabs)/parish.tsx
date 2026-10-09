@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { faDiamondTurnRight } from '@fortawesome/free-solid-svg-icons/faDiamondTurnRight';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { ReactNode, useEffect, useState } from "react";
-import { Alert, Linking, Modal, Platform, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { Alert, Keyboard, Linking, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import GeneralSettings from "../../components/GeneralSettings";
@@ -13,6 +15,7 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { Field } from "../../components/ui/Field";
 import { PressableScale } from "../../components/ui/PressableScale";
 import { Reveal } from "../../components/ui/Reveal";
+import { AppRefreshControl, RefreshSpinnerOverlay } from "../../components/ui/AppRefreshControl";
 import { CompactHeader, LargeHeader, useScrollHeader } from "../../components/ui/ScreenHeader";
 import { SectionHeader } from "../../components/ui/SectionHeader";
 import { SettingsHeader } from "../../components/ui/Settings";
@@ -22,10 +25,35 @@ import { useThemeColors } from "../../components/ui/useThemeColors";
 import { supabase } from "../../config/supabase";
 import { contentBottomPadding, entrance, palette } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
+import { useParishScope } from "../../contexts/ParishScopeContext";
 import { ChannelService } from "../../services/channelService";
 import { getParishes, getUserProfile } from "../../services/onboardingService";
-import { getParishByAdminId, getParishByUserId, updateParishDonationSettings, updateParishPriestInfo } from "../../services/parishService";
+import { getParishByAdminId, getParishByUserId, getParishMembers, ParishMember, ParishMemberRole, updateParishDonationSettings, updateParishPriestInfo } from "../../services/parishService";
 import { PayPalService } from "../../services/paypalService";
+import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
+import { filterParishesBySearch } from "../../utils/parishSearch";
+
+const memberRoleStyle = (role: ParishMemberRole) => {
+  if (role === 'admin') {
+    return {
+      tint: 'rgba(239, 68, 68, 0.14)',
+      color: palette.accentSoft,
+      icon: 'shield-checkmark' as const,
+    };
+  }
+  if (role === 'manager') {
+    return {
+      tint: 'rgba(59, 130, 246, 0.14)',
+      color: palette.blue,
+      icon: 'briefcase' as const,
+    };
+  }
+  return {
+    tint: 'rgba(107, 114, 128, 0.16)',
+    color: palette.gray500,
+    icon: 'person' as const,
+  };
+};
 
 interface Parish {
   id: string;
@@ -64,7 +92,10 @@ export default function Parish() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { scrollY, onScroll } = useScrollHeader();
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  useTabScrollToTop(scrollRef);
   const { user, signOut } = useAuth();
+  const { bumpParishEpoch } = useParishScope();
   const [parish, setParish] = useState<Parish | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -114,6 +145,29 @@ export default function Parish() {
     donation_message: ''
   });
 
+  // Parish members (admin)
+  const INITIAL_VISIBLE_MEMBERS = 5;
+  const [members, setMembers] = useState<ParishMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersExpanded, setMembersExpanded] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<ParishMember | null>(null);
+  const [showMemberDetail, setShowMemberDetail] = useState(false);
+  const [copiedField, setCopiedField] = useState<'email' | 'phone' | null>(null);
+
+  const loadParishMembers = async (parishId: string, adminUserId: string) => {
+    try {
+      setMembersLoading(true);
+      const roster = await getParishMembers(parishId, adminUserId);
+      setMembers(roster);
+      setMembersExpanded(false);
+    } catch (error) {
+      console.error('Error loading parish members:', error);
+      setMembers([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
   const fetchParishData = async () => {
     if (!user) return;
     
@@ -139,8 +193,13 @@ export default function Parish() {
             email: parishData.email || '',
             parish_calendar_id: parishData.parish_calendar_id || ''
           });
+          await loadParishMembers(parishData.id, parishData.admin_user_id);
+        } else {
+          setMembers([]);
         }
       } else if (profile?.user_type === 'regular_user') {
+        setIsParishAdmin(false);
+        setMembers([]);
         const parishData = await getParishByUserId(user.id);
         setParish(parishData);
       }
@@ -168,38 +227,56 @@ export default function Parish() {
     if (!selectedParishId || !user) return;
     
     try {
-      // Remove existing connection
-      if (parish) {
-        await supabase
-          .from('user_parish_connections')
-          .delete()
-          .eq('user_id', user.id);
-      }
-      
-      // Add new connection
-      const { error } = await supabase
+      // Insert the new parish first, then remove any other connections (including the
+      // "No Parish" sentinel). Delete-then-insert orphans the user if insert fails.
+      const { data: existing, error: existingError } = await supabase
         .from('user_parish_connections')
-        .insert({
-          user_id: user.id,
-          parish_id: selectedParishId,
-        });
-      
-      if (error) throw error;
+        .select('id, parish_id')
+        .eq('user_id', user.id);
+      if (existingError) throw existingError;
 
-      // Safety net if DB trigger has not run yet
+      const alreadyLinked = (existing || []).some(
+        (row) => row.parish_id === selectedParishId
+      );
+
+      if (!alreadyLinked) {
+        const { error: insertError } = await supabase
+          .from('user_parish_connections')
+          .insert({
+            user_id: user.id,
+            parish_id: selectedParishId,
+          });
+        if (insertError) throw insertError;
+      }
+
+      const { error: deleteError } = await supabase
+        .from('user_parish_connections')
+        .delete()
+        .eq('user_id', user.id)
+        .neq('parish_id', selectedParishId);
+      if (deleteError) throw deleteError;
+
       await ChannelService.ensureGeneralSubscription(user.id, selectedParishId);
       
-      // Refresh parish data
       const newParish = await getParishByUserId(user.id);
+      if (!newParish) {
+        throw new Error('Parish connection saved but could not be loaded');
+      }
       setParish(newParish);
       setShowParishSelector(false);
       setSelectedParishId('');
       setSearchQuery('');
+      bumpParishEpoch();
       
       Alert.alert('Success', 'Parish changed successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error changing parish:', error);
-      Alert.alert('Error', 'Failed to change parish. Please try again.');
+      Alert.alert(
+        'Error',
+        error?.message
+          ? `Failed to change parish: ${error.message}`
+          : 'Failed to change parish. Please try again.'
+      );
     }
   };
 
@@ -329,14 +406,11 @@ export default function Parish() {
     try {
       setDonationEditLoading(true);
       
-      // Validate PayPal donation URL if donation is enabled
-      if (donationForm.donation_enabled && donationForm.paypal_donation_url) {
-        if (!PayPalService.validatePayPalDonationUrl(donationForm.paypal_donation_url)) {
-          Alert.alert('Error', 'Please enter a valid donation URL (e.g., https://www.paypal.com/donate/?token=...).');
-          return;
-        }
+      if (donationForm.donation_enabled && !donationForm.paypal_donation_url.trim()) {
+        Alert.alert('Error', 'Please enter a donation URL.');
+        return;
       }
-      
+
       const result = await updateParishDonationSettings(parish.id, {
         paypal_donation_url: donationForm.paypal_donation_url,
         donation_enabled: donationForm.donation_enabled,
@@ -370,10 +444,7 @@ export default function Parish() {
     }
   };
 
-  const filteredParishes = parishes.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    `${p.city}, ${p.state}`.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredParishes = filterParishesBySearch(parishes, searchQuery);
 
   const handleCall = (phoneNumber: string) => {
     if (phoneNumber) {
@@ -391,6 +462,13 @@ export default function Parish() {
     if (email) {
       Linking.openURL(`mailto:${email}`);
     }
+  };
+
+  const copyToClipboard = async (value: string, field: 'email' | 'phone') => {
+    await Clipboard.setStringAsync(value);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setCopiedField(field);
+    setTimeout(() => setCopiedField((current) => (current === field ? null : current)), 1600);
   };
 
   const handleWebsite = (website: string) => {
@@ -478,20 +556,24 @@ export default function Parish() {
     </Pressable>
   );
 
+  const hasMoreMembers = members.length > INITIAL_VISIBLE_MEMBERS;
+  const visibleMembers =
+    membersExpanded || !hasMoreMembers ? members : members.slice(0, INITIAL_VISIBLE_MEMBERS);
+
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <CompactHeader title={parish?.name || 'Parish'} scrollY={scrollY} />
+      <RefreshSpinnerOverlay refreshing={refreshing} scrollY={scrollY} top={insets.top} />
       <Animated.ScrollView
+        ref={scrollRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top, paddingBottom: contentBottomPadding(insets.bottom) }}
         refreshControl={
-          <RefreshControl
+          <AppRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.textMuted}
-            colors={[palette.accent]}
             progressViewOffset={insets.top}
           />
         }
@@ -685,44 +767,141 @@ export default function Parish() {
                 />
               )}
             </Reveal>
+
+            {/* Donations — only when a real parish is selected */}
+            <Reveal index={4} style={{ paddingHorizontal: 20, marginTop: 28 }}>
+              <SectionHeader
+                title="Support our parish"
+                actionLabel={isParishAdmin ? 'Setup' : undefined}
+                actionIcon={isParishAdmin ? 'settings-outline' : undefined}
+                onAction={isParishAdmin ? openDonationEditModal : undefined}
+              />
+              {parish.donation_enabled && parish.paypal_donation_url ? (
+                <View className="rounded-3xl overflow-hidden">
+                  <LinearGradient colors={['#DC2626', '#991B1B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 22 }}>
+                    <Ionicons name="heart" size={22} color="rgba(255,255,255,0.9)" />
+                    <Text className="font-display text-[24px] leading-[29px] text-white mt-3">
+                      {parish.donation_message || 'Support our parish with a donation'}
+                    </Text>
+                    <PressableScale
+                      onPress={handleDonate}
+                      haptic
+                      accessibilityRole="button"
+                      style={{ marginTop: 18, alignSelf: 'flex-start' }}
+                      className="h-11 px-5 rounded-full bg-white flex-row items-center"
+                    >
+                      <Text className="font-sans-bold text-[15px] text-red-700">Donate now</Text>
+                      <Ionicons name="arrow-forward" size={15} color={palette.accent} style={{ marginLeft: 6 }} />
+                    </PressableScale>
+                  </LinearGradient>
+                </View>
+              ) : (
+                <EmptyState
+                  compact
+                  icon="heart-outline"
+                  title={isParishAdmin ? 'Donations not set up yet' : 'Donations not available yet'}
+                  action={isParishAdmin ? <Button label="Set up donations" size="sm" onPress={openDonationEditModal} /> : undefined}
+                />
+              )}
+            </Reveal>
           </>
         )}
 
-        {/* Donations */}
-        {!loading && (
-          <Reveal index={4} style={{ paddingHorizontal: 20, marginTop: 28 }}>
+        {/* Parish members (admin only) */}
+        {!loading && isParishAdmin && (
+          <Reveal index={5} style={{ paddingHorizontal: 20, marginTop: 28 }}>
             <SectionHeader
-              title="Support our parish"
-              actionLabel={isParishAdmin ? 'Setup' : undefined}
-              actionIcon={isParishAdmin ? 'settings-outline' : undefined}
-              onAction={isParishAdmin ? openDonationEditModal : undefined}
+              title="Parish members"
+              caption={
+                membersLoading
+                  ? 'Loading…'
+                  : `Only visible to you · ${members.length} ${members.length === 1 ? 'member' : 'members'}`
+              }
             />
-            {parish?.donation_enabled && parish?.paypal_donation_url ? (
-              <View className="rounded-3xl overflow-hidden">
-                <LinearGradient colors={['#DC2626', '#991B1B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 22 }}>
-                  <Ionicons name="heart" size={22} color="rgba(255,255,255,0.9)" />
-                  <Text className="font-display text-[24px] leading-[29px] text-white mt-3">
-                    {parish.donation_message || 'Support our parish with a donation'}
-                  </Text>
-                  <PressableScale
-                    onPress={handleDonate}
-                    haptic
-                    accessibilityRole="button"
-                    style={{ marginTop: 18, alignSelf: 'flex-start' }}
-                    className="h-11 px-5 rounded-full bg-white flex-row items-center"
-                  >
-                    <Text className="font-sans-bold text-[15px] text-red-700">Donate now</Text>
-                    <Ionicons name="arrow-forward" size={15} color={palette.accent} style={{ marginLeft: 6 }} />
-                  </PressableScale>
-                </LinearGradient>
+            {membersLoading ? (
+              <View className="rounded-3xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden p-4">
+                {[0, 1, 2].map((i) => (
+                  <View key={i} className={`flex-row items-center ${i > 0 ? 'mt-3' : ''}`}>
+                    <Skeleton width={44} height={44} radius={22} />
+                    <View className="flex-1 ml-3">
+                      <Skeleton width="55%" height={14} />
+                      <Skeleton width="35%" height={11} className="mt-2" />
+                    </View>
+                  </View>
+                ))}
               </View>
+            ) : members.length === 0 ? (
+              <EmptyState compact icon="people-outline" title="No members yet" message="People who join your parish will appear here." />
             ) : (
-              <EmptyState
-                compact
-                icon="heart-outline"
-                title={isParishAdmin ? 'Donations not set up yet' : 'Donations not available yet'}
-                action={isParishAdmin ? <Button label="Set up donations" size="sm" onPress={openDonationEditModal} /> : undefined}
-              />
+              <>
+                <View className="rounded-3xl bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden">
+                  {visibleMembers.map((member, index) => (
+                    <Pressable
+                      key={member.user_id}
+                      onPress={() => {
+                        setSelectedMember(member);
+                        setShowMemberDetail(true);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${member.full_name}${member.user_id === user?.id ? ' (you)' : ''}, ${member.role}`}
+                      className={`flex-row items-center px-4 py-3.5 active:bg-gray-50 dark:active:bg-white/5 ${
+                        index > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
+                      }`}
+                    >
+                      <View className="h-11 w-11 rounded-full bg-red-600/10 items-center justify-center mr-3">
+                        <Text className="font-sans-bold text-[13px] text-red-600 dark:text-red-400">
+                          {initials(member.full_name) || '?'}
+                        </Text>
+                      </View>
+                        <View className="flex-1 mr-2 flex-row items-center flex-wrap" style={{ rowGap: 4, columnGap: 6 }}>
+                          <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white" numberOfLines={1}>
+                            {member.full_name}
+                            {member.user_id === user?.id ? ' (you)' : ''}
+                          </Text>
+                          {(() => {
+                            const style = memberRoleStyle(member.role);
+                            return (
+                              <View
+                                className="flex-row items-center rounded-full pl-1.5 pr-2.5 py-1"
+                                style={{ backgroundColor: style.tint }}
+                              >
+                                <Ionicons name={style.icon} size={11} color={style.color} />
+                                <Text
+                                  className="font-sans-bold text-[11px] ml-1 capitalize"
+                                  style={{ color: style.color }}
+                                >
+                                  {member.role}
+                                </Text>
+                              </View>
+                            );
+                          })()}
+                        </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+                    </Pressable>
+                  ))}
+                </View>
+                {hasMoreMembers && (
+                  <PressableScale
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setMembersExpanded((prev) => !prev);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={membersExpanded ? 'Show fewer members' : 'Show more members'}
+                    scaleTo={0.97}
+                    className="mt-2 py-3 rounded-2xl border border-gray-100 dark:border-white/[0.06] bg-white dark:bg-white/[0.04] flex-row items-center justify-center"
+                  >
+                    <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white mr-1.5">
+                      {membersExpanded ? 'Show fewer' : 'Show more'}
+                    </Text>
+                    <Ionicons
+                      name={membersExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={colors.icon}
+                    />
+                  </PressableScale>
+                )}
+              </>
             )}
           </Reveal>
         )}
@@ -774,15 +953,16 @@ export default function Parish() {
           </View>
         }
       >
-        <View className="flex-row items-center h-12 rounded-2xl px-4 mb-4 bg-gray-100 dark:bg-white/5">
+        <View className="flex-row items-center h-12 rounded-full px-4 mb-4 bg-gray-100/70 dark:bg-white/[0.05] border border-transparent">
           <Ionicons name="search" size={17} color={palette.gray400} />
           <TextInput
             className="flex-1 font-sans text-[15px] text-gray-900 dark:text-white ml-2.5"
-            placeholder="Search by parish name or location"
+            placeholder="Search by name or location"
             placeholderTextColor={palette.gray400}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCorrect={false}
+            autoCapitalize="none"
             accessibilityLabel="Search parishes"
           />
           {!!searchQuery && (
@@ -806,7 +986,10 @@ export default function Parish() {
             return (
               <Animated.View key={p.id} entering={animateParishRows && i < 12 ? entrance.card(i * 35) : undefined}>
               <Pressable
-                onPress={() => setSelectedParishId(p.id)}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setSelectedParishId(p.id);
+                }}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
                 className={`flex-row items-center rounded-2xl p-4 mb-2 border ${
@@ -816,12 +999,13 @@ export default function Parish() {
                 <View className="flex-1">
                   <View className="flex-row items-center">
                     <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white flex-shrink">{p.name}</Text>
-                    {p.is_verified && <Ionicons name="checkmark-circle" size={14} color={palette.green} style={{ marginLeft: 6 }} />}
+                    {p.is_verified ? (
+                      <Ionicons name="checkmark-circle" size={14} color={palette.green} style={{ marginLeft: 6 }} />
+                    ) : (
+                      <Ionicons name="alert-circle" size={14} color={palette.amber} style={{ marginLeft: 6 }} />
+                    )}
                   </View>
                   <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">{p.city}, {p.state}</Text>
-                  {!p.is_verified && (
-                    <Text className="font-sans-medium text-xs text-amber-600 dark:text-amber-400 mt-0.5">Pending verification</Text>
-                  )}
                 </View>
                 <View className={`h-5 w-5 rounded-full border-2 items-center justify-center ${active ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}>
                   {active && <Animated.View entering={entrance.pop()} style={{ height: 10, width: 10, borderRadius: 5, backgroundColor: palette.accentSoft }} />}
@@ -886,6 +1070,135 @@ export default function Parish() {
         <Field label="Email" value={priestForm.priest_email} onChangeText={(text) => setPriestForm({...priestForm, priest_email: text})} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" />
       </Sheet>
 
+      {/* Member detail (admin) */}
+      <Sheet
+        visible={showMemberDetail}
+        onClose={() => {
+          setShowMemberDetail(false);
+          setSelectedMember(null);
+          setCopiedField(null);
+        }}
+        eyebrow="Parish member"
+        title={
+          selectedMember
+            ? `${selectedMember.full_name}${selectedMember.user_id === user?.id ? ' (you)' : ''}`
+            : 'Member'
+        }
+        footer={
+          <Button
+            label="Close"
+            variant="secondary"
+            onPress={() => {
+              setShowMemberDetail(false);
+              setSelectedMember(null);
+              setCopiedField(null);
+            }}
+            fullWidth
+          />
+        }
+      >
+        {selectedMember ? (
+          <View>
+            <View className="mb-4">
+              {(() => {
+                const style = memberRoleStyle(selectedMember.role);
+                return (
+                  <View
+                    className="flex-row items-center self-start rounded-full pl-1.5 pr-2.5 py-1"
+                    style={{ backgroundColor: style.tint }}
+                  >
+                    <Ionicons name={style.icon} size={11} color={style.color} />
+                    <Text
+                      className="font-sans-bold text-[11px] ml-1 capitalize"
+                      style={{ color: style.color }}
+                    >
+                      {selectedMember.role}
+                    </Text>
+                  </View>
+                );
+              })()}
+            </View>
+
+            <View className="rounded-2xl bg-gray-50 dark:bg-white/[0.04] overflow-hidden">
+              <Pressable
+                onPress={() => selectedMember.email && copyToClipboard(selectedMember.email, 'email')}
+                disabled={!selectedMember.email}
+                accessibilityRole="button"
+                accessibilityLabel={selectedMember.email ? 'Copy email' : 'No email provided'}
+                className="flex-row items-center px-4 py-3.5 active:bg-gray-100 dark:active:bg-white/5"
+              >
+                <View className="h-9 w-9 rounded-xl bg-white dark:bg-white/[0.06] items-center justify-center mr-3">
+                  <Ionicons name="mail-outline" size={16} color={colors.icon} />
+                </View>
+                <View className="flex-1">
+                  <Text className="font-sans-medium text-[11px] text-gray-500 dark:text-gray-400">Email</Text>
+                  <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white mt-0.5">
+                    {selectedMember.email || 'No email provided'}
+                  </Text>
+                </View>
+                {!!selectedMember.email && (
+                  <Ionicons
+                    name={copiedField === 'email' ? 'checkmark' : 'copy-outline'}
+                    size={16}
+                    color={copiedField === 'email' ? palette.green : colors.textFaint}
+                  />
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={() => selectedMember.phone_number && copyToClipboard(selectedMember.phone_number, 'phone')}
+                disabled={!selectedMember.phone_number}
+                accessibilityRole="button"
+                accessibilityLabel={selectedMember.phone_number ? 'Copy phone' : 'No phone provided'}
+                className="flex-row items-center px-4 py-3.5 border-t border-gray-100 dark:border-white/[0.06] active:bg-gray-100 dark:active:bg-white/5"
+              >
+                <View className="h-9 w-9 rounded-xl bg-white dark:bg-white/[0.06] items-center justify-center mr-3">
+                  <Ionicons name="call-outline" size={16} color={colors.icon} />
+                </View>
+                <View className="flex-1">
+                  <Text className="font-sans-medium text-[11px] text-gray-500 dark:text-gray-400">Phone</Text>
+                  <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white mt-0.5">
+                    {selectedMember.phone_number
+                      ? formatPhoneNumber(selectedMember.phone_number)
+                      : 'No phone provided'}
+                  </Text>
+                </View>
+                {!!selectedMember.phone_number && (
+                  <Ionicons
+                    name={copiedField === 'phone' ? 'checkmark' : 'copy-outline'}
+                    size={16}
+                    color={copiedField === 'phone' ? palette.green : colors.textFaint}
+                  />
+                )}
+              </Pressable>
+            </View>
+
+            {(selectedMember.email || selectedMember.phone_number) && (
+              <View className="flex-row mt-4">
+                {selectedMember.phone_number ? (
+                  <Button
+                    label="Message"
+                    icon="chatbubble"
+                    variant="secondary"
+                    onPress={() => handleSMS(selectedMember.phone_number!)}
+                    style={{ flex: 1, marginRight: selectedMember.email ? 8 : 0 }}
+                  />
+                ) : null}
+                {selectedMember.email ? (
+                  <Button
+                    label="Email"
+                    icon="mail"
+                    variant="secondary"
+                    onPress={() => handleEmail(selectedMember.email)}
+                    style={{ flex: 1 }}
+                  />
+                ) : null}
+              </View>
+            )}
+          </View>
+        ) : null}
+      </Sheet>
+
       {/* Donation settings */}
       <Sheet
         visible={showDonationModal}
@@ -925,9 +1238,10 @@ export default function Parish() {
               required
               value={donationForm.paypal_donation_url}
               onChangeText={(text) => setDonationForm({...donationForm, paypal_donation_url: text})}
-              placeholder="e.g., https://www.paypal.com/donate/?token=..."
+              placeholder="e.g., https://donate.example.com/give"
               autoCapitalize="none"
-              helper="Your donation page URL"
+              keyboardType="url"
+              helper="Any donation link (PayPal, Tithe.ly, church website, etc.)"
             />
             <Field
               label="Donation message (optional)"

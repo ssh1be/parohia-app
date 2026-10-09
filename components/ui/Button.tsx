@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, StyleProp, Text, View, ViewStyle } from 'react-native';
+import { StyleProp, Text, View, ViewStyle } from 'react-native';
 import { PressableScale } from './PressableScale';
+import { Spinner } from './Spinner';
 import { useThemeColors } from './useThemeColors';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -76,7 +77,7 @@ export function Button({
     >
       <View className="flex-row items-center justify-center">
         {loading ? (
-          <ActivityIndicator size="small" color={iconColor} />
+          <Spinner size="sm" />
         ) : icon ? (
           <Ionicons name={icon} size={size === 'sm' ? 15 : 18} color={iconColor} />
         ) : null}

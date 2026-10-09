@@ -98,10 +98,14 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) {
+            if (event.defaultPrevented) return;
+            if (focused) {
+              // Re-press while focused — screens may listen (e.g. Events toggles bulletin filters).
               Haptics.selectionAsync().catch(() => {});
-              navigation.navigate(route.name, route.params);
+              return;
             }
+            Haptics.selectionAsync().catch(() => {});
+            navigation.navigate(route.name, route.params);
           };
 
           const onLongPress = () => {
@@ -139,7 +143,7 @@ function TabIcon({ name, color, focused }: { name: IconName; color: string; focu
   const scale = useSharedValue(focused ? 1 : 0.92);
 
   useEffect(() => {
-    scale.value = withSpring(focused ? 1 : 0.92, { damping: 12, stiffness: 320 });
+    scale.value = withSpring(focused ? 1 : 0.92, springs.snappy);
   }, [focused]);
 
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));

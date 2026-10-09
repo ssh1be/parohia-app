@@ -176,14 +176,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Cancel local notifications and revoke token before signing out
       await notificationService.cancelAllNotifications();
-      await notificationService.revokeStoredPushTokenForCurrentUser();
+      try {
+        await notificationService.revokeStoredPushTokenForCurrentUser();
+      } catch {
+        // Token may already be gone after account deletion
+      }
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      // Redirect to auth screen after successful sign out
+      if (error) {
+        // Account may already be deleted server-side; still clear local session UI.
+        console.warn('signOut warning:', error.message);
+      }
+      setSession(null);
+      setUser(null);
       router.replace('/(auth)/welcome');
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      setSession(null);
+      setUser(null);
+      router.replace('/(auth)/welcome');
+      if (error?.message) {
+        console.warn('signOut error:', error.message);
+      }
     }
   };
 

@@ -94,6 +94,18 @@ CREATE TABLE public.bulletin_channel_subscriptions (
   CONSTRAINT bulletin_channel_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT bulletin_channel_subscriptions_unique UNIQUE (channel_id, user_id)
 );
+CREATE TABLE public.bulletin_channel_managers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  channel_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  assigned_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT bulletin_channel_managers_pkey PRIMARY KEY (id),
+  CONSTRAINT bulletin_channel_managers_channel_id_fkey FOREIGN KEY (channel_id) REFERENCES public.bulletin_channels(id),
+  CONSTRAINT bulletin_channel_managers_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT bulletin_channel_managers_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.user_profiles(id),
+  CONSTRAINT bulletin_channel_managers_unique UNIQUE (channel_id, user_id)
+);
 CREATE TABLE public.bulletin_events (
   notify boolean DEFAULT false,
   parish_id uuid NOT NULL,

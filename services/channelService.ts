@@ -12,6 +12,15 @@ export interface BulletinChannel {
   updated_at: string;
   is_subscribed?: boolean;
   subscriber_count?: number;
+  manager_count?: number;
+  manager_ids?: string[];
+}
+
+export interface ChannelManager {
+  user_id: string;
+  channel_id: string;
+  assigned_by?: string | null;
+  created_at?: string;
 }
 
 export class ChannelService {
@@ -38,23 +47,145 @@ export class ChannelService {
 
     const channels = (data || []) as BulletinChannel[];
 
-    if (options?.userId && channels.length > 0) {
-      const { data: subs } = await supabase
-        .from('bulletin_channel_subscriptions')
-        .select('channel_id')
-        .eq('user_id', options.userId)
-        .in(
-          'channel_id',
-          channels.map((c) => c.id)
-        );
+    if (channels.length > 0) {
+      const channelIds = channels.map((c) => c.id);
 
-      const subscribed = new Set((subs || []).map((s) => s.channel_id));
+      if (options?.userId) {
+        const { data: subs } = await supabase
+          .from('bulletin_channel_subscriptions')
+          .select('channel_id')
+          .eq('user_id', options.userId)
+          .in('channel_id', channelIds);
+
+        const subscribed = new Set((subs || []).map((s) => s.channel_id));
+        channels.forEach((c) => {
+          c.is_subscribed = subscribed.has(c.id);
+        });
+      }
+
+      const { data: managers } = await supabase
+        .from('bulletin_channel_managers')
+        .select('channel_id, user_id')
+        .in('channel_id', channelIds);
+
+      const managersByChannel = new Map<string, string[]>();
+      for (const row of managers || []) {
+        const list = managersByChannel.get(row.channel_id) || [];
+        list.push(row.user_id);
+        managersByChannel.set(row.channel_id, list);
+      }
       channels.forEach((c) => {
-        c.is_subscribed = subscribed.has(c.id);
+        const ids = managersByChannel.get(c.id) || [];
+        c.manager_ids = ids;
+        c.manager_count = ids.length;
       });
     }
 
     return channels;
+  }
+
+  static async listChannelManagers(channelId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('bulletin_channel_managers')
+      .select('user_id')
+      .eq('channel_id', channelId);
+
+    if (error) {
+      console.error('Error listing channel managers:', error);
+      throw error;
+    }
+
+    return (data || []).map((row) => row.user_id);
+  }
+
+  static async getManagedChannelIds(userId: string, parishId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('bulletin_channel_managers')
+      .select('channel_id, bulletin_channels!inner(parish_id, is_archived)')
+      .eq('user_id', userId)
+      .eq('bulletin_channels.parish_id', parishId)
+      .eq('bulletin_channels.is_archived', false);
+
+    if (error) {
+      console.error('Error fetching managed channels:', error);
+      throw error;
+    }
+
+    return (data || []).map((row: any) => row.channel_id);
+  }
+
+  static async getParishManagerUserIds(parishId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('bulletin_channel_managers')
+      .select('user_id, bulletin_channels!inner(parish_id, is_archived)')
+      .eq('bulletin_channels.parish_id', parishId)
+      .eq('bulletin_channels.is_archived', false);
+
+    if (error) {
+      console.error('Error fetching parish managers:', error);
+      throw error;
+    }
+
+    return Array.from(new Set((data || []).map((row: any) => row.user_id).filter(Boolean)));
+  }
+
+  /** Replace the manager set for a channel; also ensures each manager is subscribed. */
+  static async setChannelManagers(
+    channelId: string,
+    userIds: string[],
+    assignedBy: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+
+      const { data: existing, error: existingError } = await supabase
+        .from('bulletin_channel_managers')
+        .select('user_id')
+        .eq('channel_id', channelId);
+
+      if (existingError) {
+        return { success: false, error: existingError.message };
+      }
+
+      const existingIds = new Set((existing || []).map((row) => row.user_id));
+      const nextIds = new Set(uniqueIds);
+      const toRemove = [...existingIds].filter((id) => !nextIds.has(id));
+      const toAdd = uniqueIds.filter((id) => !existingIds.has(id));
+
+      if (toRemove.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('bulletin_channel_managers')
+          .delete()
+          .eq('channel_id', channelId)
+          .in('user_id', toRemove);
+        if (deleteError) {
+          return { success: false, error: deleteError.message };
+        }
+      }
+
+      if (toAdd.length > 0) {
+        const { error: insertError } = await supabase.from('bulletin_channel_managers').insert(
+          toAdd.map((userId) => ({
+            channel_id: channelId,
+            user_id: userId,
+            assigned_by: assignedBy,
+          }))
+        );
+        if (insertError) {
+          return { success: false, error: insertError.message };
+        }
+      }
+
+      // Managers should see the channel feed
+      for (const userId of uniqueIds) {
+        await this.subscribe(channelId, userId);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting channel managers:', error);
+      return { success: false, error: 'Failed to update channel managers' };
+    }
   }
 
   static async getSubscribedChannelIds(userId: string, parishId: string): Promise<string[]> {

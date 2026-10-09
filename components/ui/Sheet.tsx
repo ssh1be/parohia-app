@@ -295,8 +295,8 @@ export function Sheet({
                 <ScrollView
                   // flex:1 only when sheet has a definite expanded height; otherwise it collapses to 0.
                   style={keyboardDocked ? { flex: 1 } : undefined}
-                  keyboardShouldPersistTaps="handled"
-                  keyboardDismissMode="interactive"
+                  keyboardShouldPersistTaps="always"
+                  keyboardDismissMode="on-drag"
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   nestedScrollEnabled

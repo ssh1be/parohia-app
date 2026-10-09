@@ -98,6 +98,61 @@ export const isOnboardingComplete = async (userId: string): Promise<boolean> => 
   }
 };
 
+/** Where an authenticated user should land after sign-in. */
+export type AuthDestination = 'tabs' | 'onboarding' | 'parish-selection';
+
+/**
+ * - No profile → full onboarding
+ * - regular_user without parish connection → parish selection only
+ * - otherwise → main tabs
+ */
+export const resolveAuthDestination = async (userId: string): Promise<AuthDestination> => {
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id, user_type')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      const stored = await storage.getItem(ONBOARDING_COMPLETE_KEY);
+      return stored === userId ? 'tabs' : 'onboarding';
+    }
+
+    if (profile.user_type === 'regular_user') {
+      // Missing connection → rejoin flow (e.g. parish was deleted).
+      // Connection to the "No Parish" sentinel still counts as complete (skipped selection).
+      const { data: connections } = await supabase
+        .from('user_parish_connections')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+
+      if (!connections || connections.length === 0) {
+        return 'parish-selection';
+      }
+    }
+
+    if (profile.user_type === 'parish_admin') {
+      const { data: parish } = await supabase
+        .from('parishes')
+        .select('id')
+        .eq('admin_user_id', userId)
+        .maybeSingle();
+
+      if (!parish) {
+        return 'onboarding';
+      }
+    }
+
+    return 'tabs';
+  } catch (error) {
+    console.error('Error resolving auth destination:', error);
+    const complete = await isOnboardingComplete(userId);
+    return complete ? 'tabs' : 'onboarding';
+  }
+};
+
 export const clearOnboardingStatus = async () => {
   try {
     await storage.removeItem(ONBOARDING_COMPLETE_KEY);

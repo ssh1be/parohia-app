@@ -1,4 +1,4 @@
-import { FadeInDown, LinearTransition, WithSpringConfig, ZoomIn } from 'react-native-reanimated';
+import { FadeInDown, FadeOutDown, LinearTransition, WithSpringConfig, ZoomIn } from 'react-native-reanimated';
 
 export const palette = {
   accent: '#DC2626',
@@ -25,19 +25,21 @@ export const fonts = {
 };
 
 export const springs = {
-  snappy: { damping: 18, stiffness: 260, mass: 0.7 } satisfies WithSpringConfig,
-  gentle: { damping: 20, stiffness: 140 } satisfies WithSpringConfig,
-  sheet: { damping: 26, stiffness: 240, mass: 0.9 } satisfies WithSpringConfig,
+  snappy: { damping: 20, stiffness: 380, mass: 0.55 } satisfies WithSpringConfig,
+  gentle: { damping: 22, stiffness: 220, mass: 0.65 } satisfies WithSpringConfig,
+  sheet: { damping: 28, stiffness: 340, mass: 0.75 } satisfies WithSpringConfig,
 };
 
 /** Shared entering animations so card and pop-in motion stays consistent across screens. */
 export const entrance = {
   /** Cards and rows rising into place; near-critically damped so they settle without visible bounce. */
-  card: (delay = 0) => FadeInDown.delay(delay).springify().damping(26).stiffness(170),
+  card: (delay = 0) => FadeInDown.delay(delay).springify().damping(24).stiffness(260),
   /** Small elements (selection dots, checkmarks, pills) popping in with a soft overshoot. */
-  pop: () => ZoomIn.springify().damping(20).stiffness(240),
-  /** Layout shifts when list items are added, removed, or reordered. */
-  layout: () => LinearTransition.springify().damping(26).stiffness(200),
+  pop: () => ZoomIn.springify().damping(18).stiffness(320),
+  /** Layout shifts when list items are added, removed, or reordered — soft spring to avoid harsh reshuffles. */
+  layout: () => LinearTransition.springify().damping(30).stiffness(140).mass(0.9),
+  /** Cards leaving on filter/remove — short fade-down so exits aren't instant pops. */
+  exit: () => FadeOutDown.duration(180),
 };
 
 /** Space the floating tab bar occupies above the bottom safe-area inset. */

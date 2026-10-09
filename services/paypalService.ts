@@ -40,13 +40,13 @@ export class PayPalService {
   }
 
   /**
-   * Open PayPal donation URL
-   * @param donationUrl - The PayPal donation URL
-   * @param message - Optional message to include
+   * Open a donation URL in the browser (any provider).
+   * @param donationUrl - The donation URL
+   * @param message - Optional message (unused; kept for call-site compatibility)
    */
   static async openPayPalDonation(
     donationUrl: string,
-    message?: string
+    _message?: string
   ): Promise<void> {
     try {
       const url = this.cleanPayPalDonationUrl(donationUrl);
@@ -59,15 +59,15 @@ export class PayPalService {
       } else {
         Alert.alert(
           'Error',
-          'Unable to open PayPal. Please make sure you have a web browser installed.',
+          'Unable to open this link. Please make sure you have a web browser installed.',
           [{ text: 'OK' }]
         );
       }
     } catch (error) {
-      console.error('Error opening PayPal donation:', error);
+      console.error('Error opening donation link:', error);
       Alert.alert(
         'Error',
-        'Failed to open PayPal donation link. Please try again.',
+        'Failed to open donation link. Please try again.',
         [{ text: 'OK' }]
       );
     }

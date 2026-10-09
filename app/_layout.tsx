@@ -19,6 +19,7 @@ import { preloadBrandAssets } from "../constants/assets";
 import { AuthProvider } from "../contexts/AuthContext";
 import { CalendarTraditionProvider } from "../contexts/CalendarTraditionContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
+import { ParishScopeProvider } from "../contexts/ParishScopeContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import "../global.css";
 
@@ -106,11 +107,13 @@ export default function RootLayout() {
       <ThemeProvider>
         <CalendarTraditionProvider>
           <AuthProvider>
-            <NotificationProvider>
-              <PortalHost>
-                <InitialLoadingScreen />
-              </PortalHost>
-            </NotificationProvider>
+            <ParishScopeProvider>
+              <NotificationProvider>
+                <PortalHost>
+                  <InitialLoadingScreen />
+                </PortalHost>
+              </NotificationProvider>
+            </ParishScopeProvider>
           </AuthProvider>
         </CalendarTraditionProvider>
       </ThemeProvider>

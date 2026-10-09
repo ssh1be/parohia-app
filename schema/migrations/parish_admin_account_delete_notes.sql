@@ -1,0 +1,17 @@
+-- Notes for parish-admin account deletion.
+-- Runtime cleanup is performed by the edge function:
+--   supabase/functions/delete-parish-admin-account/index.ts
+--
+-- See also: user_account_delete_notes.sql (covers regular members + shared cleanup).
+--
+-- Parish-admin path deletes, in order:
+--   confession reservations → schedules
+--   bulletin responses → events → channel managers/subs → channels
+--   user_parish_connections for the parish (unassigns members)
+--   the parish row
+--   remaining user-owned rows (push tokens, responses, authored posts, etc.)
+--   user_profiles
+--   auth.users via auth.admin.deleteUser
+--
+-- Members keep their user_profiles. With no parish connection, app routing
+-- sends them to /(auth)/onboarding/parish-selection on next sign-in.

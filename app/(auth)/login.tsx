@@ -8,7 +8,7 @@ import { Field } from '../../components/ui/Field';
 import { Reveal } from '../../components/ui/Reveal';
 import { useThemeColors } from '../../components/ui/useThemeColors';
 import { useAuth } from '../../contexts/AuthContext';
-import { isOnboardingComplete } from '../../utils/onboardingStorage';
+import { resolveAuthDestination } from '../../utils/onboardingStorage';
 
 export default function LoginScreen() {
   const params = useLocalSearchParams();
@@ -26,31 +26,31 @@ export default function LoginScreen() {
     setIsSignUp(params.mode === 'signup');
   }, [params.mode]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const checkAndRedirect = async () => {
-      if (user) {
-        const complete = await isOnboardingComplete(user.id);
-        if (complete && isMounted) {
-          router.replace('/');
-        }
-      }
-    };
-    checkAndRedirect();
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
-
-  // When leaving the screen (back, navigate away), remount fields so a frozen
-  // autofilled password input can't persist in the native view pool.
+  // Only auto-redirect while this screen is focused. After OTP verify the session
+  // lands while login is still mounted underneath confirm-otp; redirecting then
+  // stacks a second role-selection screen on top of confirm-otp's own navigate.
   useFocusEffect(
     useCallback(() => {
+      let isMounted = true;
+      const checkAndRedirect = async () => {
+        if (!user) return;
+        const destination = await resolveAuthDestination(user.id);
+        if (!isMounted) return;
+        if (destination === 'tabs') {
+          router.replace('/');
+        } else if (destination === 'parish-selection') {
+          router.replace('/(auth)/onboarding/parish-selection');
+        } else {
+          router.replace('/(auth)/onboarding/user-type');
+        }
+      };
+      checkAndRedirect();
       return () => {
+        isMounted = false;
         setShowPassword(false);
         setFieldEpoch((n) => n + 1);
       };
-    }, []),
+    }, [user]),
   );
 
   const handleAuth = async () => {

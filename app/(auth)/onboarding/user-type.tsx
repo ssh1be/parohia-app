@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 import { AuthHeader, AuthScaffold, OnboardingProgress } from '../../../components/auth/AuthChrome';
 import { Button } from '../../../components/ui/Button';
 import { PressableScale } from '../../../components/ui/PressableScale';
 import { Reveal } from '../../../components/ui/Reveal';
+import { PAROHIA_ICON } from '../../../constants/assets';
 import { palette } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnboarding, UserType } from '../../../contexts/OnboardingContext';
@@ -13,19 +15,20 @@ const OPTIONS: {
   type: UserType;
   title: string;
   description: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
+  brandIcon?: boolean;
 }[] = [
   {
     type: 'regular_user',
     title: 'Parishioner',
     description: 'Connect with your parish and community',
-    icon: 'person-outline',
+    icon: 'person',
   },
   {
     type: 'parish_admin',
     title: 'Parish Administrator',
-    description: "Manage your parish's profile, schedule, and events",
-    icon: 'business-outline',
+    description: 'Create and manage a parish on Parohia',
+    brandIcon: true,
   },
 ];
 
@@ -69,7 +72,17 @@ export default function UserTypeScreen() {
             >
               <View className="flex-row items-center">
                 <View className="h-14 w-14 rounded-[18px] bg-red-600 items-center justify-center mr-4">
-                  <Ionicons name={option.icon} size={24} color="#FFFFFF" />
+                  {option.brandIcon ? (
+                    <Image
+                      source={PAROHIA_ICON}
+                      style={{ width: 40, height: 40 }}
+                      contentFit="contain"
+                      tintColor="#FFFFFF"
+                      accessibilityLabel="Parish"
+                    />
+                  ) : (
+                    <Ionicons name={option.icon!} size={24} color="#FFFFFF" />
+                  )}
                 </View>
                 <View className="flex-1 pr-2">
                   <Text className="font-sans-semibold text-[16px] text-gray-900 dark:text-white">

@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase';
+import { isNoParishId, NO_PARISH_ID } from '../constants/parishes';
 import { OnboardingData, UserType } from '../contexts/OnboardingContext';
 import { ChannelService } from './channelService';
 
@@ -22,14 +23,26 @@ export const saveOnboardingData = async (
       throw new Error('Failed to get user data');
     }
 
+    const { data: existingProfile } = await supabase
+      .from('user_profiles')
+      .select('id, full_name, user_type, phone_number')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const resolvedUserType = data.userType || existingProfile?.user_type;
+    const resolvedFullName = data.fullName || existingProfile?.full_name;
+    if (!resolvedUserType || !resolvedFullName) {
+      throw new Error('Missing profile information to complete onboarding');
+    }
+
     const { data: profileData, error: profileError } = await supabase
       .from('user_profiles')
       .upsert({
         id: userId,
-        full_name: data.fullName,
-        user_type: data.userType,
+        full_name: resolvedFullName,
+        user_type: resolvedUserType,
         email: user.email,
-        phone_number: data.phoneNumber || null,
+        phone_number: data.phoneNumber ?? existingProfile?.phone_number ?? null,
       }, { onConflict: 'id' })
       .select()
       .single();
@@ -44,7 +57,7 @@ export const saveOnboardingData = async (
     // 2. Handle parish data based on user type
     let parishId: string | undefined;
 
-    if (data.userType === 'parish_admin' && data.parishName) {
+    if (resolvedUserType === 'parish_admin' && data.parishName) {
       // Save new parish for parish admin
       const { data: parishData, error: parishError } = await supabase
         .from('parishes')
@@ -72,27 +85,48 @@ export const saveOnboardingData = async (
       console.log('Parish saved:', parishData);
       // Safety net if DB trigger has not run yet
       await ChannelService.ensureGeneralChannel(parishId, userId);
-    } else if (data.userType === 'regular_user' && data.selectedParishId) {
-      await supabase
+    } else if (resolvedUserType === 'regular_user' && data.selectedParishId) {
+      // Insert first so a failed write can't orphan an existing connection
+      const { data: existingConnections, error: existingError } = await supabase
+        .from('user_parish_connections')
+        .select('id, parish_id')
+        .eq('user_id', userId);
+      if (existingError) {
+        throw new Error(`Failed to read parish connections: ${existingError.message}`);
+      }
+
+      const alreadyLinked = (existingConnections || []).some(
+        (row) => row.parish_id === data.selectedParishId
+      );
+
+      if (!alreadyLinked) {
+        const { error: connectionError } = await supabase
+          .from('user_parish_connections')
+          .insert({
+            user_id: userId,
+            parish_id: data.selectedParishId,
+          });
+
+        if (connectionError) {
+          console.error('Error connecting user to parish:', connectionError);
+          throw new Error(`Failed to connect to parish: ${connectionError.message}`);
+        }
+      }
+
+      const { error: cleanupError } = await supabase
         .from('user_parish_connections')
         .delete()
-        .eq('user_id', userId);
-
-      const { error: connectionError } = await supabase
-        .from('user_parish_connections')
-        .insert({
-          user_id: userId,
-          parish_id: data.selectedParishId,
-        });
-
-      if (connectionError) {
-        console.error('Error connecting user to parish:', connectionError);
-        throw new Error(`Failed to connect to parish: ${connectionError.message}`);
+        .eq('user_id', userId)
+        .neq('parish_id', data.selectedParishId);
+      if (cleanupError) {
+        throw new Error(`Failed to clear previous parish: ${cleanupError.message}`);
       }
 
       parishId = data.selectedParishId;
-      // Safety net if DB trigger has not run yet
-      await ChannelService.ensureGeneralSubscription(userId, parishId);
+      // Skip channel subscription for the sentinel "No Parish" placeholder
+      if (!isNoParishId(parishId)) {
+        await ChannelService.ensureGeneralSubscription(userId, parishId);
+      }
       console.log('User connected to parish:', data.selectedParishId);
     }
 
@@ -117,6 +151,7 @@ export const getParishes = async () => {
     const { data, error } = await supabase
       .from('parishes')
       .select('id, name, jurisdiction, city, state, is_verified')
+      .neq('id', NO_PARISH_ID)
       .order('name');
 
     if (error) {

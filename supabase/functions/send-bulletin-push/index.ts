@@ -44,9 +44,6 @@ serve(async (req) => {
     if (parishErr || !parish) {
       return new Response('Parish not found', { status: 404, headers: corsHeaders });
     }
-    if (parish.admin_user_id !== callerId) {
-      return new Response('Forbidden', { status: 403, headers: corsHeaders });
-    }
 
     const { data: event, error: eventErr } = await supabase
       .from('bulletin_events')
@@ -59,6 +56,21 @@ serve(async (req) => {
       return new Response('Event not found', { status: 404, headers: corsHeaders });
     }
     if (event.parish_id !== parishId) {
+      return new Response('Forbidden', { status: 403, headers: corsHeaders });
+    }
+
+    const isParishAdmin = parish.admin_user_id === callerId;
+    let isChannelManager = false;
+    if (!isParishAdmin && event.channel_id) {
+      const { data: managerRow } = await supabase
+        .from('bulletin_channel_managers')
+        .select('id')
+        .eq('channel_id', event.channel_id)
+        .eq('user_id', callerId)
+        .maybeSingle();
+      isChannelManager = !!managerRow;
+    }
+    if (!isParishAdmin && !isChannelManager) {
       return new Response('Forbidden', { status: 403, headers: corsHeaders });
     }
     if (!event.is_active || !event.notify) {

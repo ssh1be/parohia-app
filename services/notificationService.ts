@@ -472,7 +472,7 @@ export class NotificationService {
       try {
         const preferences = await this.getNotificationPreferences();
         const digestMode = preferences.dailyDigestMode || 'day_of';
-        const numDays = 3;
+        const numDays = 7;
         // Fetch an extra day when in day_before mode so we can send a digest tonight for day numDays+1
         const fetchDays = digestMode === 'day_before' ? numDays + 1 : numDays;
 
@@ -527,7 +527,7 @@ export class NotificationService {
         const enabledParishIds = await this.getEnabledParishEventNotifications();
         const scheduledEventIds = new Set<string>();
 
-        // First, schedule any enabled events found in the 3-day fetch window
+        // First, schedule any enabled events found in the fetch window
         if (enabledParishIds.length > 0) {
           for (const event of events) {
             if (enabledParishIds.includes(event.id)) {
@@ -538,7 +538,7 @@ export class NotificationService {
           }
         }
 
-        // Then, schedule enabled events beyond the 3-day window using stored data
+        // Then, schedule enabled events beyond the fetch window using stored data
         const storedEventData = await this.getStoredParishEventData();
         const now = new Date();
         const expiredIds: string[] = [];

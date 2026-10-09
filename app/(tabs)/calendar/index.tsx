@@ -2,25 +2,26 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, LayoutChangeEvent, Pressable, RefreshControl, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  FadeIn,
-  FadeInLeft,
-  FadeInRight,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
+    FadeIn,
+    FadeInLeft,
+    FadeInRight,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withSpring,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventDetailSheet } from "../../../components/liturgical/EventDetailSheet";
 import { FastingBadge } from "../../../components/liturgical/FastingBadge";
-import { ReadingSheet } from "../../../components/liturgical/ReadingSheet";
 import { ReadingsCarousel } from "../../../components/liturgical/ReadingsCarousel";
+import { ReadingSheet } from "../../../components/liturgical/ReadingSheet";
 import { TimelineItem } from "../../../components/liturgical/TimelineItem";
 import ParishCalendarSetup, { CalendarSetupCallout } from "../../../components/ParishCalendarSetup";
+import { AppRefreshControl, RefreshSpinnerOverlay } from "../../../components/ui/AppRefreshControl";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { PressableScale } from "../../../components/ui/PressableScale";
@@ -28,19 +29,22 @@ import { CompactHeader, LargeHeader, useScrollHeader } from "../../../components
 import { SectionHeader } from "../../../components/ui/SectionHeader";
 import { SegmentedControl } from "../../../components/ui/SegmentedControl";
 import { SkeletonRows } from "../../../components/ui/Skeleton";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useThemeColors } from "../../../components/ui/useThemeColors";
 import { contentBottomPadding, entrance, fastingStyle, getFastingKind, palette, springs } from "../../../constants/theme";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useCalendarTradition } from "../../../contexts/CalendarTraditionContext";
 import { useNotifications } from "../../../contexts/NotificationContext";
+import { useParishScope } from "../../../contexts/ParishScopeContext";
+import { useTabScrollToTop } from "../../../hooks/useTabScrollToTop";
 import { BulletinEvent, BulletinService } from "../../../services/bulletinService";
 import {
-  Commemoration,
-  fetchOrthodoxCalendarData,
-  fetchParishEventsForMultipleDays,
-  fetchParishEventsForToday,
-  OrthodoxCalendarData,
-  ParishEvent,
+    Commemoration,
+    fetchOrthodoxCalendarData,
+    fetchParishEventsForMultipleDays,
+    fetchParishEventsForToday,
+    OrthodoxCalendarData,
+    ParishEvent,
 } from "../../../services/calendarService";
 import { ConfessionReservationWithSchedule, ConfessionService } from "../../../services/confessionService";
 import { getUserProfile } from "../../../services/onboardingService";
@@ -205,6 +209,8 @@ export default function Calendar() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { scrollY, onScroll } = useScrollHeader();
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  useTabScrollToTop(scrollRef);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthDirection, setMonthDirection] = useState<'prev' | 'next'>('next');
@@ -246,6 +252,7 @@ export default function Calendar() {
 
   const { user } = useAuth();
   const { tradition } = useCalendarTradition();
+  const { parishEpoch } = useParishScope();
   const { preferences, setParishEventNotificationEnabled, isParishEventNotificationEnabled } = useNotifications();
 
   // Fetch fasting data for multiple days
@@ -410,7 +417,7 @@ export default function Calendar() {
   // Check user type and parish calendar status
   useEffect(() => {
     checkUserAndParish();
-  }, [user]);
+  }, [user, parishEpoch]);
 
   // Load notification states for events
   const loadEventNotificationStates = async (events: ParishEvent[]) => {
@@ -439,10 +446,10 @@ export default function Calendar() {
     }
   };
 
-  // Fetch data when selected date or calendar tradition changes
+  // Fetch data when selected date, calendar tradition, or parish changes
   useEffect(() => {
     fetchDataForDate(selectedDate);
-  }, [selectedDate, user, tradition]);
+  }, [selectedDate, user, tradition, parishEpoch]);
 
   const handleCalendarSetupSuccess = () => {
     setParishHasCalendar(true);
@@ -576,7 +583,7 @@ export default function Calendar() {
     return () => {
       cancelled = true;
     };
-  }, [weekKey, viewMode, user, weekReload]);
+  }, [weekKey, viewMode, user, weekReload, parishEpoch]);
 
   const navigateWeek = (direction: 'prev' | 'next') => {
     const next = new Date(weekAnchor);
@@ -789,7 +796,7 @@ export default function Calendar() {
         }`}
       >
         {togglingEvent === event.id ? (
-          <ActivityIndicator size="small" color={colors.textMuted} />
+          <Spinner size="sm" />
         ) : (
           <Ionicons
             name={canToggle && isNotificationEnabled ? "notifications" : "notifications-off-outline"}
@@ -873,17 +880,17 @@ export default function Calendar() {
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <CompactHeader title={formatDate(selectedDate)} scrollY={scrollY} />
+      <RefreshSpinnerOverlay refreshing={refreshing} scrollY={scrollY} top={insets.top} />
       <Animated.ScrollView
+        ref={scrollRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top, paddingBottom: contentBottomPadding(insets.bottom) }}
         refreshControl={
-          <RefreshControl
+          <AppRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.textMuted}
-            colors={[palette.accent]}
             progressViewOffset={insets.top}
           />
         }
@@ -1439,7 +1446,6 @@ export default function Calendar() {
         title={selectedReading?.display}
         subtitle="King James Version"
         body={selectedReading?.passage}
-        scripture
       />
 
       <EventDetailSheet

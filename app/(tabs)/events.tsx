@@ -1,11 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
-  RefreshControl,
   ScrollView,
   Switch,
   Text,
@@ -19,6 +18,7 @@ import Animated, {
   FadeInDown,
   LinearTransition,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
   ZoomIn,
@@ -27,10 +27,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   BulletinFeedHeader,
   BulletinTimeFilter,
+  BULLETIN_FILTER_HELPER_HEIGHT,
   isWithinBulletinTimeRange,
 } from "../../components/BulletinFeedHeader";
 import { ChannelsSheet } from "../../components/ChannelsSheet";
 import CustomDateTimePicker from "../../components/DateTimePicker";
+import { AppRefreshControl, RefreshSpinnerOverlay } from "../../components/ui/AppRefreshControl";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Field } from "../../components/ui/Field";
@@ -40,10 +42,13 @@ import { CompactHeader, LargeHeader, useScrollHeader } from "../../components/ui
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Sheet, SHEET_EXIT_DURATION } from "../../components/ui/Sheet";
 import { Skeleton, SkeletonRows } from "../../components/ui/Skeleton";
+import { Spinner } from "../../components/ui/Spinner";
 import { useThemeColors } from "../../components/ui/useThemeColors";
 import { contentBottomPadding, entrance, eventKindStyle, palette, TAB_BAR_GAP, TAB_BAR_HEIGHT } from "../../constants/theme";
 import { supabase } from "../../config/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { useParishScope } from "../../contexts/ParishScopeContext";
+import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
 import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "../../services/bulletinService";
 import { BulletinChannel, ChannelService } from "../../services/channelService";
 import { ConfessionService, DaySchedule, TimeSlot } from "../../services/confessionService";
@@ -132,8 +137,37 @@ export default function Events() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const colors = useThemeColors();
   const { user, session } = useAuth();
+  const { parishEpoch } = useParishScope();
   const { scrollY, onScroll } = useScrollHeader();
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  useTabScrollToTop(scrollRef);
+  const reduceMotion = useReducedMotion();
+  const navigation = useNavigation();
+  const [isFocused, setIsFocused] = useState(true);
+  const [bulletinFiltersVisible, setBulletinFiltersVisible] = useState(false);
   const [showVolunteerConfetti, setShowVolunteerConfetti] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => {
+        setIsFocused(false);
+        setBulletinFiltersVisible(false);
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', () => {
+      if (!navigation.isFocused()) return;
+      // When scrolled down, scroll-to-top handles the press.
+      // At the top, toggle the floating bulletin filter row.
+      if (scrollY.value <= 24) {
+        setBulletinFiltersVisible((prev) => !prev);
+      }
+    });
+    return unsubscribe;
+  }, [navigation, scrollY]);
   const [activeTab, setActiveTab] = useState<TabType>('bulletin');
   const [bulletinFilter, setBulletinFilter] = useState<BulletinFilter>('all');
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
@@ -148,6 +182,7 @@ export default function Events() {
   const [parishId, setParishId] = useState<string | null>(null);
   const [parish, setParish] = useState<any>(null);
   const [isParishAdmin, setIsParishAdmin] = useState(false);
+  const [managedChannelIds, setManagedChannelIds] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
 
   // Modal states
@@ -200,20 +235,26 @@ export default function Events() {
       const profile = await getUserProfile(user.id);
       setUserProfile(profile);
       
+      let nextParishId: string | null = null;
       if (profile?.user_type === 'parish_admin') {
         setIsParishAdmin(true);
         const parishData = await getParishByAdminId(user.id);
         setParish(parishData);
-        setParishId(parishData?.id || null);
+        nextParishId = parishData?.id || null;
       } else {
+        setIsParishAdmin(false);
         const parishData = await getParishByUserId(user.id);
         setParish(parishData);
-        setParishId(parishData?.id || null);
+        nextParishId = parishData?.id || null;
       }
-      
-      if (parishId) {
-        await loadWeekSchedule();
-        await loadBulletinEvents();
+      setParishId(nextParishId);
+      setChannelFilter('all');
+      if (!nextParishId) {
+        setWeekSchedule([]);
+        setBulletinEvents([]);
+        setChannels([]);
+        setSubscribedChannels([]);
+        setManagedChannelIds([]);
       }
     } catch (error) {
       console.error('Error initializing data:', error);
@@ -225,7 +266,20 @@ export default function Events() {
 
   useEffect(() => {
     initializeData();
-  }, [user, parishId]);
+  }, [user, parishEpoch]);
+
+  useEffect(() => {
+    if (!parishId) {
+      setWeekSchedule([]);
+      setBulletinEvents([]);
+      setChannels([]);
+      setSubscribedChannels([]);
+      setManagedChannelIds([]);
+      return;
+    }
+    void loadWeekSchedule(false);
+    void loadBulletinEvents();
+  }, [parishId]);
 
   const loadWeekSchedule = async (showLoading: boolean = true) => {
     if (!parishId) return;
@@ -265,7 +319,13 @@ export default function Events() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      // Re-resolve parish, then explicitly reload bulletin + confession
+      // (initializeData alone only bumps parishId when it changes).
       await initializeData();
+      await Promise.all([loadWeekSchedule(false), loadBulletinEvents()]);
+      if (user) {
+        notificationService.refreshEventNotifications(user.id).catch(() => {});
+      }
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -301,10 +361,19 @@ export default function Events() {
         : list.filter((c) => c.is_subscribed || c.is_default);
       setSubscribedChannels(subscribed);
 
-      // Keep create form defaulted to General
+      let managedIds: string[] = [];
+      if (!isParishAdmin) {
+        managedIds = await ChannelService.getManagedChannelIds(user.id, parishId);
+      }
+      setManagedChannelIds(managedIds);
+
+      // Keep create form defaulted to an allowed channel
       const general = list.find((c) => c.is_default);
-      if (general && !createEventData.channel_id) {
-        setCreateEventData((prev) => ({ ...prev, channel_id: general.id }));
+      const defaultChannelId = isParishAdmin
+        ? general?.id || list[0]?.id || ''
+        : managedIds[0] || general?.id || '';
+      if (defaultChannelId && !createEventData.channel_id) {
+        setCreateEventData((prev) => ({ ...prev, channel_id: defaultChannelId }));
       }
 
       // Reset filter if selected channel disappeared
@@ -622,13 +691,24 @@ export default function Events() {
     return timeSlot.available ? 'available' : 'unavailable';
   };
 
+  const canPost = isParishAdmin || managedChannelIds.length > 0;
+  const postableChannels = isParishAdmin
+    ? channels
+    : channels.filter((c) => managedChannelIds.includes(c.id));
+  const canManageSelectedPost =
+    !!selectedEvent &&
+    (isParishAdmin || (!!selectedEvent.channel_id && managedChannelIds.includes(selectedEvent.channel_id)));
+
   const resetCreateForm = () => {
     const generalId = channels.find((c) => c.is_default)?.id || '';
+    const channelId = isParishAdmin
+      ? generalId || channels[0]?.id || ''
+      : managedChannelIds[0] || generalId || '';
     setCreateEventData({
       title: '',
       description: '',
       event_type: 'announcement',
-      channel_id: generalId,
+      channel_id: channelId,
       event_date: '',
       event_time: '',
       location: '',
@@ -644,6 +724,11 @@ export default function Events() {
     
     if (!createEventData.channel_id) {
       Alert.alert('Error', 'Please choose a channel for this post');
+      return;
+    }
+
+    if (!isParishAdmin && !managedChannelIds.includes(createEventData.channel_id)) {
+      Alert.alert('Error', 'You can only post to channels you manage');
       return;
     }
 
@@ -1191,6 +1276,14 @@ export default function Events() {
         totalCount={timeFilteredEvents.length}
         isParishAdmin={isParishAdmin}
         onOpenChannels={() => setShowChannelsSheet(true)}
+        floatingEnabled={
+          bulletinFiltersVisible &&
+          isFocused &&
+          activeTab === 'bulletin' &&
+          !showCreateEventModal &&
+          !showEventDetailsModal &&
+          !showChannelsSheet
+        }
       />
 
       <View className="px-5 pt-1">
@@ -1207,12 +1300,11 @@ export default function Events() {
             <EmptyState
               icon="newspaper-outline"
               title="No posts yet"
-              message={isParishAdmin ? 'Create the first post to share news with your parish.' : 'Check back later for announcements.'}
+              message={canPost ? 'Create the first post to share news with your parish.' : 'Check back later for announcements.'}
             />
-          ) : filteredBulletin.length === 0 ? (
-            <EmptyState compact icon="filter-outline" title="Nothing here" message="No posts match this filter." />
           ) : (
-            filteredBulletin.map((event, index) => {
+            <>
+            {filteredBulletin.map((event, index) => {
               const kind = eventKindStyle[event.event_type];
               const isDated = (event.event_type === 'volunteer' || event.event_type === 'event') && !!event.event_date;
               const hasMeta = (event.event_type === 'volunteer' || event.event_type === 'event') && (!!event.event_time || !!event.location);
@@ -1221,8 +1313,9 @@ export default function Events() {
               return (
                 <Animated.View
                   key={event.id}
-                  entering={entrance.card(Math.min(index, 6) * 50)}
-                  layout={entrance.layout()}
+                  entering={reduceMotion ? undefined : entrance.card(Math.min(index, 6) * 50)}
+                  exiting={reduceMotion ? undefined : entrance.exit()}
+                  layout={reduceMotion ? undefined : entrance.layout()}
                 >
                   <PressableScale
                     onPress={() => openEventDetails(event)}
@@ -1313,7 +1406,11 @@ export default function Events() {
                   </PressableScale>
                 </Animated.View>
               );
-            })
+            })}
+            {filteredBulletin.length === 0 && (
+              <EmptyState compact icon="filter-outline" title="Nothing here" message="No posts match this filter." />
+            )}
+            </>
           )}
       </View>
     </View>
@@ -1339,26 +1436,45 @@ export default function Events() {
   }
 
   const selectedKind = selectedEvent ? eventKindStyle[selectedEvent.event_type] : null;
-  const fabBottom = Math.max(insets.bottom, TAB_BAR_GAP) + TAB_BAR_HEIGHT + 16;
+  const filterHelperBottom = Math.max(insets.bottom, TAB_BAR_GAP) + TAB_BAR_HEIGHT + 16;
+  const filtersFloating =
+    bulletinFiltersVisible &&
+    activeTab === 'bulletin' &&
+    !showCreateEventModal &&
+    !showEventDetailsModal &&
+    !showChannelsSheet;
+  // Sit above the filter helper when it's visible; otherwise just above the tab bar.
+  const fabBottom = filtersFloating
+    ? filterHelperBottom + BULLETIN_FILTER_HELPER_HEIGHT + 12
+    : filterHelperBottom;
+  const showPostFab =
+    canPost &&
+    activeTab === 'bulletin' &&
+    isFocused &&
+    !showCreateEventModal &&
+    !showEventDetailsModal &&
+    !showChannelsSheet;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <CompactHeader title="Events" scrollY={scrollY} />
+      <RefreshSpinnerOverlay refreshing={refreshing} scrollY={scrollY} top={insets.top} />
 
       <Animated.ScrollView
+        ref={scrollRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingTop: insets.top,
-          paddingBottom: contentBottomPadding(insets.bottom) + (isParishAdmin && activeTab === 'bulletin' ? 56 : 0),
+          paddingBottom:
+            contentBottomPadding(insets.bottom) +
+            (activeTab === 'bulletin' ? (canPost ? 120 : 56) : 0),
         }}
         refreshControl={
-          <RefreshControl
+          <AppRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.textMuted}
-            colors={[palette.accent]}
             progressViewOffset={insets.top}
           />
         }
@@ -1385,27 +1501,30 @@ export default function Events() {
         </Animated.View>
       </Animated.ScrollView>
 
-      {isParishAdmin && activeTab === 'bulletin' && (
-        <Animated.View
-          entering={entrance.pop()}
-          style={{ position: 'absolute', right: 20, bottom: fabBottom }}
-        >
-          <PressableScale
-            onPress={() => {
-              resetCreateForm();
-              setEditingEventId(null);
-              setShowCreateEventModal(true);
-            }}
-            haptic
-            accessibilityRole="button"
-            accessibilityLabel="Create a new post"
-            className="h-14 pl-5 pr-6 rounded-full bg-red-600 flex-row items-center"
-            style={{ shadowColor: palette.accent, shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8, borderRadius: 999 }}
+      {showPostFab && (
+        <Portal>
+          <Animated.View
+            entering={entrance.pop()}
+            pointerEvents="box-none"
+            style={{ position: 'absolute', right: 20, bottom: fabBottom, zIndex: 10 }}
           >
-            <Ionicons name="add" size={22} color="white" />
-            <Text className="font-sans-bold text-[15px] text-white ml-1.5">New post</Text>
-          </PressableScale>
-        </Animated.View>
+            <PressableScale
+              onPress={() => {
+                resetCreateForm();
+                setEditingEventId(null);
+                setShowCreateEventModal(true);
+              }}
+              haptic
+              accessibilityRole="button"
+              accessibilityLabel="Create a new post"
+              className="h-14 pl-5 pr-6 rounded-full bg-red-600 flex-row items-center"
+              style={{ shadowColor: palette.accent, shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10, borderRadius: 999 }}
+            >
+              <Ionicons name="add" size={22} color="white" />
+              <Text className="font-sans-bold text-[15px] text-white ml-1.5">New post</Text>
+            </PressableScale>
+          </Animated.View>
+        </Portal>
       )}
 
       {/* Reservation sheet */}
@@ -1557,13 +1676,13 @@ export default function Events() {
 
         <View className="mb-5">
           <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300 mb-2">Channel</Text>
-          {channels.length === 0 ? (
+          {postableChannels.length === 0 ? (
             <Text className="font-sans text-sm text-gray-500 dark:text-gray-400">
               No channels available. Run the channels migration or create one first.
             </Text>
           ) : (
             <View className="flex-row flex-wrap" style={{ marginHorizontal: -4 }}>
-              {channels.map((channel) => {
+              {postableChannels.map((channel) => {
                 const active = createEventData.channel_id === channel.id;
                 return (
                   <Pressable
@@ -1679,9 +1798,9 @@ export default function Events() {
             <Ionicons name="notifications" size={16} color={palette.accent} />
           </View>
           <View className="flex-1 pr-3">
-            <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Notify channel subscribers</Text>
+            <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Notify subscribers</Text>
             <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Push only to people subscribed to this channel
+              Push to people subscribed to this channel
             </Text>
           </View>
           <Switch
@@ -1704,7 +1823,7 @@ export default function Events() {
         eyebrow={selectedKind?.label}
         title={selectedEvent?.title}
         footer={
-          isParishAdmin && selectedEvent?.created_by === user?.id ? (
+          canManageSelectedPost ? (
             <View className="flex-row">
               <Button label="Edit" variant="secondary" icon="pencil" onPress={startEditingSelectedEvent} style={{ flex: 1, marginRight: 8 }} />
               <Button label="Delete" variant="danger" icon="trash-outline" onPress={() => handleDeleteEvent(selectedEvent!.id)} style={{ flex: 1 }} />
@@ -1774,9 +1893,9 @@ export default function Events() {
             {!isParishAdmin && selectedEvent.event_type === 'event' && (
               <View className="pt-4 mt-2 border-t border-gray-100 dark:border-white/[0.06]">
                 {selectedEvent.user_response ? (
-                  <Animated.View entering={FadeInDown.duration(360).springify().damping(26).stiffness(175)}>
+                  <Animated.View entering={FadeInDown.duration(280).springify().damping(24).stiffness(260)}>
                     <View className="flex-row items-center rounded-2xl p-4 bg-emerald-500/[0.08] border border-emerald-500/20 overflow-hidden">
-                      <Animated.View entering={ZoomIn.delay(80).springify().damping(18).stiffness(210)}>
+                      <Animated.View entering={ZoomIn.delay(60).springify().damping(18).stiffness(320)}>
                         <View className="h-10 w-10 rounded-full bg-emerald-500/15 items-center justify-center">
                           <Ionicons name="checkmark-circle" size={22} color={palette.green} />
                         </View>
@@ -1950,7 +2069,7 @@ export default function Events() {
               <View className="pt-4 mt-2 border-t border-gray-100 dark:border-white/[0.06]">
                 <View className="flex-row items-center justify-between mb-3">
                   <Text className="font-display text-[22px] text-gray-900 dark:text-white">Responses</Text>
-                  {loadingResponses && <ActivityIndicator size="small" color={colors.textMuted} />}
+                  {loadingResponses && <Spinner size="sm" />}
                 </View>
 
                 {!loadingResponses && eventResponses.length > 0 && (
@@ -2008,7 +2127,7 @@ export default function Events() {
                 {renderVolunteerProgress(selectedEvent)}
                 <View className="flex-row items-center justify-between mb-3">
                   <Text className="font-display text-[22px] text-gray-900 dark:text-white">Volunteers</Text>
-                  {loadingResponses && <ActivityIndicator size="small" color={colors.textMuted} />}
+                  {loadingResponses && <Spinner size="sm" />}
                 </View>
                 {eventResponses.length === 0 ? (
                   !loadingResponses && <EmptyState compact icon="people-outline" title="No volunteers yet" />
@@ -2044,6 +2163,7 @@ export default function Events() {
           onClose={() => setShowChannelsSheet(false)}
           parishId={parishId}
           userId={user.id}
+          adminUserId={parish?.admin_user_id || user.id}
           isParishAdmin={isParishAdmin}
           onChanged={() => {
             loadBulletinEvents();
@@ -2067,7 +2187,7 @@ export default function Events() {
             }}
           >
             <ConfettiCannon
-              count={180}
+              count={90}
               origin={{ x: windowWidth / 2, y: -20 }}
               fadeOut
               autoStart

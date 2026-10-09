@@ -1,15 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
+import { useEffect, useState } from 'react';
 import { Alert, Linking, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { entrance, palette } from '../constants/theme';
+import { useAuth } from '../contexts/AuthContext';
 import { CalendarTradition, useCalendarTradition } from '../contexts/CalendarTraditionContext';
 import { ThemePreference, useTheme } from '../contexts/ThemeContext';
+import { deleteAccount } from '../services/accountService';
+import { getUserProfile } from '../services/onboardingService';
+import { clearOnboardingStatus } from '../utils/onboardingStorage';
 import { PressableScale } from './ui/PressableScale';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { SettingsGroup, SettingsRow } from './ui/Settings';
+import { Spinner } from './ui/Spinner';
 
 const SUPPORT_EMAIL = 'support@parohia.app';
 
@@ -71,7 +77,23 @@ function ThemePreview({ scheme }: { scheme: ThemePreference }) {
 export default function GeneralSettings() {
   const { themePreference, setThemePreference } = useTheme();
   const { tradition, setTradition } = useCalendarTradition();
+  const { user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
+  const [isParishAdmin, setIsParishAdmin] = useState(false);
+  const [canDeleteAccount, setCanDeleteAccount] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user) return;
+      const profile = await getUserProfile(user.id);
+      const admin = profile?.user_type === 'parish_admin';
+      const regular = profile?.user_type === 'regular_user';
+      setIsParishAdmin(admin);
+      setCanDeleteAccount(admin || regular);
+    };
+    load();
+  }, [user]);
 
   const themeOptions: { label: string; value: ThemePreference; icon: keyof typeof Ionicons.glyphMap; description: string }[] = [
     { label: 'Light', value: 'light', icon: 'sunny', description: 'Always use light theme' },
@@ -85,6 +107,54 @@ export default function GeneralSettings() {
   };
 
   const active = themeOptions.find((o) => o.value === themePreference);
+
+  const confirmDeleteAccount = () => {
+    const title = isParishAdmin ? 'Delete parish account?' : 'Delete account?';
+    const message = isParishAdmin
+      ? 'This permanently deletes your account and your parish from Parohia.\n\n• All posts, channels, and confession schedules for your parish will be removed\n• Members will be unassigned and asked to choose a parish next time they sign in\n• This cannot be undone'
+      : 'This permanently deletes your Parohia account.\n\n• Your parish membership, channel subscriptions, and RSVPs will be removed\n• Posts you authored as a channel manager will be removed\n• This cannot be undone';
+    const secondMessage = isParishAdmin
+      ? 'Tap Delete forever only if you intend to remove your parish and account permanently.'
+      : 'Tap Delete forever only if you intend to remove your account permanently.';
+
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Continue',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert('Are you sure?', secondMessage, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete forever',
+              style: 'destructive',
+              onPress: runDeleteAccount,
+            },
+          ]);
+        },
+      },
+    ]);
+  };
+
+  const runDeleteAccount = async () => {
+    if (deleting) return;
+    try {
+      setDeleting(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      const result = await deleteAccount();
+      if (!result.success) {
+        Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
+        return;
+      }
+      await clearOnboardingStatus();
+      await signOut();
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      Alert.alert('Error', error?.message || 'Failed to delete account. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -182,12 +252,47 @@ export default function GeneralSettings() {
               Haptics.selectionAsync().catch(() => {});
               openSupportEmail();
             }}
-            right={<Ionicons name="chevron-forward" size={16} color={palette.gray400} />}
+            right={<Ionicons name="chevron-forward" size={16} color={palette.blue} />}
           />
         </SettingsGroup>
       </Animated.View>
 
-      <Animated.View entering={entrance.card(120)} style={{ alignItems: 'center', marginTop: 40 }}>
+      {canDeleteAccount && (
+        <Animated.View entering={entrance.card(120)}>
+          <SettingsGroup
+            title="Danger zone"
+            footer={
+              isParishAdmin
+                ? 'Deleting your account removes your parish from Parohia. Members will need to choose a new parish the next time they sign in.'
+                : 'Deleting your account permanently removes your profile and membership data from Parohia.'
+            }
+          >
+            <SettingsRow
+              first
+              icon="trash-outline"
+              iconColor={palette.accentSoft}
+              title={
+                deleting
+                  ? 'Deleting account…'
+                  : isParishAdmin
+                    ? 'Delete account & parish'
+                    : 'Delete account'
+              }
+              subtitle="Permanent — cannot be undone"
+              onPress={deleting ? undefined : confirmDeleteAccount}
+              right={
+                deleting ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <Ionicons name="chevron-forward" size={16} color={palette.accentSoft} />
+                )
+              }
+            />
+          </SettingsGroup>
+        </Animated.View>
+      )}
+
+      <Animated.View entering={entrance.card(160)} style={{ alignItems: 'center', marginTop: 40 }}>
         <Text className="font-display text-[20px] text-gray-400 dark:text-gray-600">Parohia</Text>
         <Text className="font-sans text-xs text-gray-400 dark:text-gray-600 mt-0.5">
           Version {Constants.expoConfig?.version ?? '1.0.0'}

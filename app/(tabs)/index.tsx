@@ -2,28 +2,32 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, RefreshControl, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventDetailSheet } from "../../components/liturgical/EventDetailSheet";
 import { FastingBadge } from "../../components/liturgical/FastingBadge";
-import { ReadingSheet } from "../../components/liturgical/ReadingSheet";
 import { ReadingsCarousel } from "../../components/liturgical/ReadingsCarousel";
+import { ReadingSheet } from "../../components/liturgical/ReadingSheet";
 import { TimelineItem } from "../../components/liturgical/TimelineItem";
 import ParishCalendarSetup, { CalendarSetupCallout } from '../../components/ParishCalendarSetup';
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PressableScale } from "../../components/ui/PressableScale";
 import { Reveal } from "../../components/ui/Reveal";
+import { AppRefreshControl, RefreshSpinnerOverlay } from "../../components/ui/AppRefreshControl";
 import { CompactHeader, LargeHeader, useScrollHeader } from "../../components/ui/ScreenHeader";
 import { SectionHeader } from "../../components/ui/SectionHeader";
 import { Skeleton, SkeletonRows } from "../../components/ui/Skeleton";
+import { Spinner } from "../../components/ui/Spinner";
 import { useThemeColors } from "../../components/ui/useThemeColors";
 import { contentBottomPadding, EventKind, eventKindStyle, palette } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNotifications } from "../../contexts/NotificationContext";
+import { useParishScope } from "../../contexts/ParishScopeContext";
 import { useOrthodoxCalendar } from "../../hooks/useOrthodoxCalendar";
+import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
 import { BulletinEvent, BulletinService } from '../../services/bulletinService';
 import { ConfessionReservationWithSchedule, ConfessionService } from '../../services/confessionService';
 import { getUserProfile } from '../../services/onboardingService';
@@ -46,7 +50,10 @@ export default function Index() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { scrollY, onScroll } = useScrollHeader();
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  useTabScrollToTop(scrollRef);
   const { user, loading: authLoading } = useAuth();
+  const { parishEpoch } = useParishScope();
   const { 
     calendarData, 
     greeting, 
@@ -137,7 +144,7 @@ export default function Index() {
       await fetchPersonalConfessions();
     };
     initializeData();
-  }, [user]);
+  }, [user, parishEpoch]);
 
   const handleCalendarSetupSuccess = () => {
     setParishHasCalendar(true);
@@ -365,7 +372,7 @@ export default function Index() {
   if (authLoading) {
     return (
       <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
-        <ActivityIndicator size="small" color={colors.textMuted} />
+        <Spinner size="sm" />
         <Text className="font-sans-medium text-gray-500 dark:text-gray-400 mt-3">Signing you in…</Text>
       </View>
     );
@@ -403,17 +410,17 @@ export default function Index() {
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <CompactHeader title="Home" scrollY={scrollY} />
+      <RefreshSpinnerOverlay refreshing={refreshing} scrollY={scrollY} top={insets.top} />
       <Animated.ScrollView
+        ref={scrollRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top, paddingBottom: contentBottomPadding(insets.bottom) }}
         refreshControl={
-          <RefreshControl
+          <AppRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.textMuted}
-            colors={[palette.accent]}
             progressViewOffset={insets.top}
           />
         }
@@ -567,7 +574,6 @@ export default function Index() {
         title={selectedReading?.display}
         subtitle="King James Version"
         body={selectedReading?.passage}
-        scripture
       />
 
       <EventDetailSheet

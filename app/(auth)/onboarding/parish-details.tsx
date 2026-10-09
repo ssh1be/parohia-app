@@ -46,6 +46,11 @@ export default function ParishDetailsScreen() {
       return;
     }
 
+    if (!jurisdiction.trim()) {
+      Alert.alert('Error', 'Please enter your jurisdiction');
+      return;
+    }
+
     if (!address.trim()) {
       Alert.alert('Error', 'Please enter your parish address');
       return;
@@ -63,7 +68,7 @@ export default function ParishDetailsScreen() {
 
     updateData({
       parishName: parishName.trim(),
-      jurisdiction,
+      jurisdiction: jurisdiction.trim(),
       address: address.trim(),
       city: city.trim(),
       state: state.trim(),
@@ -98,6 +103,7 @@ export default function ParishDetailsScreen() {
 
         <Field
           label="Jurisdiction"
+          required
           placeholder="Orthodox Church in America (OCA)"
           value={jurisdiction}
           onChangeText={setJurisdiction}

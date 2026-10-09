@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { eventKindStyle, palette } from '../constants/theme';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { eventKindStyle, palette, TAB_BAR_GAP, TAB_BAR_HEIGHT } from '../constants/theme';
 import { BulletinChannel } from '../services/channelService';
+import { Portal } from './ui/Portal';
 import { PressableScale } from './ui/PressableScale';
 import { Sheet } from './ui/Sheet';
 import { useThemeColors } from './ui/useThemeColors';
@@ -95,6 +99,8 @@ interface BulletinFeedHeaderProps {
   totalCount: number;
   isParishAdmin: boolean;
   onOpenChannels: () => void;
+  /** Only show the floating helper while the bulletin tab is active. */
+  floatingEnabled: boolean;
 }
 
 function channelIcon(channel: BulletinChannel | { id: 'all' }): keyof typeof Ionicons.glyphMap {
@@ -160,7 +166,10 @@ export function BulletinFeedHeader({
   totalCount,
   isParishAdmin,
   onOpenChannels,
+  floatingEnabled,
 }: BulletinFeedHeaderProps) {
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const [showFiltersSheet, setShowFiltersSheet] = useState(false);
   const [filterPicker, setFilterPicker] = useState<'type' | 'time'>('type');
 
@@ -178,7 +187,21 @@ export function BulletinFeedHeader({
     channelFilter !== 'all' || typeFilter !== 'all' || timeFilter !== 'all';
   const typeOrTimeActive = typeFilter !== 'all' || timeFilter !== 'all';
 
-  const colors = useThemeColors();
+  const countLabel =
+    visibleCount === 0
+      ? `No ${activeType.countPlural} here`
+      : `${visibleCount} ${visibleCount === 1 ? activeType.countSingular : activeType.countPlural}${
+          channelFilter === 'all' ? '' : ` in ${activeChannel?.name ?? 'channel'}`
+        }`;
+
+  // Sit just above the tab bar; the New post FAB (when present) floats above this row.
+  const helperBottom = Math.max(insets.bottom, TAB_BAR_GAP) + TAB_BAR_HEIGHT + 16;
+
+  const openFilters = () => {
+    Haptics.selectionAsync().catch(() => {});
+    setFilterPicker('type');
+    setShowFiltersSheet(true);
+  };
 
   return (
     <View className="pb-1">
@@ -252,74 +275,102 @@ export function BulletinFeedHeader({
         </Pressable>
       </ScrollView>
 
-      {/* Temporarily hidden — filters + post counts row
-      <View className="px-5 mb-2 flex-row items-center">
-        <View className="flex-1 flex-row items-center pr-3">
-          <Text className="font-sans-medium text-[13px] text-gray-500 dark:text-gray-400" numberOfLines={1}>
-            {visibleCount === 0
-              ? `No ${activeType.countPlural} here`
-              : `${visibleCount} ${visibleCount === 1 ? activeType.countSingular : activeType.countPlural}${
-                  channelFilter === 'all' ? '' : ` in ${activeChannel?.name ?? 'channel'}`
-                }`}
-          </Text>
-        </View>
-
-        {filtersActive && (
-          <Pressable
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onChannelChange('all');
-              onTypeChange('all');
-              onTimeChange('all');
-            }}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Clear filters"
-            className="mr-2"
+      {/* Floating filter helper — always present on bulletin; hidden under sheets */}
+      {floatingEnabled && !showFiltersSheet && (
+        <Portal>
+          <Animated.View
+            entering={FadeInDown.duration(220)}
+            exiting={FadeOutDown.duration(80)}
+            pointerEvents="box-none"
+            style={[styles.helperHost, { bottom: helperBottom }]}
           >
-            <Text className="font-sans-bold text-[12px] text-red-600 dark:text-red-400">Clear</Text>
-          </Pressable>
-        )}
+            <View
+              className="mx-4 overflow-hidden rounded-full border border-gray-200/80 dark:border-white/10"
+              style={{
+                shadowColor: '#111827',
+                shadowOpacity: colors.isDark ? 0.35 : 0.12,
+                shadowRadius: 14,
+                shadowOffset: { width: 0, height: 6 },
+                elevation: 6,
+              }}
+            >
+              {Platform.OS === 'ios' ? (
+                <BlurView
+                  intensity={colors.isDark ? 40 : 55}
+                  tint={colors.isDark ? 'systemUltraThinMaterialDark' : 'systemUltraThinMaterialLight'}
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : (
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor: colors.isDark ? 'rgba(17,24,39,0.92)' : 'rgba(255,255,255,0.94)' },
+                  ]}
+                />
+              )}
+              <View className="h-11 px-3.5 flex-row items-center">
+                <Text
+                  className="flex-1 font-sans-medium text-[13px] text-gray-600 dark:text-gray-300 pr-2"
+                  numberOfLines={1}
+                >
+                  {countLabel}
+                </Text>
 
-        <PressableScale
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            setFilterPicker('type');
-            setShowFiltersSheet(true);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Filters: ${activeType.label}, ${activeTime.label}`}
-          scaleTo={0.97}
-          className={`h-9 pl-3 pr-2.5 rounded-full flex-row items-center border ${
-            typeOrTimeActive
-              ? 'bg-red-600/10 border-red-600/20'
-              : 'bg-white dark:bg-white/[0.05] border-gray-200 dark:border-white/10'
-          }`}
-        >
-          <Ionicons
-            name="options-outline"
-            size={14}
-            color={typeOrTimeActive ? palette.accent : palette.gray500}
-          />
-          <Text
-            className={`font-sans-bold text-[12px] ml-1.5 ${
-              typeOrTimeActive
-                ? 'text-red-700 dark:text-red-300'
-                : 'text-gray-700 dark:text-gray-300'
-            }`}
-            numberOfLines={1}
-          >
-            Filters
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={13}
-            color={typeOrTimeActive ? palette.accent : colors.textMuted}
-            style={{ marginLeft: 2 }}
-          />
-        </PressableScale>
-      </View>
-      */}
+                {filtersActive && (
+                  <Pressable
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      onChannelChange('all');
+                      onTypeChange('all');
+                      onTimeChange('all');
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear filters"
+                    className="mr-2"
+                  >
+                    <Text className="font-sans-bold text-[12px] text-red-600 dark:text-red-400">Clear</Text>
+                  </Pressable>
+                )}
+
+                <PressableScale
+                  onPress={openFilters}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Filters: ${activeType.label}, ${activeTime.label}`}
+                  scaleTo={0.97}
+                  className={`h-8 pl-2.5 pr-2 rounded-full flex-row items-center border ${
+                    typeOrTimeActive
+                      ? 'bg-red-600/15 border-red-600/25'
+                      : 'bg-gray-100/80 dark:bg-white/10 border-transparent'
+                  }`}
+                >
+                  <Ionicons
+                    name="options-outline"
+                    size={13}
+                    color={typeOrTimeActive ? palette.accent : palette.gray500}
+                  />
+                  <Text
+                    className={`font-sans-bold text-[12px] ml-1 ${
+                      typeOrTimeActive
+                        ? 'text-red-700 dark:text-red-300'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                    numberOfLines={1}
+                  >
+                    Filter
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={12}
+                    color={typeOrTimeActive ? palette.accent : colors.textMuted}
+                    style={{ marginLeft: 1 }}
+                  />
+                </PressableScale>
+              </View>
+            </View>
+          </Animated.View>
+        </Portal>
+      )}
 
       <Sheet
         visible={showFiltersSheet}
@@ -415,3 +466,16 @@ export function BulletinFeedHeader({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  helperHost: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 9,
+  },
+});
+
+/** Keep in sync with Events FAB stack offset above this helper. */
+export const BULLETIN_FILTER_HELPER_HEIGHT = 44;
+

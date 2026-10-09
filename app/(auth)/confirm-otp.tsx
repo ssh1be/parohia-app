@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Keyboard,
   Pressable,
   Text,
   TextInput,
@@ -12,7 +12,7 @@ import {
 import { AuthHeader, AuthScaffold } from '../../components/auth/AuthChrome';
 import { Button } from '../../components/ui/Button';
 import { Reveal } from '../../components/ui/Reveal';
-import { useThemeColors } from '../../components/ui/useThemeColors';
+import { Spinner } from '../../components/ui/Spinner';
 import { palette } from '../../constants/theme';
 import { supabase } from '../../config/supabase';
 
@@ -26,8 +26,8 @@ export default function ConfirmOTPScreen() {
   const [resendLoading, setResendLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [focused, setFocused] = useState(false);
-  const colors = useThemeColors();
   const inputRef = useRef<TextInput>(null);
+  const verifyingRef = useRef(false);
 
   useEffect(() => {
     if (!email) {
@@ -42,17 +42,22 @@ export default function ConfirmOTPScreen() {
     }
   }, [countdown]);
 
-  const handleConfirmOTP = async () => {
-    if (!otp || otp.length < OTP_LENGTH) {
-      Alert.alert('Error', 'Please enter the 6-digit OTP code');
+  const handleConfirmOTP = async (code = otp) => {
+    if (!code || code.length < OTP_LENGTH || verifyingRef.current) {
+      if (!code || code.length < OTP_LENGTH) {
+        Alert.alert('Error', 'Please enter the 6-digit OTP code');
+      }
       return;
     }
 
+    verifyingRef.current = true;
+    Keyboard.dismiss();
+    inputRef.current?.blur();
     setLoading(true);
     try {
       const { error } = await supabase.auth.verifyOtp({
         email,
-        token: otp,
+        token: code,
         type: 'signup',
       });
 
@@ -61,12 +66,21 @@ export default function ConfirmOTPScreen() {
       Alert.alert(
         'Success!',
         "Your email has been verified. Let's complete your profile.",
-        [{ text: 'Continue', onPress: () => router.push('/(auth)/onboarding/user-type') }],
+        [{ text: 'Continue', onPress: () => router.replace('/(auth)/onboarding/user-type') }],
       );
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to verify OTP');
     } finally {
+      verifyingRef.current = false;
       setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (text: string) => {
+    const next = text.replace(/[^0-9]/g, '').slice(0, OTP_LENGTH);
+    setOtp(next);
+    if (next.length === OTP_LENGTH) {
+      handleConfirmOTP(next);
     }
   };
 
@@ -94,7 +108,7 @@ export default function ConfirmOTPScreen() {
   if (!email) {
     return (
       <View className="flex-1 bg-gray-50 dark:bg-black justify-center items-center">
-        <ActivityIndicator size="small" color={colors.textMuted} />
+        <Spinner size="sm" />
       </View>
     );
   }
@@ -152,7 +166,7 @@ export default function ConfirmOTPScreen() {
           <TextInput
             ref={inputRef}
             value={otp}
-            onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, '').slice(0, OTP_LENGTH))}
+            onChangeText={handleOtpChange}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             keyboardType="number-pad"
@@ -160,7 +174,8 @@ export default function ConfirmOTPScreen() {
             autoComplete="sms-otp"
             maxLength={OTP_LENGTH}
             autoFocus
-            onSubmitEditing={handleConfirmOTP}
+            editable={!loading}
+            onSubmitEditing={() => handleConfirmOTP()}
             style={{ position: 'absolute', opacity: 0, height: 1, width: 1 }}
             caretHidden
           />
