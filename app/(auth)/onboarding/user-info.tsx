@@ -16,7 +16,7 @@ export default function UserInfoScreen() {
 
   const handleContinue = () => {
     if (!fullName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
+      Alert.alert('Error', 'Please enter your display name');
       return;
     }
 
@@ -47,7 +47,7 @@ export default function UserInfoScreen() {
 
       <Reveal index={2}>
         <Field
-          label="Full Name"
+          label="Display Name"
           required
           placeholder="John Doe"
           value={fullName}
@@ -59,7 +59,7 @@ export default function UserInfoScreen() {
 
         <Field
           label="Phone Number"
-          helper="Optional — used by your parish if they need to reach you."
+          helper="Optional — only used by your parish if they need to reach you."
           placeholder="(503) 123-4567"
           value={phoneNumber}
           onChangeText={setPhoneNumber}

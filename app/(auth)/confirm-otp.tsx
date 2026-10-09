@@ -63,14 +63,9 @@ export default function ConfirmOTPScreen() {
 
       if (error) throw error;
 
-      Alert.alert(
-        'Success!',
-        "Your email has been verified. Let's complete your profile.",
-        [{ text: 'Continue', onPress: () => router.replace('/(auth)/onboarding/user-type') }],
-      );
+      router.replace('/(auth)/onboarding/user-type');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to verify OTP');
-    } finally {
       verifyingRef.current = false;
       setLoading(false);
     }

@@ -1880,13 +1880,21 @@ export default function Events() {
             })()}
 
             <Text className="font-sans text-xs text-gray-400 dark:text-gray-500 mt-4 mb-2">
-              Posted {new Date(selectedEvent.created_at).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {(() => {
+                const postedAt = new Date(selectedEvent.created_at);
+                const posterName =
+                  selectedEvent.created_by_profile?.full_name?.trim() || 'Unknown';
+                const datePart = postedAt.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                });
+                const timePart = postedAt.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                });
+                return `Posted by ${posterName} on ${datePart} at ${timePart}`;
+              })()}
             </Text>
 
             {/* RSVP for parishioners */}

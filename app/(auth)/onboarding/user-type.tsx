@@ -20,7 +20,7 @@ const OPTIONS: {
 }[] = [
   {
     type: 'regular_user',
-    title: 'Parishioner',
+    title: 'Parish Member',
     description: 'Connect with your parish and community',
     icon: 'person',
   },

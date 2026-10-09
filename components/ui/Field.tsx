@@ -1,6 +1,7 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useRef, useState } from 'react';
 import { Platform, Text, TextInput, TextInputProps, View } from 'react-native';
 import { palette } from '../../constants/theme';
+import { useSheetScroll } from './Sheet';
 import { useThemeColors } from './useThemeColors';
 
 interface FieldProps extends TextInputProps {
@@ -29,11 +30,13 @@ export function Field({
 }: FieldProps) {
   const [focused, setFocused] = useState(false);
   const colors = useThemeColors();
+  const sheetScroll = useSheetScroll();
+  const fieldRef = useRef<View>(null);
   // Explicit background beats iOS autofill's yellow fill; className alone does not.
   const fill = colors.isDark ? 'rgba(255,255,255,0.05)' : '#F3F4F6';
 
   return (
-    <View className={`mb-4 ${containerClassName}`}>
+    <View ref={fieldRef} className={`mb-4 ${containerClassName}`}>
       <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300 mb-2">
         {label}
         {required ? <Text className="text-red-600 dark:text-red-400"> *</Text> : null}
@@ -46,6 +49,7 @@ export function Field({
           placeholderTextColor={palette.gray400}
           onFocus={(e) => {
             setFocused(true);
+            sheetScroll?.ensureVisible(fieldRef.current);
             onFocus?.(e);
           }}
           onBlur={(e) => {

@@ -1,17 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   Keyboard,
   KeyboardEvent,
   Platform,
   Pressable,
+  ScrollView as RNScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   Extrapolation,
@@ -27,6 +28,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { springs } from '../../constants/theme';
 import { Portal } from './Portal';
 import { useThemeColors } from './useThemeColors';
+
+type SheetScrollContextValue = {
+  /** Scroll a focused field into view inside the sheet body. */
+  ensureVisible: (node: View | null) => void;
+};
+
+const SheetScrollContext = createContext<SheetScrollContextValue | null>(null);
+
+/** Used by Field (and similar) to keep focused inputs above the keyboard/footer. */
+export function useSheetScroll() {
+  return useContext(SheetScrollContext);
+}
 
 interface SheetProps {
   visible: boolean;
@@ -78,10 +91,13 @@ export function Sheet({
   const translateY = useSharedValue(height);
   const backdrop = useSharedValue(0);
   const keyboardHeight = useSharedValue(0);
+  const scrollRef = useRef<RNScrollView>(null);
+  const scrollOffsetRef = useRef(0);
 
   const pendingEnter = useRef(false);
   const visibleRef = useRef(visible);
   const unmountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollFocusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   visibleRef.current = visible;
 
   const clearUnmountTimer = () => {
@@ -109,6 +125,32 @@ export function Sheet({
     pendingEnter.current = false;
     requestAnimationFrame(enter);
   };
+
+  const ensureVisible = useCallback((node: View | null) => {
+    if (!node || !scrollRef.current) return;
+    if (scrollFocusTimer.current) clearTimeout(scrollFocusTimer.current);
+
+    // Wait for keyboard dock + layout, then keep the focused field in the visible viewport.
+    scrollFocusTimer.current = setTimeout(() => {
+      node.measureInWindow((_x, y, _w, h) => {
+        scrollRef.current?.measureInWindow((_sx, sy, _sw, sh) => {
+          const pad = 20;
+          const fieldTop = y;
+          const fieldBottom = y + h;
+          const viewTop = sy + pad;
+          const viewBottom = sy + sh - pad;
+          let delta = 0;
+          if (fieldBottom > viewBottom) delta = fieldBottom - viewBottom;
+          else if (fieldTop < viewTop) delta = fieldTop - viewTop;
+          if (Math.abs(delta) < 2) return;
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, scrollOffsetRef.current + delta),
+            animated: true,
+          });
+        });
+      });
+    }, Platform.OS === 'ios' ? 300 : 140);
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -156,6 +198,10 @@ export function Sheet({
     const onHide = (event: KeyboardEvent) => {
       setKeyboardDocked(false);
       keyboardHeight.value = withTiming(0, keyboardTiming(event));
+      if (scrollFocusTimer.current) {
+        clearTimeout(scrollFocusTimer.current);
+        scrollFocusTimer.current = null;
+      }
     };
 
     const showSub = Keyboard.addListener(showEvent, onShow);
@@ -163,6 +209,7 @@ export function Sheet({
     return () => {
       showSub.remove();
       hideSub.remove();
+      if (scrollFocusTimer.current) clearTimeout(scrollFocusTimer.current);
     };
   }, [mounted, keyboardHeight]);
 
@@ -181,7 +228,7 @@ export function Sheet({
   }, [visible, dismissible, onClose]);
 
   const pan = Gesture.Pan()
-    .enabled(dismissible && visible)
+    .enabled(dismissible && visible && !keyboardDocked)
     .activeOffsetY(8)
     .failOffsetX([-24, 24])
     .onUpdate((e) => {
@@ -218,6 +265,11 @@ export function Sheet({
 
   const hasHeader = !!(title || subtitle || eyebrow);
   const restingMaxHeight = height - insets.top - TOP_GAP;
+  const scrollBottomPad = footer
+    ? keyboardDocked
+      ? 28
+      : 20
+    : Math.max(insets.bottom, 16) + 16;
 
   return (
     <Portal>
@@ -291,34 +343,42 @@ export function Sheet({
                 </View>
               </GestureDetector>
 
-              {scrollable ? (
-                <ScrollView
-                  // flex:1 only when sheet has a definite expanded height; otherwise it collapses to 0.
-                  style={keyboardDocked ? { flex: 1 } : undefined}
-                  keyboardShouldPersistTaps="always"
-                  keyboardDismissMode="on-drag"
-                  showsVerticalScrollIndicator={false}
-                  bounces={false}
-                  nestedScrollEnabled
-                  contentContainerStyle={{
-                    paddingHorizontal: 24,
-                    paddingTop: 4,
-                    paddingBottom: footer ? 16 : Math.max(insets.bottom, 16) + 16,
-                  }}
-                >
-                  {children}
-                </ScrollView>
-              ) : (
-                <View
-                  style={{
-                    flexGrow: keyboardDocked ? 1 : undefined,
-                    paddingHorizontal: 24,
-                    paddingBottom: footer ? 16 : Math.max(insets.bottom, 16) + 16,
-                  }}
-                >
-                  {children}
-                </View>
-              )}
+              <SheetScrollContext.Provider value={{ ensureVisible }}>
+                {scrollable ? (
+                  <RNScrollView
+                    ref={scrollRef}
+                    // flex:1 only when sheet has a definite expanded height; otherwise it collapses to 0.
+                    style={keyboardDocked ? { flex: 1 } : undefined}
+                    keyboardShouldPersistTaps="always"
+                    keyboardDismissMode="on-drag"
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                    nestedScrollEnabled
+                    onScroll={(e) => {
+                      scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+                    }}
+                    scrollEventThrottle={16}
+                    contentContainerStyle={{
+                      paddingHorizontal: 24,
+                      paddingTop: 4,
+                      paddingBottom: scrollBottomPad,
+                      flexGrow: keyboardDocked ? 1 : undefined,
+                    }}
+                  >
+                    {children}
+                  </RNScrollView>
+                ) : (
+                  <View
+                    style={{
+                      flexGrow: keyboardDocked ? 1 : undefined,
+                      paddingHorizontal: 24,
+                      paddingBottom: scrollBottomPad,
+                    }}
+                  >
+                    {children}
+                  </View>
+                )}
+              </SheetScrollContext.Provider>
 
               {footer && (
                 <Animated.View
