@@ -272,6 +272,8 @@ const easeInOut = (t: number) => {
 };
 /** Pin progress where the phone has faded out. */
 const EXITED = 0.97;
+/** Entry progress where the phone has faded out (mirror of EXITED when scrolling up). */
+const ENTERED = 0.35;
 /** Point in the section's entry (0 to 1) where the zoom-in starts, before the pin locks. */
 const FOCUS_START = 0.45;
 
@@ -355,24 +357,43 @@ function PinnedPreview() {
     document.documentElement.dataset.immersive = t > 0.85 && p < 0.98 ? "true" : "false";
   });
 
-  /** Once a downward scroll settles past the faded-out phone, glide on to center the next section. */
+  /** Once a scroll settles past the faded-out phone, glide on to center the next (down) or previous (up) section. */
   useEffect(() => {
     let timer = 0;
     let lastY = window.scrollY;
     let down = false;
     let gliding = false;
 
+    const centerOf = (el: Element) => {
+      const rect = el.getBoundingClientRect();
+      const offset = rect.height < window.innerHeight ? (rect.height - window.innerHeight) / 2 : 0;
+      return { rect, offset, top: window.scrollY + rect.top + offset };
+    };
+
     const glide = () => {
       const track = trackRef.current;
-      const next = track?.closest("section")?.nextElementSibling;
-      if (!track || !next || !down) return;
-      const progress = -track.getBoundingClientRect().top / (track.offsetHeight - window.innerHeight);
-      const rect = next.getBoundingClientRect();
-      const offset = rect.height < window.innerHeight ? (rect.height - window.innerHeight) / 2 : 0;
-      if (progress < EXITED || rect.top + offset < 2) return;
+      const section = track?.closest("section");
+      const sibling = down ? section?.nextElementSibling : section?.previousElementSibling;
+      if (!track || !sibling) return;
+
+      if (down) {
+        const progress = -track.getBoundingClientRect().top / (track.offsetHeight - window.innerHeight);
+        const { offset, top, rect } = centerOf(sibling);
+        if (progress < EXITED || rect.top + offset < 2) return;
+        gliding = true;
+        window.setTimeout(onScrollEnd, 1200);
+        window.scrollTo({ top, behavior: "smooth" });
+        return;
+      }
+
+      const trackTop = track.getBoundingClientRect().top;
+      const entry = 1 - Math.min(Math.max(trackTop / window.innerHeight, 0), 1);
+      const { offset, top, rect } = centerOf(sibling);
+      // Only while still in the entry fade band — not after we've fully left the section.
+      if (entry > ENTERED || entry <= 0 || rect.top + offset > -2) return;
       gliding = true;
       window.setTimeout(onScrollEnd, 1200);
-      window.scrollTo({ top: window.scrollY + rect.top + offset, behavior: "smooth" });
+      window.scrollTo({ top, behavior: "smooth" });
     };
     const onScroll = () => {
       const y = window.scrollY;

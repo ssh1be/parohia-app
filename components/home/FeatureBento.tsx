@@ -146,14 +146,13 @@ function useDelayed<T>(value: T, ms: number) {
   return delayed;
 }
 
-function Notification({ title, body }: { title: string; body: string }) {
+function Notification({ title, body, delay = 0 }: { title: string; body: string; delay?: number }) {
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: -14, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      animate={{ opacity: 1, y: 0, scale: 1, transition: { type: "spring", damping: 22, stiffness: 220, delay } }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
-      transition={{ type: "spring", damping: 22, stiffness: 220 }}
       className="glass flex items-start gap-3 rounded-[20px] border border-gray-200/70 p-3 shadow-[0_12px_28px_-14px_rgba(9,9,11,0.3)] dark:border-white/10"
     >
       <img src="/App_store_1024_1x.png" alt="" className="h-9 w-9 shrink-0 rounded-[10px]" />
@@ -188,7 +187,9 @@ function RemindersTile({
   const delayedSlot = useDelayed(booked, 650);
   // A stale slot's reminder clears the moment the booking changes; only the new one waits.
   const notifiedSlot = delayedSlot === booked ? delayedSlot : null;
-  const notifiedLead = useDelayed(lead, 300);
+  const delayedLead = useDelayed(lead, 320);
+  // Same beat for lead: exit current cards immediately, then enter with the new timing.
+  const notifiedLead = delayedLead === lead ? delayedLead : null;
 
   return (
     <div>
@@ -219,15 +220,20 @@ function RemindersTile({
 
       <div className="mt-3 flex min-h-[76px] flex-col gap-2" aria-live="polite">
         <AnimatePresence initial={false}>
-          {notify && notifiedSlot && (
+          {notify && notifiedSlot && notifiedLead && (
             <Notification
               key={`confession-${notifiedSlot}-${notifiedLead}`}
               title={`Confession with ${PARISH.priest}`}
               body={`Starts in ${LEAD_TEXT[notifiedLead]}, at ${notifiedSlot} AM`}
             />
           )}
-          {notify && (
-            <Notification key={`paraklesis-${notifiedLead}`} title="Paraklesis to St. John the Baptist" body={`Starts in ${LEAD_TEXT[notifiedLead]}`} />
+          {notify && notifiedLead && (
+            <Notification
+              key={`paraklesis-${notifiedLead}`}
+              title="Paraklesis to St. John the Baptist"
+              body={`Starts in ${LEAD_TEXT[notifiedLead]}`}
+              delay={notifiedSlot ? 0.14 : 0}
+            />
           )}
           {showPaused && (
             <motion.p
