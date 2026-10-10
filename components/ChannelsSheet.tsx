@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { palette } from '../constants/theme';
 import { BulletinChannel, ChannelService } from '../services/channelService';
 import { getParishMembers, ParishMember } from '../services/parishService';
-import { palette } from '../constants/theme';
 import { Button } from './ui/Button';
 import { Field } from './ui/Field';
 import { PressableScale } from './ui/PressableScale';
@@ -166,13 +166,13 @@ export function ChannelsSheet({
   };
 
   const handleSaveChannel = async () => {
-    if (!editingChannel?.is_default && !name.trim()) return;
+    if (!editingChannel?.is_default && !editingChannel?.is_chant && !name.trim()) return;
     try {
       setSaving(true);
       let channelId = editingChannel?.id;
 
       if (editingChannel) {
-        if (!editingChannel.is_default) {
+        if (!editingChannel.is_default && !editingChannel.is_chant) {
           const result = await ChannelService.renameChannel(
             editingChannel.id,
             name,
@@ -219,7 +219,7 @@ export function ChannelsSheet({
   };
 
   const handleArchive = (channel: BulletinChannel) => {
-    if (channel.is_default) return;
+    if (channel.is_default || channel.is_chant) return;
     Alert.alert(
       'Archive channel',
       `Archive “${channel.name}”? It will be hidden from parishioners. Existing posts stay in the archive.`,
@@ -244,7 +244,7 @@ export function ChannelsSheet({
   };
 
   const formOpen = showCreate || !!editingChannel;
-  const editingDefault = !!editingChannel?.is_default;
+  const editingLocked = !!(editingChannel?.is_default || editingChannel?.is_chant);
 
   return (
     <Sheet
@@ -276,7 +276,7 @@ export function ChannelsSheet({
               label={saving ? 'Saving…' : editingChannel ? 'Save' : 'Create'}
               icon="checkmark"
               loading={saving}
-              disabled={(!editingDefault && !name.trim()) || saving}
+              disabled={(!editingLocked && !name.trim()) || saving}
               onPress={handleSaveChannel}
               style={{ flex: 1 }}
             />
@@ -293,14 +293,14 @@ export function ChannelsSheet({
     >
       {formOpen ? (
         <View>
-          {!editingDefault && (
+          {!editingLocked && (
             <>
               <Field
                 label="Name"
                 required
                 value={name}
                 onChangeText={setName}
-                placeholder="e.g. Choir, Youth, Outreach"
+                placeholder="e.g. Youth, Fellowship, Outreach"
                 autoFocus
               />
               <Field
@@ -389,7 +389,7 @@ export function ChannelsSheet({
             </View>
           )}
 
-          {editingChannel && !editingChannel.is_default && (
+          {editingChannel && !editingChannel.is_default && !editingChannel.is_chant && (
             <Pressable
               onPress={() => handleArchive(editingChannel)}
               className="mt-2 py-3 items-center"
@@ -424,7 +424,7 @@ export function ChannelsSheet({
               <View className="flex-row items-start">
                 <View className="h-10 w-10 rounded-xl bg-red-600/10 items-center justify-center mr-3">
                   <Ionicons
-                    name={channel.is_default ? 'home' : 'radio-outline'}
+                    name={channel.is_default ? 'home' : channel.is_chant ? 'musical-notes' : 'radio-outline'}
                     size={18}
                     color={palette.accent}
                   />

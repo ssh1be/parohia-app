@@ -106,6 +106,7 @@ interface BulletinFeedHeaderProps {
 function channelIcon(channel: BulletinChannel | { id: 'all' }): keyof typeof Ionicons.glyphMap {
   if (channel.id === 'all') return 'apps-outline';
   if ('is_default' in channel && channel.is_default) return 'home';
+  if ('is_chant' in channel && channel.is_chant) return 'musical-notes';
   return 'radio-outline';
 }
 
@@ -265,12 +266,12 @@ export function BulletinFeedHeader({
           className="h-10 pl-3.5 pr-4 rounded-full flex-row items-center border border-dashed border-gray-300 dark:border-white/20 bg-transparent"
         >
           <Ionicons
-            name={isParishAdmin ? 'settings-outline' : 'compass-outline'}
+            name={'settings-outline'}
             size={14}
             color={palette.gray500}
           />
           <Text className="font-sans-semibold text-[13px] text-gray-500 dark:text-gray-400 ml-1.5">
-            {isParishAdmin ? 'Manage' : 'Discover'}
+            {'Manage'}
           </Text>
         </Pressable>
       </ScrollView>

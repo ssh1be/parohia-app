@@ -257,6 +257,7 @@ export default function Parish() {
       if (deleteError) throw deleteError;
 
       await ChannelService.ensureGeneralSubscription(user.id, selectedParishId);
+      await ChannelService.ensureChantChannel(selectedParishId);
       
       const newParish = await getParishByUserId(user.id);
       if (!newParish) {

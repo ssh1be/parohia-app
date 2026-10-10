@@ -6,6 +6,7 @@ export interface BulletinChannel {
   name: string;
   description?: string | null;
   is_default: boolean;
+  is_chant: boolean;
   is_archived: boolean;
   created_by?: string | null;
   created_at: string;
@@ -33,6 +34,7 @@ export class ChannelService {
       .select('*')
       .eq('parish_id', parishId)
       .order('is_default', { ascending: false })
+      .order('is_chant', { ascending: false })
       .order('name', { ascending: true });
 
     if (!options?.includeArchived) {
@@ -261,6 +263,7 @@ export class ChannelService {
           name: 'General',
           description: 'Default parish channel',
           is_default: true,
+          is_chant: false,
           created_by: createdBy || null,
         })
         .select()
@@ -273,6 +276,76 @@ export class ChannelService {
     } catch (error) {
       console.error('Error ensuring General channel:', error);
       return { success: false, error: 'Failed to create General channel' };
+    }
+  }
+
+  /** Opt-in Chant channel — created per parish, never auto-subscribed. */
+  static async ensureChantChannel(
+    parishId: string,
+    createdBy?: string
+  ): Promise<{ success: boolean; channel?: BulletinChannel; error?: string }> {
+    try {
+      const { data: existing } = await supabase
+        .from('bulletin_channels')
+        .select('*')
+        .eq('parish_id', parishId)
+        .eq('is_chant', true)
+        .eq('is_archived', false)
+        .maybeSingle();
+
+      if (existing) {
+        return { success: true, channel: existing as BulletinChannel };
+      }
+
+      const { data, error } = await supabase
+        .from('bulletin_channels')
+        .insert({
+          parish_id: parishId,
+          name: 'Chant',
+          description: 'Opt-in channel for service chanting',
+          is_default: false,
+          is_chant: true,
+          created_by: createdBy || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true, channel: data as BulletinChannel };
+    } catch (error) {
+      console.error('Error ensuring Chant channel:', error);
+      return { success: false, error: 'Failed to create Chant channel' };
+    }
+  }
+
+  static async isUserSubscribedToChant(
+    userId: string,
+    parishId: string
+  ): Promise<boolean> {
+    try {
+      const { data: chant } = await supabase
+        .from('bulletin_channels')
+        .select('id')
+        .eq('parish_id', parishId)
+        .eq('is_chant', true)
+        .eq('is_archived', false)
+        .maybeSingle();
+
+      if (!chant?.id) return false;
+
+      const { data: sub } = await supabase
+        .from('bulletin_channel_subscriptions')
+        .select('id')
+        .eq('channel_id', chant.id)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      return !!sub?.id;
+    } catch (error) {
+      console.error('Error checking Chant subscription:', error);
+      return false;
     }
   }
 
@@ -300,7 +373,7 @@ export class ChannelService {
     try {
       const { data: channel, error: channelError } = await supabase
         .from('bulletin_channels')
-        .select('id, is_default')
+        .select('id, is_default, is_chant')
         .eq('id', channelId)
         .single();
 
@@ -344,6 +417,7 @@ export class ChannelService {
           name: trimmed,
           description: description?.trim() || null,
           is_default: false,
+          is_chant: false,
           created_by: userId,
         })
         .select()
@@ -370,7 +444,7 @@ export class ChannelService {
     try {
       const { data: channel, error: channelError } = await supabase
         .from('bulletin_channels')
-        .select('id, is_default')
+        .select('id, is_default, is_chant')
         .eq('id', channelId)
         .single();
 
@@ -379,6 +453,9 @@ export class ChannelService {
       }
       if (channel.is_default) {
         return { success: false, error: 'The General channel cannot be renamed' };
+      }
+      if (channel.is_chant) {
+        return { success: false, error: 'The Chant channel cannot be renamed' };
       }
 
       const trimmed = name.trim();
@@ -416,7 +493,7 @@ export class ChannelService {
     try {
       const { data: channel, error: channelError } = await supabase
         .from('bulletin_channels')
-        .select('id, is_default')
+        .select('id, is_default, is_chant')
         .eq('id', channelId)
         .single();
 
@@ -425,6 +502,9 @@ export class ChannelService {
       }
       if (channel.is_default) {
         return { success: false, error: 'The General channel cannot be archived' };
+      }
+      if (channel.is_chant) {
+        return { success: false, error: 'The Chant channel cannot be archived' };
       }
 
       const { error } = await supabase

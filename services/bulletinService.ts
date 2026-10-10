@@ -21,6 +21,7 @@ export interface BulletinEvent {
     id: string;
     name: string;
     is_default: boolean;
+    is_chant?: boolean;
   };
   created_by_profile?: {
     full_name: string;

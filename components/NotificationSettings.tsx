@@ -110,10 +110,10 @@ export default function NotificationSettings() {
   };
 
   const reminderTimeOptions = [
-    { label: '15 min', value: 15 },
     { label: '30 min', value: 30 },
     { label: '1 hr', value: 60 },
     { label: '2 hr', value: 120 },
+    { label: '4 hr', value: 240 },
   ];
 
   const selectedOption = reminderTimeOptions.find(option => option.value === preferences.reminderTime);

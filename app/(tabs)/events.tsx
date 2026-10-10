@@ -17,6 +17,10 @@ import Animated, {
   FadeIn,
   FadeInDown,
   LinearTransition,
+  SlideInDown,
+  SlideInUp,
+  SlideOutDown,
+  SlideOutUp,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -54,7 +58,7 @@ import { BulletinChannel, ChannelService } from "../../services/channelService";
 import { ConfessionService, DaySchedule, TimeSlot } from "../../services/confessionService";
 import { notificationService } from "../../services/notificationService";
 import { getUserProfile } from "../../services/onboardingService";
-import { getParishByAdminId, getParishByUserId } from "../../services/parishService";
+import { getParishByAdminId, getParishByUserId, updateParishConfessionEnabled } from "../../services/parishService";
 
 type TabType = 'confession' | 'bulletin';
 type BulletinFilter = 'all' | 'announcement' | 'event' | 'volunteer';
@@ -70,6 +74,10 @@ const RESPONSE_LABEL: Record<string, string> = {
 /** Duration of the volunteer bar update ease — keep in sync with close stagger on remove. */
 const VOLUNTEER_PROGRESS_MS = 320;
 const VOLUNTEER_CLOSE_STAGGER_MS = 140;
+/** Stored in `volunteers_needed` when a post accepts any number of volunteers. */
+const VOLUNTEERS_UNLIMITED = -1;
+const isUnlimitedVolunteers = (needed?: number | null) =>
+  typeof needed === 'number' && needed < 0;
 
 const CONFETTI_COLORS = [
   palette.accent,
@@ -79,6 +87,57 @@ const CONFETTI_COLORS = [
   palette.blue,
   '#FFFFFF',
 ];
+
+/** Odometer-style flip when a volunteer count changes in the detail sheet. */
+function FlipCount({
+  value,
+  textClassName,
+  lineHeight = 28,
+}: {
+  value: number;
+  textClassName: string;
+  lineHeight?: number;
+}) {
+  const reduceMotion = useReducedMotion();
+  const prevRef = useRef(value);
+  const dirRef = useRef<1 | -1>(1);
+  const skipEnterRef = useRef(true);
+
+  if (value !== prevRef.current) {
+    dirRef.current = value > prevRef.current ? 1 : -1;
+    prevRef.current = value;
+  }
+
+  useEffect(() => {
+    skipEnterRef.current = false;
+  }, []);
+
+  if (reduceMotion) {
+    return <Text className={textClassName}>{value}</Text>;
+  }
+
+  const increasing = dirRef.current > 0;
+  const entering = skipEnterRef.current
+    ? undefined
+    : (increasing ? SlideInDown : SlideInUp)
+        .duration(320)
+        .easing(Easing.out(Easing.cubic));
+
+  return (
+    <View style={{ height: lineHeight, overflow: 'hidden', justifyContent: 'center' }}>
+      <Animated.Text
+        key={value}
+        entering={entering}
+        exiting={(increasing ? SlideOutUp : SlideOutDown)
+          .duration(240)
+          .easing(Easing.in(Easing.cubic))}
+        className={textClassName}
+      >
+        {value}
+      </Animated.Text>
+    </View>
+  );
+}
 
 /** Animated emerald fill for volunteer signup progress. */
 function VolunteerProgressFill({
@@ -216,7 +275,7 @@ export default function Events() {
   });
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [responseData, setResponseData] = useState<EventResponse>({
-    response_type: 'interested',
+    response_type: 'attending',
     notes: ''
   });
   const [respondingToEvent, setRespondingToEvent] = useState(false);
@@ -224,9 +283,13 @@ export default function Events() {
   const [eventResponses, setEventResponses] = useState<any[]>([]);
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [notifyParishioners, setNotifyParishioners] = useState(false);
+  const [togglingConfession, setTogglingConfession] = useState(false);
+
+  const confessionEnabled = !!parish?.confession_enabled;
+  const showConfessionTab = isParishAdmin || confessionEnabled;
 
   const initializeData = async () => {
-    if (!user) return;
+    if (!user) return null;
     
     try {
       setLoading(true);
@@ -236,14 +299,15 @@ export default function Events() {
       setUserProfile(profile);
       
       let nextParishId: string | null = null;
+      let parishData: Awaited<ReturnType<typeof getParishByAdminId>> = null;
       if (profile?.user_type === 'parish_admin') {
         setIsParishAdmin(true);
-        const parishData = await getParishByAdminId(user.id);
+        parishData = await getParishByAdminId(user.id);
         setParish(parishData);
         nextParishId = parishData?.id || null;
       } else {
         setIsParishAdmin(false);
-        const parishData = await getParishByUserId(user.id);
+        parishData = await getParishByUserId(user.id);
         setParish(parishData);
         nextParishId = parishData?.id || null;
       }
@@ -256,9 +320,11 @@ export default function Events() {
         setSubscribedChannels([]);
         setManagedChannelIds([]);
       }
+      return parishData;
     } catch (error) {
       console.error('Error initializing data:', error);
       Alert.alert('Error', 'Failed to load parish data');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -269,6 +335,12 @@ export default function Events() {
   }, [user, parishEpoch]);
 
   useEffect(() => {
+    if (!isParishAdmin && !confessionEnabled && activeTab === 'confession') {
+      setActiveTab('bulletin');
+    }
+  }, [isParishAdmin, confessionEnabled, activeTab]);
+
+  useEffect(() => {
     if (!parishId) {
       setWeekSchedule([]);
       setBulletinEvents([]);
@@ -277,12 +349,20 @@ export default function Events() {
       setManagedChannelIds([]);
       return;
     }
-    void loadWeekSchedule(false);
     void loadBulletinEvents();
-  }, [parishId]);
+    if (confessionEnabled) {
+      void loadWeekSchedule(false);
+    } else {
+      setWeekSchedule([]);
+    }
+  }, [parishId, confessionEnabled]);
 
-  const loadWeekSchedule = async (showLoading: boolean = true) => {
-    if (!parishId) return;
+  const loadWeekSchedule = async (showLoading: boolean = true, enabledOverride?: boolean) => {
+    const enabled = enabledOverride ?? confessionEnabled;
+    if (!parishId || !enabled) {
+      setWeekSchedule([]);
+      return;
+    }
     
     try {
       if (showLoading) {
@@ -316,13 +396,65 @@ export default function Events() {
     }
   };
 
+  const setConfessionEnabled = async (enabled: boolean) => {
+    if (!parish?.id || togglingConfession) return;
+
+    try {
+      setTogglingConfession(true);
+      const result = await updateParishConfessionEnabled(parish.id, enabled);
+      if (!result.success) {
+        Alert.alert('Error', result.error || 'Failed to update confession settings');
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setParish({ ...parish, confession_enabled: enabled });
+      if (enabled) {
+        // loadWeekSchedule will run via confessionEnabled effect after parish updates;
+        // call explicitly with the new flag since state may not have flushed yet.
+        const schedule = await ConfessionService.generateWeekSchedule(parish.id, new Date());
+        setWeekSchedule(schedule);
+      } else {
+        setWeekSchedule([]);
+      }
+    } catch (error) {
+      console.error('Error updating confession enabled:', error);
+      Alert.alert('Error', 'Failed to update confession settings');
+    } finally {
+      setTogglingConfession(false);
+    }
+  };
+
+  const handleDisableConfession = () => {
+    Alert.alert(
+      'Turn off confession?',
+      'Parishioners will no longer see confession booking. Existing reservations stay on their calendars.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Turn off',
+          style: 'destructive',
+          onPress: () => {
+            void setConfessionEnabled(false);
+          },
+        },
+      ],
+    );
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       // Re-resolve parish, then explicitly reload bulletin + confession
       // (initializeData alone only bumps parishId when it changes).
-      await initializeData();
-      await Promise.all([loadWeekSchedule(false), loadBulletinEvents()]);
+      const parishData = await initializeData();
+      const loads: Promise<unknown>[] = [loadBulletinEvents()];
+      if (parishData?.confession_enabled) {
+        loads.push(loadWeekSchedule(false, true));
+      } else {
+        setWeekSchedule([]);
+      }
+      await Promise.all(loads);
       if (user) {
         notificationService.refreshEventNotifications(user.id).catch(() => {});
       }
@@ -350,8 +482,10 @@ export default function Events() {
     try {
       if (!isParishAdmin) {
         await ChannelService.ensureGeneralSubscription(user.id, parishId);
+        await ChannelService.ensureChantChannel(parishId);
       } else {
         await ChannelService.ensureGeneralChannel(parishId, user.id);
+        await ChannelService.ensureChantChannel(parishId, user.id);
       }
 
       const list = await ChannelService.listChannels(parishId, { userId: user.id });
@@ -759,8 +893,12 @@ export default function Events() {
         }
       }
       
-      // Add volunteers needed for volunteer events
-      if (createEventData.event_type === 'volunteer' && createEventData.volunteers_needed) {
+      // Add volunteers needed for volunteer events (−1 = no limit)
+      if (
+        createEventData.event_type === 'volunteer' &&
+        createEventData.volunteers_needed != null &&
+        createEventData.volunteers_needed !== 0
+      ) {
         eventData.volunteers_needed = createEventData.volunteers_needed;
       }
 
@@ -981,7 +1119,10 @@ export default function Events() {
       event_time: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_time || '') : '',
       location: selectedEvent.event_type !== 'announcement' ? (selectedEvent.location || '') : '',
       contact_info: selectedEvent.contact_info || '',
-      volunteers_needed: selectedEvent.event_type === 'volunteer' ? (selectedEvent.volunteers_needed || undefined) : undefined
+      volunteers_needed:
+        selectedEvent.event_type === 'volunteer'
+          ? (selectedEvent.volunteers_needed ?? undefined)
+          : undefined,
     });
     setNotifyParishioners(false);
     setEditingEventId(selectedEvent.id);
@@ -990,30 +1131,69 @@ export default function Events() {
     setTimeout(() => setShowCreateEventModal(true), 320);
   };
 
+  const volunteerLimitUnlimited = isUnlimitedVolunteers(createEventData.volunteers_needed);
+  const hasVolunteerTarget =
+    volunteerLimitUnlimited ||
+    (typeof createEventData.volunteers_needed === 'number' && createEventData.volunteers_needed > 0);
   const canSubmitPost =
     !creatingEvent &&
     !!createEventData.title.trim() &&
     !!createEventData.channel_id &&
-    !(createEventData.event_type === 'volunteer' && !createEventData.volunteers_needed);
+    !(createEventData.event_type === 'volunteer' && !hasVolunteerTarget);
 
   const renderVolunteerProgress = (event: BulletinEvent) => {
     const count = event.volunteer_count || 0;
-    const needed = event.volunteers_needed || 0;
-    const ratio = Math.min(1, count / (needed || 1));
-    const reached = !!needed && !!count && count >= needed;
+    const unlimited = isUnlimitedVolunteers(event.volunteers_needed);
+    const needed = unlimited ? 0 : (event.volunteers_needed || 0);
+    const ratio = unlimited ? 0 : Math.min(1, count / (needed || 1));
+    const reached = !unlimited && !!needed && !!count && count >= needed;
+
+    if (unlimited) {
+      return (
+        <View className="rounded-2xl p-4 mb-4 bg-emerald-500/[0.08] border border-emerald-500/20">
+          <View className="flex-row items-center">
+            <View className="h-12 w-12 rounded-2xl bg-emerald-500/15 items-center justify-center mr-3">
+              <Ionicons name="people" size={22} color={palette.green} />
+            </View>
+            <View className="flex-1">
+              <Text className="font-sans-semibold text-[11px] tracking-[1.1px] uppercase text-emerald-700/80 dark:text-emerald-400/90">
+                Signed up
+              </Text>
+              <View className="flex-row items-baseline mt-0.5">
+                <FlipCount
+                  value={count}
+                  lineHeight={28}
+                  textClassName="font-sans-bold text-[24px] leading-[28px] text-gray-900 dark:text-white"
+                />
+                <Text className="font-sans-semibold text-[14px] text-gray-500 dark:text-gray-400">
+                  {count === 1 ? ' volunteer' : ' volunteers'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View className="rounded-2xl p-4 mb-4 bg-emerald-500/[0.08] border border-emerald-500/20">
-        <View className="flex-row items-end justify-between">
-          <View>
-            <Text className="font-sans-semibold text-xs text-emerald-700 dark:text-emerald-400">Volunteers</Text>
-            <Text className="font-display text-[30px] leading-[34px] text-gray-900 dark:text-white">
-              {count}
-              <Text className="font-display text-[20px] text-gray-400"> of {needed}</Text>
+        <Text className="font-sans-semibold text-xs text-emerald-700 dark:text-emerald-400">Volunteers</Text>
+        <View className="flex-row items-end justify-between mt-0.5">
+          <View className="flex-row items-end">
+            <FlipCount
+              value={count}
+              lineHeight={28}
+              textClassName="font-sans-bold text-[24px] leading-[28px] text-gray-900 dark:text-white"
+            />
+            <Text className="font-sans-semibold text-[14px] leading-[20px] text-gray-500 dark:text-gray-400 pb-[3px]">
+              {' '}of {needed}
             </Text>
           </View>
-          <Text className="font-sans-bold text-sm text-emerald-700 dark:text-emerald-400">{Math.round(ratio * 100)}%</Text>
+          <Text className="font-sans-bold text-sm leading-[20px] text-emerald-700 dark:text-emerald-400 pb-[3px]">
+            {Math.round(ratio * 100)}%
+          </Text>
         </View>
-        <View className="mt-3">
+        <View className="mt-2">
           <VolunteerProgressFill ratio={ratio} height={8} animateFromZero />
         </View>
         <View className="flex-row items-center mt-2.5">
@@ -1046,6 +1226,37 @@ export default function Events() {
   };
 
   const renderConfessionTab = () => {
+    if (isParishAdmin && !confessionEnabled) {
+      return (
+        <View className="px-5 pt-4">
+          <View className="rounded-3xl p-5 bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20">
+            <View className="flex-row items-start">
+              <View className="h-10 w-10 rounded-2xl bg-red-600/15 items-center justify-center">
+                <Ionicons name="time-outline" size={18} color={palette.accent} />
+              </View>
+              <View className="flex-1 ml-3">
+                <Text className="font-sans-bold text-[15px] text-gray-900 dark:text-white">
+                  Confession scheduling is off
+                </Text>
+                <Text className="font-sans text-[13px] leading-5 text-gray-600 dark:text-gray-300 mt-1">
+                  Turn this on so parishioners can book confession times from the Events tab.
+                </Text>
+                <Button
+                  label={togglingConfession ? 'Enabling…' : 'Enable confession'}
+                  icon="checkmark-circle-outline"
+                  size="sm"
+                  loading={togglingConfession}
+                  disabled={togglingConfession}
+                  onPress={() => void setConfessionEnabled(true)}
+                  className="mt-3 self-start"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
     const selectedDaySchedule = weekSchedule.find(day => day.date.toDateString() === selectedDay.toDateString());
     const slots = selectedDaySchedule?.timeSlots ?? [];
     const INITIAL_VISIBLE_SLOTS = 9; // 3x3 grid
@@ -1054,7 +1265,40 @@ export default function Events() {
 
     return (
       <View>
-        <View className="px-5 pt-4">
+        {isParishAdmin && (
+          <View className="px-5 pt-4">
+            <View className="flex-row items-center rounded-2xl p-4 bg-gray-50 dark:bg-white/[0.04]">
+              <View className="h-9 w-9 rounded-xl bg-red-600/10 items-center justify-center mr-3">
+                <Ionicons name="time" size={16} color={palette.accent} />
+              </View>
+              <View className="flex-1 pr-3">
+                <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">
+                  Offer confession booking
+                </Text>
+                <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Parishioners can see and book times
+                </Text>
+              </View>
+              <Switch
+                value={confessionEnabled}
+                onValueChange={(value) => {
+                  Haptics.selectionAsync().catch(() => {});
+                  if (value) {
+                    void setConfessionEnabled(true);
+                  } else {
+                    handleDisableConfession();
+                  }
+                }}
+                disabled={togglingConfession}
+                trackColor={{ false: colors.isDark ? '#374151' : '#D1D5DB', true: palette.accentSoft }}
+                thumbColor="white"
+                ios_backgroundColor={colors.isDark ? '#374151' : '#D1D5DB'}
+              />
+            </View>
+          </View>
+        )}
+
+        <View className={`px-5 ${isParishAdmin ? 'pt-3' : 'pt-4'}`}>
           <View className="rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex-row items-center">
             <View className="h-12 w-12 rounded-2xl bg-red-600/10 items-center justify-center mr-4">
               <Ionicons name="time" size={22} color={palette.accent} />
@@ -1390,15 +1634,19 @@ export default function Events() {
                           <View className="flex-1 flex-row items-center">
                             <Ionicons name="people" size={14} color={palette.green} />
                             <Text className="font-sans-semibold text-xs text-emerald-600 dark:text-emerald-400 ml-1">
-                              {event.volunteer_count || 0}/{event.volunteers_needed} volunteers
+                              {isUnlimitedVolunteers(event.volunteers_needed)
+                                ? `${event.volunteer_count || 0} volunteer${(event.volunteer_count || 0) === 1 ? '' : 's'}`
+                                : `${event.volunteer_count || 0}/${event.volunteers_needed} volunteers`}
                             </Text>
-                            <View className="flex-1 ml-3">
-                              <VolunteerProgressFill
-                                ratio={Math.min(1, (event.volunteer_count || 0) / (event.volunteers_needed || 1))}
-                                height={6}
-                                animateFromZero
-                              />
-                            </View>
+                            {!isUnlimitedVolunteers(event.volunteers_needed) && (
+                              <View className="flex-1 ml-3">
+                                <VolunteerProgressFill
+                                  ratio={Math.min(1, (event.volunteer_count || 0) / (event.volunteers_needed || 1))}
+                                  height={6}
+                                  animateFromZero
+                                />
+                              </View>
+                            )}
                           </View>
                         )}
                       </View>
@@ -1482,22 +1730,30 @@ export default function Events() {
         <LargeHeader
           scrollY={scrollY}
           title="Events"
-          subtitle={parish?.name ? `News and confession at ${parish.name}` : 'Parish events and announcements'}
+          subtitle={
+            parish?.name
+              ? showConfessionTab
+                ? `News and confession at ${parish.name}`
+                : `News and announcements at ${parish.name}`
+              : 'Parish events and announcements'
+          }
         />
 
-        <View className="px-5 pt-2 pb-1">
-          <SegmentedControl
-            value={activeTab}
-            onChange={setActiveTab}
-            segments={[
-              { key: 'bulletin', label: 'Bulletin Board', icon: activeTab === 'bulletin' ? 'pin' : 'pin-outline' },
-              { key: 'confession', label: 'Confession', icon: activeTab === 'confession' ? 'time' : 'time-outline' },
-            ]}
-          />
-        </View>
+        {showConfessionTab && (
+          <View className="px-5 pt-2 pb-1">
+            <SegmentedControl
+              value={activeTab}
+              onChange={setActiveTab}
+              segments={[
+                { key: 'bulletin', label: 'Bulletin Board', icon: activeTab === 'bulletin' ? 'pin' : 'pin-outline' },
+                { key: 'confession', label: 'Confession', icon: activeTab === 'confession' ? 'time' : 'time-outline' },
+              ]}
+            />
+          </View>
+        )}
 
         <Animated.View key={activeTab} entering={FadeIn.duration(220)}>
-          {activeTab === 'confession' ? renderConfessionTab() : renderBulletinTab()}
+          {activeTab === 'confession' && showConfessionTab ? renderConfessionTab() : renderBulletinTab()}
         </Animated.View>
       </Animated.ScrollView>
 
@@ -1735,18 +1991,51 @@ export default function Events() {
         />
 
         {createEventData.event_type === 'volunteer' && (
-          <Animated.View entering={FadeInDown.duration(220)}>
-            <Field
-              label="Volunteers needed"
-              required
-              value={createEventData.volunteers_needed?.toString() || ''}
-              onChangeText={(text) => {
-                const num = parseInt(text) || undefined;
-                setCreateEventData({...createEventData, volunteers_needed: num});
+          <Animated.View entering={FadeInDown.duration(220)} className="mb-1">
+            <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300 mb-2">
+              Volunteers needed
+              <Text className="text-red-600 dark:text-red-400"> *</Text>
+            </Text>
+            <SegmentedControl
+              segments={[
+                { key: 'limit', label: 'Set a limit' },
+                { key: 'unlimited', label: 'No limit' },
+              ]}
+              value={volunteerLimitUnlimited ? 'unlimited' : 'limit'}
+              onChange={(value) => {
+                setCreateEventData({
+                  ...createEventData,
+                  volunteers_needed: value === 'unlimited' ? VOLUNTEERS_UNLIMITED : undefined,
+                });
               }}
-              placeholder="Number of volunteers needed..."
-              keyboardType="numeric"
+              className="mb-3"
             />
+            {!volunteerLimitUnlimited && (
+              <Field
+                label="How many?"
+                required
+                value={
+                  createEventData.volunteers_needed != null && createEventData.volunteers_needed > 0
+                    ? String(createEventData.volunteers_needed)
+                    : ''
+                }
+                onChangeText={(text) => {
+                  const digits = text.replace(/[^0-9]/g, '');
+                  const num = digits ? parseInt(digits, 10) : undefined;
+                  setCreateEventData({
+                    ...createEventData,
+                    volunteers_needed: num && num > 0 ? num : undefined,
+                  });
+                }}
+                placeholder="Number of volunteers needed..."
+                keyboardType="number-pad"
+              />
+            )}
+            {volunteerLimitUnlimited && (
+              <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Anyone can sign up — the post will show how many have volunteered so far.
+              </Text>
+            )}
           </Animated.View>
         )}
 
@@ -1883,7 +2172,9 @@ export default function Events() {
               {(() => {
                 const postedAt = new Date(selectedEvent.created_at);
                 const posterName =
-                  selectedEvent.created_by_profile?.full_name?.trim() || 'Unknown';
+                  selectedEvent.created_by === user?.id
+                    ? 'you'
+                    : selectedEvent.created_by_profile?.full_name?.trim() || 'Unknown';
                 const datePart = postedAt.toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
@@ -1943,7 +2234,6 @@ export default function Events() {
                     <View className="flex-row mb-4">
                       {([
                         { key: 'attending', label: 'Attending', icon: 'checkmark-circle', color: palette.green },
-                        { key: 'interested', label: 'Interested', icon: 'star', color: palette.blue },
                         { key: 'unavailable', label: 'Can’t make it', icon: 'close-circle', color: palette.accentSoft },
                       ] as const).map((option, i) => {
                         const active = responseData.response_type === option.key;
@@ -1956,7 +2246,7 @@ export default function Events() {
                             }}
                             accessibilityRole="radio"
                             accessibilityState={{ selected: active }}
-                            style={{ flex: 1, marginRight: i < 2 ? 8 : 0 }}
+                            style={{ flex: 1, marginRight: i < 1 ? 8 : 0 }}
                             className={`rounded-2xl py-3 items-center ${active ? '' : 'bg-gray-100 dark:bg-white/5'}`}
                           >
                             {active && (
@@ -2084,11 +2374,10 @@ export default function Events() {
                   <View className="flex-row mb-4">
                     {[
                       { label: 'Attending', value: eventResponses.filter(r => r.response_type === 'attending').length, color: palette.green },
-                      { label: 'Interested', value: eventResponses.filter(r => r.response_type === 'interested').length, color: palette.blue },
                       { label: 'Unavailable', value: eventResponses.filter(r => r.response_type === 'unavailable').length, color: palette.accentSoft },
                       { label: 'Total', value: eventResponses.length, color: colors.text },
                     ].map((stat, i) => (
-                      <View key={stat.label} className={`flex-1 rounded-2xl py-3 items-center bg-gray-50 dark:bg-white/[0.04] ${i < 3 ? 'mr-2' : ''}`}>
+                      <View key={stat.label} className={`flex-1 rounded-2xl py-3 items-center bg-gray-50 dark:bg-white/[0.04] ${i < 2 ? 'mr-2' : ''}`}>
                         <Text className="font-display text-[28px] leading-[30px]" style={{ color: stat.color }}>{stat.value}</Text>
                         <Text className="font-sans-medium text-[10.5px] text-gray-500 dark:text-gray-400 mt-0.5">{stat.label}</Text>
                       </View>
@@ -2101,8 +2390,7 @@ export default function Events() {
                 ) : (
                   eventResponses.map((response, index) => {
                     const tone =
-                      response.response_type === 'attending' ? palette.green :
-                      response.response_type === 'interested' ? palette.blue : palette.accentSoft;
+                      response.response_type === 'attending' ? palette.green : palette.accentSoft;
                     return (
                       <View key={index} className="rounded-2xl p-4 mb-2 bg-gray-50 dark:bg-white/[0.04]">
                         <View className="flex-row items-center justify-between">
@@ -2111,8 +2399,7 @@ export default function Events() {
                           </Text>
                           <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${tone}1F` }}>
                             <Text className="font-sans-bold text-[11px]" style={{ color: tone }}>
-                              {response.response_type === 'attending' ? 'Attending' :
-                               response.response_type === 'interested' ? 'Interested' : 'Unavailable'}
+                              {RESPONSE_LABEL[response.response_type] ?? 'Unavailable'}
                             </Text>
                           </View>
                         </View>

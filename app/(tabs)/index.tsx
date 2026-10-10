@@ -29,6 +29,8 @@ import { useParishScope } from "../../contexts/ParishScopeContext";
 import { useOrthodoxCalendar } from "../../hooks/useOrthodoxCalendar";
 import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
 import { BulletinEvent, BulletinService } from '../../services/bulletinService';
+import { ChannelService } from '../../services/channelService';
+import { ChantService, ChantSignup, isChantServiceEvent } from '../../services/chantService';
 import { ConfessionReservationWithSchedule, ConfessionService } from '../../services/confessionService';
 import { getUserProfile } from '../../services/onboardingService';
 import { getParishByAdminId, getParishByUserId } from '../../services/parishService';
@@ -44,6 +46,7 @@ type ScheduleItem = {
   eventType?: 'event' | 'volunteer' | 'announcement';
   location?: string;
   startTime?: string;
+  endTime?: string;
 };
 
 export default function Index() {
@@ -70,6 +73,7 @@ export default function Index() {
   const [isParishAdmin, setIsParishAdmin] = useState(false);
   const [parishHasCalendar, setParishHasCalendar] = useState(true);
   const [parishName, setParishName] = useState<string>('');
+  const [parishId, setParishId] = useState<string | null>(null);
   const [personalConfessions, setPersonalConfessions] = useState<ConfessionReservationWithSchedule[]>([]);
   const [confessionDetails, setConfessionDetails] = useState<Record<string, any>>({});
   const [parishDetails, setParishDetails] = useState<any>(null);
@@ -79,7 +83,65 @@ export default function Index() {
   const [itemSheetVisible, setItemSheetVisible] = useState(false);
   const [reminderStates, setReminderStates] = useState<Record<string, boolean>>({});
   const [togglingReminder, setTogglingReminder] = useState<string | null>(null);
+  const [chantSubscribed, setChantSubscribed] = useState(false);
+  const [chantSignups, setChantSignups] = useState<ChantSignup[]>([]);
+  const [chantLoading, setChantLoading] = useState(false);
+  const [chantToggling, setChantToggling] = useState(false);
   const { isParishEventNotificationEnabled, setParishEventNotificationEnabled } = useNotifications();
+
+  const loadChantSignupsForItem = async (item: ScheduleItem) => {
+    if (
+      !user ||
+      !parishId ||
+      !chantSubscribed ||
+      item.type !== 'parish' ||
+      !item.startTime ||
+      !isChantServiceEvent(item.title, item.startTime, item.endTime)
+    ) {
+      setChantSignups([]);
+      return;
+    }
+    try {
+      setChantLoading(true);
+      const list = await ChantService.listSignups(parishId, item.id);
+      setChantSignups(list);
+    } catch (error) {
+      console.error('Error loading chant signups:', error);
+      setChantSignups([]);
+    } finally {
+      setChantLoading(false);
+    }
+  };
+
+  const toggleChantSignup = async () => {
+    if (!user || !parishId || !activeItem || activeItem.type !== 'parish' || chantToggling) return;
+    const signedUp = chantSignups.some((s) => s.userId === user.id);
+    try {
+      setChantToggling(true);
+      const result = signedUp
+        ? await ChantService.removeSignup({
+            parishId,
+            calendarEventId: activeItem.id,
+            userId: user.id,
+          })
+        : await ChantService.signUp({
+            parishId,
+            calendarEventId: activeItem.id,
+            userId: user.id,
+            eventTitle: activeItem.title,
+            eventStart: activeItem.startTime,
+          });
+      if (!result.success) {
+        console.error('Chant signup failed:', result.error);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      const list = await ChantService.listSignups(parishId, activeItem.id);
+      setChantSignups(list);
+    } finally {
+      setChantToggling(false);
+    }
+  };
 
   const openItem = async (item: ScheduleItem) => {
     Haptics.selectionAsync().catch(() => {});
@@ -88,6 +150,9 @@ export default function Index() {
     if (item.type === 'parish') {
       const enabled = await isParishEventNotificationEnabled(item.id);
       setReminderStates(prev => ({ ...prev, [item.id]: !!enabled }));
+      void loadChantSignupsForItem(item);
+    } else {
+      setChantSignups([]);
     }
   };
 
@@ -120,19 +185,31 @@ export default function Index() {
       }
 
       // Check if user is parish admin and if parish has calendar set up
+      let nextParishId: string | null = null;
       if (profile?.user_type === 'parish_admin') {
         setIsParishAdmin(true);
         const parish = await getParishByAdminId(user.id);
         if (parish) {
           setParishHasCalendar(!!parish.parish_calendar_id);
           setParishName(parish.name);
+          nextParishId = parish.id;
+          await ChannelService.ensureChantChannel(parish.id, user.id);
         }
       } else if (profile?.user_type === 'regular_user') {
+        setIsParishAdmin(false);
         const parish = await getParishByUserId(user.id);
         if (parish) {
           setParishHasCalendar(!!parish.parish_calendar_id);
           setParishName(parish.name);
+          nextParishId = parish.id;
+          await ChannelService.ensureChantChannel(parish.id);
         }
+      }
+      setParishId(nextParishId);
+      if (nextParishId) {
+        setChantSubscribed(await ChannelService.isUserSubscribedToChant(user.id, nextParishId));
+      } else {
+        setChantSubscribed(false);
       }
     }
   };
@@ -320,9 +397,10 @@ export default function Index() {
         timeRange: formatEventTimeRange(event.startTime, event.endTime),
         description: event.description,
         type: 'parish',
-        isAllDay: false,
+        isAllDay: !event.startTime.includes('T'),
         location: event.location,
         startTime: event.startTime,
+        endTime: event.endTime,
       });
     });
 
@@ -601,6 +679,21 @@ export default function Index() {
                 loading: togglingReminder === activeItem.id,
                 onToggle: () => toggleReminder(activeItem.id),
                 onOpenSettings: () => closeItemThen(() => router.push('/(tabs)/calendar/notification-settings')),
+              }
+            : undefined
+        }
+        chantSignup={
+          activeItem?.type === 'parish' &&
+          chantSubscribed &&
+          !!activeItem.startTime &&
+          isChantServiceEvent(activeItem.title, activeItem.startTime, activeItem.endTime)
+            ? {
+                loading: chantLoading,
+                toggling: chantToggling,
+                signedUp: !!user && chantSignups.some((s) => s.userId === user.id),
+                currentUserId: user?.id,
+                signups: chantSignups.map((s) => ({ userId: s.userId, name: s.name })),
+                onToggle: () => void toggleChantSignup(),
               }
             : undefined
         }

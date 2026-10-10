@@ -85,6 +85,7 @@ export const saveOnboardingData = async (
       console.log('Parish saved:', parishData);
       // Safety net if DB trigger has not run yet
       await ChannelService.ensureGeneralChannel(parishId, userId);
+      await ChannelService.ensureChantChannel(parishId, userId);
     } else if (resolvedUserType === 'regular_user' && data.selectedParishId) {
       // Insert first so a failed write can't orphan an existing connection
       const { data: existingConnections, error: existingError } = await supabase

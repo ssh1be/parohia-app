@@ -34,6 +34,7 @@ CREATE TABLE public.parishes (
   donation_enabled boolean DEFAULT false,
   donation_message text,
   paypal_donation_url text,
+  confession_enabled boolean DEFAULT false,
   CONSTRAINT parishes_pkey PRIMARY KEY (id),
   CONSTRAINT parishes_admin_user_id_fkey FOREIGN KEY (admin_user_id) REFERENCES auth.users(id)
 );
@@ -76,6 +77,7 @@ CREATE TABLE public.bulletin_channels (
   name text NOT NULL,
   description text,
   is_default boolean NOT NULL DEFAULT false,
+  is_chant boolean NOT NULL DEFAULT false,
   is_archived boolean NOT NULL DEFAULT false,
   created_by uuid,
   created_at timestamp with time zone DEFAULT now(),
@@ -138,6 +140,19 @@ CREATE TABLE public.bulletin_responses (
   CONSTRAINT bulletin_responses_pkey PRIMARY KEY (id),
   CONSTRAINT bulletin_responses_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.bulletin_events(id),
   CONSTRAINT bulletin_responses_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user_profiles(id)
+);
+CREATE TABLE public.chant_signups (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  parish_id uuid NOT NULL,
+  calendar_event_id text NOT NULL,
+  event_title text,
+  event_start timestamp with time zone,
+  user_id uuid NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT chant_signups_pkey PRIMARY KEY (id),
+  CONSTRAINT chant_signups_unique UNIQUE (parish_id, calendar_event_id, user_id),
+  CONSTRAINT chant_signups_parish_id_fkey FOREIGN KEY (parish_id) REFERENCES public.parishes(id),
+  CONSTRAINT chant_signups_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.user_push_tokens (
   user_id uuid NOT NULL,

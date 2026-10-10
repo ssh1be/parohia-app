@@ -31,7 +31,7 @@ import { SegmentedControl } from "../../../components/ui/SegmentedControl";
 import { SkeletonRows } from "../../../components/ui/Skeleton";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useThemeColors } from "../../../components/ui/useThemeColors";
-import { contentBottomPadding, entrance, fastingStyle, getFastingKind, palette, springs } from "../../../constants/theme";
+import { contentBottomPadding, entrance, eventKindStyle, fastingStyle, getFastingKind, palette, springs } from "../../../constants/theme";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useCalendarTradition } from "../../../contexts/CalendarTraditionContext";
 import { useNotifications } from "../../../contexts/NotificationContext";
@@ -46,6 +46,8 @@ import {
     OrthodoxCalendarData,
     ParishEvent,
 } from "../../../services/calendarService";
+import { ChannelService } from "../../../services/channelService";
+import { ChantService, ChantSignup, isChantServiceEvent } from "../../../services/chantService";
 import { ConfessionReservationWithSchedule, ConfessionService } from "../../../services/confessionService";
 import { getUserProfile } from "../../../services/onboardingService";
 import { getParishByAdminId, getParishByUserId } from "../../../services/parishService";
@@ -226,8 +228,13 @@ export default function Calendar() {
   const [isParishAdmin, setIsParishAdmin] = useState(false);
   const [parishHasCalendar, setParishHasCalendar] = useState(true);
   const [parishName, setParishName] = useState<string>('');
+  const [parishId, setParishId] = useState<string | null>(null);
   const [eventNotificationStates, setEventNotificationStates] = useState<Record<string, boolean>>({});
   const [togglingEvent, setTogglingEvent] = useState<string | null>(null);
+  const [chantSubscribed, setChantSubscribed] = useState(false);
+  const [chantSignups, setChantSignups] = useState<ChantSignup[]>([]);
+  const [chantLoading, setChantLoading] = useState(false);
+  const [chantToggling, setChantToggling] = useState(false);
   const [personalConfessions, setPersonalConfessions] = useState<ConfessionReservationWithSchedule[]>([]);
   const [confessionDetails, setConfessionDetails] = useState<Record<string, any>>({});
   const [parishDetails, setParishDetails] = useState<any>(null);
@@ -240,6 +247,7 @@ export default function Calendar() {
   const [weekReload, setWeekReload] = useState(0);
   const [weekAnchor, setWeekAnchor] = useState(new Date());
   const [activeEvent, setActiveEvent] = useState<ParishEvent | null>(null);
+  const [activePersonal, setActivePersonal] = useState<PersonalItem | null>(null);
   const [eventSheetVisible, setEventSheetVisible] = useState(false);
   const [monthGridWidth, setMonthGridWidth] = useState(0);
   const [weekStripWidth, setWeekStripWidth] = useState(0);
@@ -397,19 +405,32 @@ export default function Calendar() {
   const checkUserAndParish = async () => {
     if (user) {
       const profile = await getUserProfile(user.id);
+      let nextParishId: string | null = null;
       if (profile?.user_type === 'parish_admin') {
         setIsParishAdmin(true);
         const parish = await getParishByAdminId(user.id);
         if (parish) {
           setParishHasCalendar(!!parish.parish_calendar_id);
           setParishName(parish.name);
+          nextParishId = parish.id;
+          await ChannelService.ensureChantChannel(parish.id, user.id);
         }
       } else if (profile?.user_type === 'regular_user') {
+        setIsParishAdmin(false);
         const parish = await getParishByUserId(user.id);
         if (parish) {
           setParishHasCalendar(!!parish.parish_calendar_id);
           setParishName(parish.name);
+          nextParishId = parish.id;
+          await ChannelService.ensureChantChannel(parish.id);
         }
+      }
+      setParishId(nextParishId);
+      if (nextParishId) {
+        const subscribed = await ChannelService.isUserSubscribedToChant(user.id, nextParishId);
+        setChantSubscribed(subscribed);
+      } else {
+        setChantSubscribed(false);
       }
     }
   };
@@ -808,11 +829,81 @@ export default function Calendar() {
     );
   };
 
+  const loadChantSignups = async (event: ParishEvent) => {
+    if (!user || !parishId || !chantSubscribed) {
+      setChantSignups([]);
+      return;
+    }
+    if (!isChantServiceEvent(event.title, event.startTime, event.endTime)) {
+      setChantSignups([]);
+      return;
+    }
+    try {
+      setChantLoading(true);
+      const list = await ChantService.listSignups(parishId, event.id);
+      setChantSignups(list);
+    } catch (error) {
+      console.error('Error loading chant signups:', error);
+      setChantSignups([]);
+    } finally {
+      setChantLoading(false);
+    }
+  };
+
+  const toggleChantSignup = async () => {
+    if (!user || !parishId || !activeEvent || chantToggling) return;
+    const signedUp = chantSignups.some((s) => s.userId === user.id);
+    try {
+      setChantToggling(true);
+      const result = signedUp
+        ? await ChantService.removeSignup({
+            parishId,
+            calendarEventId: activeEvent.id,
+            userId: user.id,
+          })
+        : await ChantService.signUp({
+            parishId,
+            calendarEventId: activeEvent.id,
+            userId: user.id,
+            eventTitle: activeEvent.title,
+            eventStart: activeEvent.startTime,
+          });
+      if (!result.success) {
+        console.error('Chant signup failed:', result.error);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      const list = await ChantService.listSignups(parishId, activeEvent.id);
+      setChantSignups(list);
+    } finally {
+      setChantToggling(false);
+    }
+  };
+
   const openEvent = (event: ParishEvent) => {
     Haptics.selectionAsync().catch(() => {});
+    setActivePersonal(null);
     setActiveEvent(event);
     setEventSheetVisible(true);
+    void loadChantSignups(event);
   };
+
+  const openPersonalItem = (item: PersonalItem) => {
+    Haptics.selectionAsync().catch(() => {});
+    setActiveEvent(null);
+    setActivePersonal(item);
+    setChantSignups([]);
+    setEventSheetVisible(true);
+  };
+
+  const showChantSignup =
+    !activePersonal &&
+    !!activeEvent &&
+    chantSubscribed &&
+    isChantServiceEvent(activeEvent.title, activeEvent.startTime, activeEvent.endTime);
+
+  const personalKind = (item: PersonalItem) =>
+    item.type === 'confession' ? 'confession' : item.eventType === 'volunteer' ? 'volunteer' : 'event';
 
   const weekDayKeys = new Set(weekDays.map(localDateKey));
   const weekEventsByDay = groupEventsByDay(weekEvents, weekDayKeys);
@@ -1394,11 +1485,12 @@ export default function Calendar() {
                 {personalSchedule.map((event, i) => (
                   <TimelineItem
                     key={event.id}
-                    kind={event.type === 'confession' ? 'confession' : event.eventType === 'volunteer' ? 'volunteer' : 'event'}
+                    kind={personalKind(event)}
                     title={event.title}
                     time={event.timeDisplay}
                     meta={event.location}
                     isLast={i === personalSchedule.length - 1}
+                    onPress={() => openPersonalItem(event)}
                   />
                 ))}
               </View>
@@ -1451,25 +1543,34 @@ export default function Calendar() {
       <EventDetailSheet
         visible={eventSheetVisible}
         onClose={() => setEventSheetVisible(false)}
-        eyebrow={parishName || 'Parish event'}
-        title={activeEvent?.title}
+        eyebrow={
+          activePersonal
+            ? eventKindStyle[personalKind(activePersonal)].label
+            : parishName || 'Parish event'
+        }
+        title={activePersonal?.title ?? activeEvent?.title}
         when={
-          activeEvent
-            ? activeEvent.startTime.includes('T')
-              ? formatEventTimeRange(activeEvent.startTime, activeEvent.endTime)
-              : 'All day'
-            : undefined
+          activePersonal
+            ? activePersonal.timeDisplay
+            : activeEvent
+              ? activeEvent.startTime.includes('T')
+                ? formatEventTimeRange(activeEvent.startTime, activeEvent.endTime)
+                : 'All day'
+              : undefined
         }
         whenDetail={
-          activeEvent
-            ? (activeEvent.startTime.includes('T') ? new Date(activeEvent.startTime) : parseDateOnly(activeEvent.startTime))
-                .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-            : undefined
+          activePersonal
+            ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+            : activeEvent
+              ? (activeEvent.startTime.includes('T') ? new Date(activeEvent.startTime) : parseDateOnly(activeEvent.startTime))
+                  .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+              : undefined
         }
-        location={activeEvent?.location}
-        description={activeEvent?.description}
+        location={activePersonal?.location ?? activeEvent?.location}
+        description={activePersonal ? undefined : activeEvent?.description}
+        notes={activePersonal?.notes}
         reminder={
-          activeEvent?.startTime.includes('T')
+          !activePersonal && activeEvent?.startTime.includes('T')
             ? {
                 isTimed: activeEvent.startTime.includes('T'),
                 isUpcoming: activeEvent.startTime.includes('T') && new Date(activeEvent.startTime) > new Date(),
@@ -1479,6 +1580,30 @@ export default function Calendar() {
                 onOpenSettings: () => {
                   setEventSheetVisible(false);
                   setTimeout(() => router.push('/(tabs)/calendar/notification-settings'), 320);
+                },
+              }
+            : undefined
+        }
+        chantSignup={
+          showChantSignup
+            ? {
+                loading: chantLoading,
+                toggling: chantToggling,
+                signedUp: !!user && chantSignups.some((s) => s.userId === user.id),
+                currentUserId: user?.id,
+                signups: chantSignups.map((s) => ({ userId: s.userId, name: s.name })),
+                onToggle: () => void toggleChantSignup(),
+              }
+            : undefined
+        }
+        secondaryAction={
+          activePersonal
+            ? {
+                label: 'Open in Events',
+                icon: 'arrow-forward',
+                onPress: () => {
+                  setEventSheetVisible(false);
+                  setTimeout(() => router.push('/(tabs)/events'), 320);
                 },
               }
             : undefined

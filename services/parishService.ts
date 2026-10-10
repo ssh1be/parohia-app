@@ -23,6 +23,8 @@ export interface Parish {
   paypal_donation_url?: string;
   donation_enabled?: boolean;
   donation_message?: string;
+  /** When false, confession booking is hidden from parishioners. */
+  confession_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +78,7 @@ export const getParishByUserId = async (userId: string): Promise<Parish | null> 
           paypal_donation_url,
           donation_enabled,
           donation_message,
+          confession_enabled,
           created_at,
           updated_at
         )
@@ -158,6 +161,31 @@ export const updateParishCalendarId = async (
     return {
       success: false,
       error: error.message || 'Failed to update calendar ID'
+    };
+  }
+};
+
+// Enable or disable confession scheduling for a parish
+export const updateParishConfessionEnabled = async (
+  parishId: string,
+  enabled: boolean
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from('parishes')
+      .update({ confession_enabled: enabled })
+      .eq('id', parishId);
+
+    if (error) {
+      throw error;
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating confession enabled:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to update confession settings',
     };
   }
 };
