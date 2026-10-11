@@ -13,7 +13,7 @@ import {
   type ParishEvent,
 } from "@parohia/shared";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../../../components/Icon";
 import { Button, Card, IconButton, Spinner, cx } from "../../../components/app/ui";
@@ -60,7 +60,6 @@ export default function CalendarPage() {
   const [adminConfessions, setAdminConfessions] = useState<Record<string, ConfessionWithName[]>>({});
   const requestedDays = useRef(new Set<string>());
   const [menu, setMenu] = useState<{ day: Date; rect: DOMRect } | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const [activeEvent, setActiveEvent] = useState<ParishEvent | null>(null);
   const [activePersonal, setActivePersonal] = useState<PersonalDetail | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -154,7 +153,7 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!menu) return;
     const close = () => setMenu(null);
-    const inPanel = (target: EventTarget | null) => target instanceof Node && !!panelRef.current?.contains(target);
+    const inPanel = (target: EventTarget | null) => target instanceof Element && !!target.closest("[data-day-menu]");
     const onScroll = (event: Event) => !inPanel(event.target) && close();
     // Day cells toggle the menu themselves; dialog clicks land outside the panel but should keep it open underneath
     const onPointerDown = (event: PointerEvent) => {
@@ -404,7 +403,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {menu && (
           <DayPreview
             key={localDateKey(menu.day)}
@@ -414,7 +413,6 @@ export default function CalendarPage() {
             items={itemsFor(menu.day)}
             loading={isAdmin && reservations.some((r) => r.date === localDateKey(menu.day)) && !adminConfessions[localDateKey(menu.day)]}
             fasting={fastingByDay[localDateKey(menu.day)]}
-            panelRef={panelRef}
           />
         )}
       </AnimatePresence>
@@ -449,7 +447,6 @@ function DayPreview({
   items,
   loading,
   fasting,
-  panelRef,
 }: {
   day: Date;
   rect: DOMRect;
@@ -457,7 +454,6 @@ function DayPreview({
   items: ScheduleItem[];
   loading: boolean;
   fasting?: string;
-  panelRef: RefObject<HTMLDivElement>;
 }) {
   const fitsRight = rect.right + 10 + PREVIEW_WIDTH < window.innerWidth - 12;
   const left = fitsRight ? rect.right + 10 : Math.max(12, rect.left - 10 - PREVIEW_WIDTH);
@@ -481,10 +477,10 @@ function DayPreview({
     <motion.div
       role="dialog"
       aria-label={day.toDateString()}
-      ref={panelRef}
+      data-day-menu
       initial={{ opacity: 0, x: fitsRight ? -6 : 6, scale: 0.98 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12 } }}
+      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
       transition={{ type: "spring", damping: 30, stiffness: 420 }}
       style={{ left, top, width: PREVIEW_WIDTH, maxHeight: window.innerHeight - top - 12 }}
       className="no-scrollbar fixed z-40 overflow-y-auto rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-[0_20px_50px_-12px_rgba(9,9,11,0.25)] dark:border-white/10 dark:bg-zinc-900 dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)]"

@@ -18,6 +18,7 @@ import {
   Card,
   CardHeader,
   Checkbox,
+  cx,
   Dialog,
   EmptyState,
   Notice,
@@ -124,7 +125,16 @@ function ParishOverview({ parish }: { parish: Parish }) {
       <PageHeader
         eyebrow={isAdmin ? "Your parish · Administrator" : "Your parish"}
         title={parish.name}
-        description={parish.jurisdiction}
+        description={
+          <span className="inline-flex items-center gap-2">
+            {parish.jurisdiction}
+            {parish.is_verified && (
+              <span title="Verified parish" className="inline-flex text-emerald-500">
+                <Icon name="checkmark-circle" size={16} />
+              </span>
+            )}
+          </span>
+        }
         badge={parish.is_verified ? undefined : "Pending verification"}
         actions={
           isAdmin ? (
@@ -157,6 +167,7 @@ function ParishOverview({ parish }: { parish: Parish }) {
                 {parish.website || "—"}
               </InfoRow>
             </div>
+            <CalendarStatusRow calendarId={parish.parish_calendar_id} isAdmin={isAdmin} onSetup={() => setEditCalendar(true)} />
           </Card>
 
           <Card>
@@ -313,34 +324,6 @@ function ParishOverview({ parish }: { parish: Parish }) {
             )}
           </Card>
 
-          {isAdmin && (
-            <Card>
-              <CardHeader eyebrow="Services" title="Parish calendar" />
-              {parish.parish_calendar_id ? (
-                <>
-                  <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/[0.07] p-3">
-                    <Icon name="checkmark-circle" size={18} className="text-emerald-500" />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-zinc-700 dark:text-zinc-300">
-                      {parish.parish_calendar_id}
-                    </span>
-                  </div>
-                  <Button size="sm" variant="ghost" icon="link-outline" className="mt-3" onClick={() => setEditCalendar(true)}>
-                    Change calendar
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="mb-4 text-[13px] leading-5 text-zinc-500 dark:text-zinc-400">
-                    Connect a public Google Calendar to show services in the app and on the dashboard.
-                  </p>
-                  <Button size="sm" icon="link-outline" onClick={() => setEditCalendar(true)}>
-                    Connect calendar
-                  </Button>
-                </>
-              )}
-            </Card>
-          )}
-
           <MapCard query={`${parish.name} ${address}`.trim()} address={address} directionsUrl={mapsUrl} />
         </div>
       </div>
@@ -427,6 +410,51 @@ function InfoRow({ icon, label, href, children }: { icon: IconName; label: strin
     >
       {body}
     </a>
+  ) : (
+    <div className={className}>{body}</div>
+  );
+}
+
+function CalendarStatusRow({ calendarId, isAdmin, onSetup }: { calendarId?: string | null; isAdmin: boolean; onSetup: () => void }) {
+  const connected = !!calendarId;
+  const body = (
+    <>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-600/[0.07] text-red-600 dark:bg-red-500/[0.12] dark:text-red-400">
+        <Icon name="calendar-outline" size={16} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-400">Parish calendar</span>
+        <span className="mt-0.5 block truncate text-[14px] text-zinc-800 dark:text-zinc-200">
+          {connected
+            ? isAdmin
+              ? calendarId
+              : "Services sync from the parish calendar"
+            : isAdmin
+              ? "Connect a public Google Calendar to show services in the app and on the dashboard"
+              : "Services aren't connected yet"}
+        </span>
+      </span>
+      <span
+        className={cx(
+          "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 font-sans-bold text-[11px]",
+          connected ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        )}
+      >
+        <Icon name={connected ? "checkmark-circle" : "alert-circle"} size={13} />
+        {connected ? "Connected" : isAdmin ? "Set up" : "Not set up"}
+        {isAdmin && <Icon name="chevron-forward" size={12} />}
+      </span>
+    </>
+  );
+  const className = "mt-3 flex w-full items-center gap-3 rounded-2xl bg-zinc-900/[0.03] p-3 text-left dark:bg-white/[0.04]";
+  return isAdmin ? (
+    <button
+      type="button"
+      onClick={onSetup}
+      className={`${className} outline-none transition-colors hover:bg-zinc-900/[0.06] focus-visible:ring-2 focus-visible:ring-brand-red/50 dark:hover:bg-white/[0.07]`}
+    >
+      {body}
+    </button>
   ) : (
     <div className={className}>{body}</div>
   );
