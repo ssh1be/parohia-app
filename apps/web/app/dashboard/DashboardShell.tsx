@@ -31,7 +31,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       visible: !!parish && (isAdmin || !!parish.confession_enabled),
     },
     { href: "/dashboard/parish", label: "Parish", icon: "business-outline", visible: true },
-    { href: "/dashboard/settings", label: "Settings", icon: "settings-outline", visible: true },
   ];
 
   const isActive = (href: string) =>
@@ -91,7 +90,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="pl-[248px]">
-        <div className="mx-auto max-w-[1180px] px-10 pb-16 pt-10">{children}</div>
+        <div className="mx-auto max-w-[1640px] px-10 pb-16 pt-10 2xl:px-14">{children}</div>
       </main>
     </div>
   );
@@ -219,12 +218,12 @@ export function DashboardSkeleton() {
       <aside className="fixed inset-y-0 left-0 flex w-[248px] flex-col gap-3 border-r border-zinc-200/70 px-4 py-6 dark:border-white/[0.06]">
         <Skeleton className="h-9 w-32" />
         <Skeleton className="mt-4 h-14" />
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-10" />
         ))}
       </aside>
       <main className="pl-[248px]">
-        <div className="mx-auto max-w-[1180px] px-10 pt-10">
+        <div className="mx-auto max-w-[1640px] px-10 pt-10 2xl:px-14">
           <Skeleton className="h-4 w-28" />
           <Skeleton className="mt-3 h-12 w-80" />
           <div className="mt-10 grid grid-cols-3 gap-5">

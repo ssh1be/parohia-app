@@ -1,3 +1,4 @@
+import AccountLink from "./AccountLink";
 import MobileNav from "./MobileNav";
 import ThemeToggle from "./ThemeToggle";
 
@@ -34,6 +35,7 @@ export default function PageHeader() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          <AccountLink className="hidden h-10 items-center rounded-full px-4 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-900/[0.05] hover:text-zinc-900 md:inline-flex dark:text-zinc-300 dark:hover:bg-white/[0.06] dark:hover:text-white" />
           <a
             href="/notify"
             className="hidden h-10 items-center rounded-full bg-brand-gradient px-5 text-sm font-semibold text-white shadow-md shadow-brand-red/25 transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97] md:inline-flex"

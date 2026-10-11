@@ -32,13 +32,18 @@ function eventHasPassed(startTime: string, endTime?: string): boolean {
   return endOfDay.getTime() <= now.getTime();
 }
 
+/** True for liturgical services (Liturgy, Vespers, …) regardless of date. */
+export function isLiturgicalServiceTitle(title: string): boolean {
+  const normalized = (title || '').toLowerCase();
+  return CHANT_SERVICE_TERMS.some((term) => normalized.includes(term));
+}
+
 export function isChantServiceEvent(
   title: string,
   startTime: string,
   endTime?: string
 ): boolean {
-  const normalized = (title || '').toLowerCase();
-  if (!CHANT_SERVICE_TERMS.some((term) => normalized.includes(term))) {
+  if (!isLiturgicalServiceTitle(title)) {
     return false;
   }
   return !eventHasPassed(startTime, endTime);

@@ -2,6 +2,7 @@
 
 import {
   getFastingKind,
+  isLiturgicalServiceTitle,
   type BulletinEvent,
   type ConfessionReservationWithSchedule,
   type OrthodoxCalendarData,
@@ -10,9 +11,10 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Icon } from "../Icon";
-import { eventKindStyle, fastingStyle, type EventKind } from "../phone/tokens";
-import { Card, EmptyState, Skeleton, cx } from "../app/ui";
-import { eventStartDate, formatClockTime, formatConfessionRange, formatEventRange } from "../../lib/format";
+import { eventKindStyle, fastingStyle, palette, type EventKind } from "../phone/tokens";
+import { Card, EmptyState, Skeleton, cx, useSeeMore } from "../app/ui";
+import { eventStartDate, formatClockTime, formatConfessionRange, formatEventRange, isSameDay, parseLocalDate } from "../../lib/format";
+import type { PersonalDetail } from "./EventDetailDialog";
 
 export interface ScheduleItem {
   id: string;
@@ -22,6 +24,8 @@ export interface ScheduleItem {
   /** Minutes since midnight; all-day items sort first. */
   sortKey: number;
   detail?: string;
+  /** Liturgical service (Liturgy, Vespers, …), highlighted in lists. */
+  service?: boolean;
   chant?: boolean;
   onOpen?: () => void;
 }
@@ -40,15 +44,12 @@ export const parishEventItem = (event: ParishEvent, onOpen: () => void, chant = 
   time: formatEventRange(event.startTime, event.endTime),
   sortKey: event.startTime.includes("T") ? minutesOf(eventStartDate(event.startTime)) : -1,
   detail: event.location,
+  service: isLiturgicalServiceTitle(event.title),
   chant,
   onOpen,
 });
 
-export const confessionItem = (
-  reservation: ConfessionReservationWithSchedule,
-  title: string,
-  onOpen?: () => void
-): ScheduleItem => ({
+export const confessionItem = (reservation: ConfessionReservationWithSchedule, title: string, onOpen?: () => void): ScheduleItem => ({
   id: `confession-${reservation.id}`,
   kind: "confession",
   title,
@@ -73,17 +74,49 @@ export const bulletinItem = (event: BulletinEvent, onOpen?: () => void): Schedul
   onOpen,
 });
 
+const longDate = (value?: string) =>
+  value ? parseLocalDate(value).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : undefined;
+
+export const bulletinDetail = (event: BulletinEvent): PersonalDetail => ({
+  kind: event.event_type,
+  title: event.title,
+  when: event.event_time ? formatClockTime(event.event_time) : "All day",
+  whenDetail: longDate(event.event_date),
+  location: event.location,
+  description: event.description,
+  notes: event.user_response?.notes,
+  href: "/dashboard/bulletin",
+  hrefLabel: "Open in Bulletin",
+});
+
+export const confessionDetail = (reservation: ConfessionReservationWithSchedule, title: string): PersonalDetail => ({
+  kind: "confession",
+  title,
+  when: formatConfessionRange(reservation.confession_schedules?.time_slot),
+  whenDetail: longDate(reservation.confession_schedules?.date),
+  notes: reservation.notes || undefined,
+  href: "/dashboard/confession",
+  hrefLabel: "Open in Confession",
+});
+
 export function ScheduleList({
   items,
   loading,
   emptyTitle = "Nothing scheduled",
   emptyMessage,
+  limit = 4,
 }: {
   items: ScheduleItem[];
   loading?: boolean;
   emptyTitle?: string;
   emptyMessage?: string;
+  limit?: number;
 }) {
+  const { visible, toggle } = useSeeMore(
+    [...items].sort((a, b) => a.sortKey - b.sortKey),
+    limit
+  );
+
   if (loading) {
     return (
       <div className="space-y-2">
@@ -97,15 +130,16 @@ export function ScheduleList({
     return <EmptyState compact icon="calendar-outline" title={emptyTitle} message={emptyMessage} />;
   }
   return (
-    <ul className="space-y-1.5">
-      {[...items]
-        .sort((a, b) => a.sortKey - b.sortKey)
-        .map((item) => (
+    <>
+      <ul className="space-y-1.5">
+        {visible.map((item) => (
           <li key={item.id}>
             <ScheduleRow item={item} />
           </li>
         ))}
-    </ul>
+      </ul>
+      {toggle}
+    </>
   );
 }
 
@@ -113,16 +147,22 @@ function ScheduleRow({ item }: { item: ScheduleItem }) {
   const style = eventKindStyle[item.kind];
   const content = (
     <>
-      <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-        style={{ backgroundColor: style.tint, color: style.color }}
-      >
-        <Icon name={style.icon} size={17} />
-      </span>
+      {item.service ? (
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
+          <Icon name={style.icon} size={17} />
+        </span>
+      ) : (
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: style.tint, color: style.color }}
+        >
+          <Icon name={style.icon} size={17} />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <span className="truncate font-sans-semibold text-[14px] text-zinc-900 dark:text-white">{item.title}</span>
-          {item.chant && <Icon name="musical-notes" size={13} className="shrink-0 text-purple-500" />}
+          {item.chant && <Icon name="musical-notes" size={13} className="shrink-0 text-red-500" />}
         </span>
         <span className="mt-0.5 block truncate text-[12px] text-zinc-500 dark:text-zinc-400">
           {item.time}
@@ -162,6 +202,8 @@ export function LiturgicalDayCard({
 }) {
   const [openStory, setOpenStory] = useState<number | null>(null);
   const [openReading, setOpenReading] = useState<number | null>(null);
+  const saints = useSeeMore(data?.saintsFull ?? [], 4);
+  const readings = useSeeMore(data?.readingsFull ?? [], 3);
 
   if (loading || !data) {
     return (
@@ -186,50 +228,65 @@ export function LiturgicalDayCard({
       />
       <div className="relative p-7">
         <p className="font-sans-semibold text-[12px] uppercase tracking-[0.16em] text-red-600 dark:text-red-400">
-          {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          {isSameDay(date, new Date())
+            ? "Today in the Church"
+            : date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </p>
-        <h2 className="mt-2 font-display text-[32px] leading-[1.1] text-zinc-900 dark:text-white">
-          {data.title || "Liturgical day"}
-        </h2>
+        <h2 className="mt-2 font-display text-[32px] leading-[1.1] text-zinc-900 dark:text-white">{data.title || "Liturgical day"}</h2>
 
-        <div className="mt-5 flex items-start gap-3 rounded-2xl bg-zinc-900/[0.03] p-3.5 dark:bg-white/[0.04]">
+        {data.fasting && (
           <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: `${fasting.color}1f`, color: fasting.color }}
+            title={data.fasting}
+            className="mt-4 inline-flex max-w-full items-center gap-1.5 rounded-full bg-zinc-900/[0.05] py-1 pl-1 pr-3 dark:bg-white/[0.07]"
           >
-            <Icon name={fasting.icon} size={17} />
+            <span
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+              style={{ backgroundColor: `${fasting.color}22`, color: fasting.color }}
+            >
+              <Icon name={fasting.icon} size={12} />
+            </span>
+            <span className="shrink-0 font-sans-semibold text-[12px] text-zinc-800 dark:text-zinc-200">{fastLevel}</span>
+            {fastNote && <span className="truncate text-[12px] text-zinc-500 dark:text-zinc-400">· {fastNote}</span>}
           </span>
-          <div className="min-w-0">
-            <p className="font-sans-semibold text-[14px] text-zinc-900 dark:text-white">{fastLevel || fasting.label}</p>
-            {fastNote && <p className="text-[13px] text-zinc-500 dark:text-zinc-400">{fastNote}</p>}
-          </div>
-        </div>
+        )}
 
         {data.saintsFull.length > 0 && (
-          <section className="mt-7">
+          <section className="mt-6">
             <h3 className="mb-2 font-sans-semibold text-[12px] uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
               Commemorations
             </h3>
             <ul className="divide-y divide-zinc-100 dark:divide-white/[0.06]">
-              {data.saintsFull.map((saint, index) => {
+              {saints.visible.map((saint, index) => {
                 const open = openStory === index;
+                const isFeast = saint.kind === "feast";
                 return (
                   <li key={`${saint.title}-${index}`}>
                     <button
                       type="button"
                       disabled={!saint.story}
                       onClick={() => setOpenStory(open ? null : index)}
+                      aria-expanded={saint.story ? open : undefined}
                       className="flex w-full items-center gap-3 py-2.5 text-left disabled:cursor-default"
                     >
-                      <Icon
-                        name={saint.kind === "feast" ? "sparkles" : "person-outline"}
-                        size={15}
-                        className={saint.kind === "feast" ? "text-amber-500" : "text-zinc-400"}
-                      />
-                      <span className="flex-1 text-[14px] text-zinc-800 dark:text-zinc-200">{saint.title}</span>
-                      {saint.story && (
-                        <Icon name={open ? "chevron-up" : "chevron-down"} size={14} className="text-zinc-400" />
-                      )}
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                        style={
+                          isFeast
+                            ? { backgroundColor: palette.accentMuted, color: palette.accent }
+                            : { backgroundColor: "rgba(245, 158, 11, 0.12)", color: palette.amber }
+                        }
+                      >
+                        <Icon name={isFeast ? "star" : "sparkles"} size={15} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-display text-[17px] leading-[22px] text-zinc-900 dark:text-white">{saint.title}</span>
+                        {saint.story && (
+                          <span className="mt-0.5 block text-[12px] font-medium text-zinc-500 dark:text-zinc-400">
+                            {isFeast ? "Read about the feast" : "Read the life"}
+                          </span>
+                        )}
+                      </span>
+                      {saint.story && <Icon name={open ? "chevron-up" : "chevron-down"} size={14} className="text-zinc-400" />}
                     </button>
                     <AnimatePresence initial={false}>
                       {open && (
@@ -237,7 +294,7 @@ export function LiturgicalDayCard({
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden pb-3 pl-7 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400"
+                          className="overflow-hidden pb-3 pl-12 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400"
                         >
                           {saint.story}
                         </motion.p>
@@ -247,6 +304,7 @@ export function LiturgicalDayCard({
                 );
               })}
             </ul>
+            {saints.toggle}
           </section>
         )}
 
@@ -256,7 +314,7 @@ export function LiturgicalDayCard({
               Scripture readings
             </h3>
             <ul className="space-y-1.5">
-              {data.readingsFull.map((reading, index) => {
+              {readings.visible.map((reading, index) => {
                 const open = openReading === index;
                 return (
                   <li key={`${reading.display}-${index}`} className="rounded-2xl border border-zinc-100 dark:border-white/[0.06]">
@@ -266,9 +324,7 @@ export function LiturgicalDayCard({
                       className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
                     >
                       <Icon name="book-outline" size={15} className="text-red-500" />
-                      <span className="flex-1 font-sans-semibold text-[14px] text-zinc-800 dark:text-zinc-200">
-                        {reading.display}
-                      </span>
+                      <span className="flex-1 font-sans-semibold text-[14px] text-zinc-800 dark:text-zinc-200">{reading.display}</span>
                       <Icon name={open ? "chevron-up" : "chevron-down"} size={14} className="text-zinc-400" />
                     </button>
                     <AnimatePresence initial={false}>
@@ -287,6 +343,7 @@ export function LiturgicalDayCard({
                 );
               })}
             </ul>
+            {readings.toggle}
           </section>
         )}
 

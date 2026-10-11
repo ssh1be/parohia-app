@@ -3,7 +3,7 @@
 import { BulletinService, ChannelService, type BulletinChannel, type BulletinEvent } from "@parohia/shared";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "../../../components/Icon";
-import { Button, Card, EmptyState, Segmented, Skeleton, Switch, cx } from "../../../components/app/ui";
+import { Button, Card, EmptyState, Segmented, Skeleton, Spinner, cx, useSeeMore } from "../../../components/app/ui";
 import { useToast } from "../../../components/app/toast";
 import { formatClockTime, formatRelativeTime } from "../../../lib/format";
 import { useDashboard } from "../DashboardContext";
@@ -61,10 +61,9 @@ function Bulletin({ parishId }: { parishId: string }) {
   }, [load]);
 
   const visibleChannels = isAdmin ? channels : channels.filter((c) => c.is_subscribed || c.is_default);
+  const channelList = useSeeMore(channels, 5);
   const postableChannels = isAdmin ? channels : channels.filter((c) => managedChannelIds.includes(c.id));
-  const defaultChannelId = isAdmin
-    ? channels.find((c) => c.is_default)?.id || channels[0]?.id || ""
-    : managedChannelIds[0] || "";
+  const defaultChannelId = isAdmin ? channels.find((c) => c.is_default)?.id || channels[0]?.id || "" : managedChannelIds[0] || "";
 
   useEffect(() => {
     if (channelFilter !== "all" && !visibleChannels.some((c) => c.id === channelFilter)) setChannelFilter("all");
@@ -103,11 +102,7 @@ function Bulletin({ parishId }: { parishId: string }) {
       <PageHeader
         eyebrow="Bulletin"
         title="Parish bulletin"
-        description={
-          isAdmin
-            ? "Every post across your parish channels."
-            : "Posts from the channels you follow."
-        }
+        description={isAdmin ? "Every post across your parish channels." : "Posts from the channels you follow."}
         actions={
           canPost && (
             <Button
@@ -136,16 +131,9 @@ function Bulletin({ parishId }: { parishId: string }) {
                 { value: "volunteer", label: "Volunteer" },
               ]}
             />
-            {channelFilter !== "all" && (
-              <button
-                type="button"
-                onClick={() => setChannelFilter("all")}
-                className="flex items-center gap-1.5 rounded-full bg-red-600/[0.08] px-3 py-1.5 text-[12px] font-semibold text-red-700 dark:text-red-300"
-              >
-                #{channels.find((c) => c.id === channelFilter)?.name}
-                <Icon name="close" size={12} />
-              </button>
-            )}
+            <span className="text-[13px] font-semibold text-zinc-500 dark:text-zinc-400">
+              {channelFilter === "all" ? "All channels" : `#${channels.find((c) => c.id === channelFilter)?.name ?? ""}`}
+            </span>
           </div>
 
           {loading ? (
@@ -192,63 +180,79 @@ function Bulletin({ parishId }: { parishId: string }) {
             {loading ? (
               <Skeleton className="h-40" />
             ) : (
-              <ul className="space-y-0.5">
-                {channels.map((channel) => {
-                  const visible = visibleChannels.some((c) => c.id === channel.id);
-                  const managed = managedChannelIds.includes(channel.id);
-                  return (
-                    <li key={channel.id} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={!visible}
-                        onClick={() => setChannelFilter(channelFilter === channel.id ? "all" : channel.id)}
-                        className={cx(
-                          "flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors disabled:cursor-default",
-                          channelFilter === channel.id
-                            ? "bg-red-600/[0.08] dark:bg-red-500/[0.12]"
-                            : visible && "hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
-                        )}
-                      >
-                        <Icon
-                          name={channel.is_chant ? "musical-notes-outline" : channel.is_default ? "home-outline" : "chatbubbles-outline"}
-                          size={15}
-                          className={visible ? "text-zinc-500" : "text-zinc-300 dark:text-zinc-600"}
-                        />
-                        <span
+              <>
+                <ul className="space-y-0.5">
+                  {channelList.visible.map((channel) => {
+                    const visible = visibleChannels.some((c) => c.id === channel.id);
+                    const managed = managedChannelIds.includes(channel.id);
+                    return (
+                      <li key={channel.id} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={!visible}
+                          onClick={() => setChannelFilter(channelFilter === channel.id ? "all" : channel.id)}
                           className={cx(
-                            "truncate text-[14px] font-semibold",
-                            visible ? "text-zinc-800 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"
+                            "flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors disabled:cursor-default",
+                            channelFilter === channel.id
+                              ? "bg-red-600/[0.08] dark:bg-red-500/[0.12]"
+                              : visible && "hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
                           )}
                         >
-                          {channel.name}
-                        </span>
-                        {managed && (
-                          <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-300">
-                            Manager
+                          <Icon
+                            name={channel.is_chant ? "musical-notes-outline" : channel.is_default ? "home-outline" : "chatbubbles-outline"}
+                            size={15}
+                            className={visible ? "text-zinc-500" : "text-zinc-300 dark:text-zinc-600"}
+                          />
+                          <span
+                            className={cx(
+                              "truncate text-[14px] font-semibold",
+                              visible ? "text-zinc-800 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"
+                            )}
+                          >
+                            {channel.name}
                           </span>
+                          {managed && (
+                            <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-300">
+                              Manager
+                            </span>
+                          )}
+                          {isAdmin && !!channel.manager_count && (
+                            <span className="ml-auto text-[11px] text-zinc-400">
+                              {channel.manager_count} {channel.manager_count === 1 ? "manager" : "managers"}
+                            </span>
+                          )}
+                        </button>
+                        {!isAdmin && !channel.is_default && (
+                          <button
+                            type="button"
+                            disabled={togglingChannel === channel.id}
+                            onClick={() => toggleSubscription(channel)}
+                            aria-label={channel.is_subscribed ? `Leave ${channel.name}` : `Join ${channel.name}`}
+                            title={channel.is_subscribed ? "Leave channel" : "Join channel"}
+                            className={cx(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-red/50 disabled:opacity-50",
+                              channel.is_subscribed
+                                ? "text-zinc-400 hover:bg-red-600/10 hover:text-red-600 dark:hover:bg-red-500/15 dark:hover:text-red-400"
+                                : "bg-zinc-900/[0.06] text-zinc-700 hover:bg-zinc-900/[0.1] hover:text-zinc-900 dark:bg-white/[0.08] dark:text-zinc-200 dark:hover:bg-white/[0.14] dark:hover:text-white"
+                            )}
+                          >
+                            {togglingChannel === channel.id ? (
+                              <Spinner size={13} />
+                            ) : (
+                              <Icon name={channel.is_subscribed ? "close" : "add"} size={15} />
+                            )}
+                          </button>
                         )}
-                        {isAdmin && !!channel.manager_count && (
-                          <span className="ml-auto text-[11px] text-zinc-400">
-                            {channel.manager_count} {channel.manager_count === 1 ? "manager" : "managers"}
-                          </span>
-                        )}
-                      </button>
-                      {!isAdmin && !channel.is_default && (
-                        <Switch
-                          checked={!!channel.is_subscribed}
-                          disabled={togglingChannel === channel.id}
-                          onChange={() => toggleSubscription(channel)}
-                          label={channel.is_subscribed ? `Leave ${channel.name}` : `Join ${channel.name}`}
-                        />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {channelList.toggle}
+              </>
             )}
             {!isAdmin && (
               <p className="mt-3 text-[12px] leading-5 text-zinc-500 dark:text-zinc-400">
-                Everyone follows General. Turn on other channels to see their posts.
+                Everyone follows General. Join other channels to see their posts.
               </p>
             )}
           </Card>

@@ -25,6 +25,7 @@ import {
   Skeleton,
   TextArea,
   TextField,
+  useSeeMore,
 } from "../../../components/app/ui";
 import { useToast } from "../../../components/app/toast";
 import { CalendarSetupDialog } from "../../../components/dashboard/CalendarSetupDialog";
@@ -105,6 +106,7 @@ function ParishOverview({ parish }: { parish: Parish }) {
   const [switchOpen, setSwitchOpen] = useState(false);
   const [members, setMembers] = useState<ParishMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(isAdmin);
+  const memberList = useSeeMore(members, 6);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -113,9 +115,7 @@ function ParishOverview({ parish }: { parish: Parish }) {
       .finally(() => setMembersLoading(false));
   }, [isAdmin, parish.id, userId]);
 
-  const address = [parish.address, parish.city, [parish.state, parish.zip_code].filter(Boolean).join(" ")]
-    .filter(Boolean)
-    .join(", ");
+  const address = [parish.address, parish.city, [parish.state, parish.zip_code].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${parish.name} ${address}`)}`;
   const website = parish.website ? (parish.website.startsWith("http") ? parish.website : `https://${parish.website}`) : null;
 
@@ -178,13 +178,19 @@ function ParishOverview({ parish }: { parish: Parish }) {
                   <p className="font-sans-bold text-[17px] text-zinc-900 dark:text-white">{parish.priest_name}</p>
                   <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
                     {parish.priest_phone_number && (
-                      <a href={`tel:${parish.priest_phone_number}`} className="flex items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300">
+                      <a
+                        href={`tel:${parish.priest_phone_number}`}
+                        className="flex items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300"
+                      >
                         <Icon name="call-outline" size={14} />
                         {formatPhone(parish.priest_phone_number)}
                       </a>
                     )}
                     {parish.priest_email && (
-                      <a href={`mailto:${parish.priest_email}`} className="flex items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300">
+                      <a
+                        href={`mailto:${parish.priest_email}`}
+                        className="flex items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300"
+                      >
                         <Icon name="mail-outline" size={14} />
                         {parish.priest_email}
                       </a>
@@ -215,7 +221,12 @@ function ParishOverview({ parish }: { parish: Parish }) {
               {membersLoading ? (
                 <Skeleton className="h-40" />
               ) : members.length === 0 ? (
-                <EmptyState compact icon="people-outline" title="No members yet" message="Members appear here once they join your parish." />
+                <EmptyState
+                  compact
+                  icon="people-outline"
+                  title="No members yet"
+                  message="Members appear here once they join your parish."
+                />
               ) : (
                 <table className="w-full text-left text-[13px]">
                   <thead className="text-[11px] uppercase tracking-[0.1em] text-zinc-400">
@@ -224,11 +235,11 @@ function ParishOverview({ parish }: { parish: Parish }) {
                       <th className="pb-2 font-semibold">Email</th>
                       <th className="pb-2 font-semibold">Phone</th>
                       <th className="pb-2 font-semibold">Role</th>
-                      <th className="pb-2 text-right font-semibold">Joined</th>
+                      <th className="pb-2 text-right font-semibold">Last sign-in</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.06]">
-                    {members.map((member) => (
+                    {memberList.visible.map((member) => (
                       <tr key={member.user_id}>
                         <td className="py-2.5">
                           <span className="flex items-center gap-2.5">
@@ -241,25 +252,22 @@ function ParishOverview({ parish }: { parish: Parish }) {
                           {member.phone_number ? formatPhone(member.phone_number) : "—"}
                         </td>
                         <td className="py-2.5">
-                          <Pill
-                            color={member.role === "admin" ? "#DC2626" : member.role === "manager" ? "#3B82F6" : undefined}
-                          >
+                          <Pill color={member.role === "admin" ? "#DC2626" : member.role === "manager" ? "#3B82F6" : undefined}>
                             {member.role === "admin" ? "Admin" : member.role === "manager" ? "Manager" : "Member"}
                           </Pill>
                         </td>
-                        <td className="py-2.5 text-right text-zinc-500">
-                          {member.joined_at ? formatRelativeTime(member.joined_at) : "—"}
-                        </td>
+                        <td className="py-2.5 text-right text-zinc-500">{member.joined_at ? formatRelativeTime(member.joined_at) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
+              {!membersLoading && memberList.toggle}
             </Card>
           )}
         </div>
 
-        <div className="col-span-4 space-y-6">
+        <div className="col-span-4 flex flex-col gap-6">
           <Card className="relative overflow-hidden">
             <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-red-500/10 blur-2xl" />
             <CardHeader
@@ -332,6 +340,8 @@ function ParishOverview({ parish }: { parish: Parish }) {
               )}
             </Card>
           )}
+
+          <MapCard query={`${parish.name} ${address}`.trim()} address={address} directionsUrl={mapsUrl} />
         </div>
       </div>
 
@@ -365,6 +375,36 @@ function ParishOverview({ parish }: { parish: Parish }) {
   );
 }
 
+function MapCard({ query, address, directionsUrl }: { query: string; address: string; directionsUrl: string }) {
+  return (
+    <Card className="flex min-h-[320px] flex-1 flex-col overflow-hidden" padded={false}>
+      <div className="flex items-start justify-between gap-4 p-6 pb-4">
+        <div className="min-w-0">
+          <p className="mb-1 font-sans-semibold text-[11px] uppercase tracking-[0.14em] text-red-600 dark:text-red-400">Location</p>
+          <h2 className="font-display text-[24px] leading-tight text-zinc-900 dark:text-white">Find us</h2>
+          {address && <p className="mt-1 text-[13px] leading-5 text-zinc-500 dark:text-zinc-400">{address}</p>}
+        </div>
+        <a
+          href={directionsUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 inline-flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-red-600 hover:underline dark:text-red-400"
+        >
+          Directions
+          <Icon name="open-outline" size={13} />
+        </a>
+      </div>
+      <iframe
+        title="Parish location map"
+        src={`https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=15&output=embed`}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        className="min-h-[220px] w-full flex-1 border-0 border-t border-zinc-100 dark:border-white/[0.06] dark:[filter:invert(0.9)_hue-rotate(180deg)]"
+      />
+    </Card>
+  );
+}
+
 function InfoRow({ icon, label, href, children }: { icon: IconName; label: string; href?: string; children: ReactNode }) {
   const body = (
     <>
@@ -379,7 +419,12 @@ function InfoRow({ icon, label, href, children }: { icon: IconName; label: strin
   );
   const className = "flex items-start gap-3 rounded-2xl bg-zinc-900/[0.03] p-3 dark:bg-white/[0.04]";
   return href ? (
-    <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className={`${className} transition-colors hover:bg-zinc-900/[0.06] dark:hover:bg-white/[0.07]`}>
+    <a
+      href={href}
+      target={href.startsWith("http") ? "_blank" : undefined}
+      rel="noreferrer"
+      className={`${className} transition-colors hover:bg-zinc-900/[0.06] dark:hover:bg-white/[0.07]`}
+    >
       {body}
     </a>
   ) : (
@@ -573,11 +618,7 @@ function PriestDialog({
 
   const save = async () => {
     setSaving(true);
-    const result = await updateParishPriestInfo(parish.id, {
-      priest_name: name,
-      priest_phone_number: phone,
-      priest_email: email,
-    });
+    const result = await updateParishPriestInfo(parish.id, { priest_name: name, priest_phone_number: phone, priest_email: email });
     setSaving(false);
     if (!result.success) return toast(result.error || "Failed to update priest information", "error");
     onSaved({

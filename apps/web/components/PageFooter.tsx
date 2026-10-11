@@ -1,3 +1,4 @@
+import AccountLink from "./AccountLink";
 import { Icon } from "./Icon";
 
 const COLUMNS = [
@@ -48,6 +49,11 @@ export default function PageFooter() {
                     </a>
                   </li>
                 ))}
+                {column.title === "Product" && (
+                  <li>
+                    <AccountLink className="text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-white" />
+                  </li>
+                )}
               </ul>
             </div>
           ))}

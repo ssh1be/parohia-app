@@ -4,7 +4,6 @@ import {
   BulletinService,
   ChannelService,
   ConfessionService,
-  fetchOrthodoxCalendarData,
   fetchParishEventsForMultipleDays,
   isChantServiceEvent,
   type BulletinEvent,
@@ -15,19 +14,23 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "../../components/Icon";
-import { Button, Card, CardHeader, EmptyState, Segmented, Skeleton } from "../../components/app/ui";
+import { Button, Card, CardHeader, EmptyState, Skeleton, useSeeMore } from "../../components/app/ui";
 import { useToast } from "../../components/app/toast";
 import { CalendarSetupCallout, CalendarSetupDialog } from "../../components/dashboard/CalendarSetupDialog";
+import { PersonalEventDialog, type PersonalDetail } from "../../components/dashboard/EventDetailDialog";
 import { ParishEventDialog } from "../../components/dashboard/ParishEventDialog";
 import {
   LiturgicalDayCard,
   ScheduleList,
+  bulletinDetail,
   bulletinItem,
+  confessionDetail,
   confessionItem,
   parishEventItem,
   type ScheduleItem,
 } from "../../components/dashboard/Schedule";
 import { eventStartDate, firstName, formatEventRange, isSameDay, localDateKey } from "../../lib/format";
+import { getOrthodoxDay } from "../../lib/orthocal";
 import { useDashboard } from "./DashboardContext";
 import { PageHeader } from "./DashboardShell";
 
@@ -42,17 +45,7 @@ type ConfessionWithName = ConfessionReservationWithSchedule & { personName?: str
 
 export default function TodayPage() {
   const toast = useToast();
-  const {
-    userId,
-    profile,
-    parish,
-    isAdmin,
-    tradition,
-    setTradition,
-    chantSubscribed,
-    setChantSubscribed,
-    setParish,
-  } = useDashboard();
+  const { userId, profile, parish, isAdmin, tradition, chantSubscribed, setChantSubscribed, setParish } = useDashboard();
   const today = useMemo(() => new Date(), []);
 
   const [orthodox, setOrthodox] = useState<OrthodoxCalendarData | null>(null);
@@ -62,12 +55,13 @@ export default function TodayPage() {
   const [personal, setPersonal] = useState<BulletinEvent[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [activeEvent, setActiveEvent] = useState<ParishEvent | null>(null);
+  const [activePersonal, setActivePersonal] = useState<PersonalDetail | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [joiningChant, setJoiningChant] = useState(false);
 
   useEffect(() => {
     setOrthodoxLoading(true);
-    fetchOrthodoxCalendarData(today, tradition)
+    getOrthodoxDay(today, tradition)
       .then(setOrthodox)
       .finally(() => setOrthodoxLoading(false));
   }, [today, tradition]);
@@ -110,25 +104,22 @@ export default function TodayPage() {
 
   const chantEnabled = isAdmin || chantSubscribed;
   const todayEvents = weekEvents.filter((e) => isSameDay(eventStartDate(e.startTime), today));
-  const upcomingChant = chantEnabled
-    ? weekEvents.filter((e) => isChantServiceEvent(e.title, e.startTime, e.endTime)).slice(0, 4)
-    : [];
+  const upcomingChant = chantEnabled ? weekEvents.filter((e) => isChantServiceEvent(e.title, e.startTime, e.endTime)) : [];
+  const chantList = useSeeMore(upcomingChant, 3);
 
   const items: ScheduleItem[] = [
     ...todayEvents.map((e) =>
       parishEventItem(e, () => setActiveEvent(e), chantEnabled && isChantServiceEvent(e.title, e.startTime, e.endTime))
     ),
-    ...confessions.map((c) =>
-      confessionItem(
-        c,
-        isAdmin
-          ? `Confession with ${c.personName || "a parishioner"}`
-          : parish?.priest_name
-            ? `Confession with ${parish.priest_name}`
-            : "Confession"
-      )
-    ),
-    ...personal.map((e) => bulletinItem(e)),
+    ...confessions.map((c) => {
+      const title = isAdmin
+        ? `Confession with ${c.personName || "a parishioner"}`
+        : parish?.priest_name
+          ? `Confession with ${parish.priest_name}`
+          : "Confession";
+      return confessionItem(c, title, () => setActivePersonal(confessionDetail(c, title)));
+    }),
+    ...personal.map((e) => bulletinItem(e, () => setActivePersonal(bulletinDetail(e)))),
   ];
 
   const joinChant = async () => {
@@ -157,17 +148,6 @@ export default function TodayPage() {
         eyebrow={today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         title={name ? `${greeting()}, ${name}` : greeting()}
         description={parish ? parish.name : "You haven't joined a parish yet."}
-        actions={
-          <Segmented
-            size="sm"
-            value={tradition}
-            onChange={setTradition}
-            options={[
-              { value: "greek", label: "Greek" },
-              { value: "slavic", label: "Slavic" },
-            ]}
-          />
-        }
       />
 
       {isAdmin && parish && !parish.parish_calendar_id && (
@@ -204,10 +184,7 @@ export default function TodayPage() {
               eyebrow="Today"
               title="Your schedule"
               action={
-                <Link
-                  href="/dashboard/calendar"
-                  className="mt-1 text-[13px] font-semibold text-red-600 hover:underline dark:text-red-400"
-                >
+                <Link href="/dashboard/calendar" className="mt-1 text-[13px] font-semibold text-red-600 hover:underline dark:text-red-400">
                   Open calendar
                 </Link>
               }
@@ -232,38 +209,39 @@ export default function TodayPage() {
               ) : upcomingChant.length === 0 ? (
                 <EmptyState compact icon="musical-notes-outline" title="No upcoming services" />
               ) : (
-                <ul className="space-y-1.5">
-                  {upcomingChant.map((event) => {
-                    const date = eventStartDate(event.startTime);
-                    return (
-                      <li key={event.id}>
-                        <button
-                          type="button"
-                          onClick={() => setActiveEvent(event)}
-                          className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
-                        >
-                          <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl bg-purple-500/10">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-300">
-                              {date.toLocaleDateString("en-US", { weekday: "short" })}
+                <>
+                  <ul className="space-y-1.5">
+                    {chantList.visible.map((event) => {
+                      const date = eventStartDate(event.startTime);
+                      return (
+                        <li key={event.id}>
+                          <button
+                            type="button"
+                            onClick={() => setActiveEvent(event)}
+                            className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
+                          >
+                            <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl bg-red-600/10">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
+                                {date.toLocaleDateString("en-US", { weekday: "short" })}
+                              </span>
+                              <span className="font-display text-[18px] leading-none text-zinc-900 dark:text-white">{date.getDate()}</span>
                             </span>
-                            <span className="font-display text-[18px] leading-none text-zinc-900 dark:text-white">
-                              {date.getDate()}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-sans-semibold text-[14px] text-zinc-900 dark:text-white">
+                                {event.title}
+                              </span>
+                              <span className="text-[12px] text-zinc-500 dark:text-zinc-400">
+                                {formatEventRange(event.startTime, event.endTime)}
+                              </span>
                             </span>
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate font-sans-semibold text-[14px] text-zinc-900 dark:text-white">
-                              {event.title}
-                            </span>
-                            <span className="text-[12px] text-zinc-500 dark:text-zinc-400">
-                              {formatEventRange(event.startTime, event.endTime)}
-                            </span>
-                          </span>
-                          <Icon name="chevron-forward" size={14} className="text-zinc-300 dark:text-zinc-600" />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                            <Icon name="chevron-forward" size={14} className="text-zinc-300 dark:text-zinc-600" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {chantList.toggle}
+                </>
               )}
             </Card>
           )}
@@ -271,7 +249,7 @@ export default function TodayPage() {
           {parish && !chantEnabled && (
             <Card className="relative overflow-hidden">
               <div className="flex items-start gap-4">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-300">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-600/10 text-red-600 dark:text-red-400">
                   <Icon name="musical-notes" size={20} />
                 </span>
                 <div className="flex-1">
@@ -296,6 +274,7 @@ export default function TodayPage() {
         userId={userId}
         chantEnabled={chantEnabled}
       />
+      <PersonalEventDialog detail={activePersonal} onClose={() => setActivePersonal(null)} />
 
       {isAdmin && parish && (
         <CalendarSetupDialog

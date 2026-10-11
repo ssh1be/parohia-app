@@ -55,6 +55,7 @@ import {
   send,
   settingsOutline,
   sparkles,
+  star,
   sunny,
   sunnyOutline,
   swapHorizontal,
@@ -102,6 +103,8 @@ import {
   shieldCheckmarkOutline,
   trashOutline,
   warningOutline,
+  copyOutline,
+  handLeft,
 } from "ionicons/icons";
 
 /** Ionicons, the same set the mobile app uses, keyed by the app's kebab-case names. */
@@ -161,6 +164,7 @@ const ICONS = {
   send,
   "settings-outline": settingsOutline,
   sparkles,
+  star,
   sunny,
   "sunny-outline": sunnyOutline,
   "swap-horizontal": swapHorizontal,
@@ -208,6 +212,8 @@ const ICONS = {
   "shield-checkmark-outline": shieldCheckmarkOutline,
   "trash-outline": trashOutline,
   "warning-outline": warningOutline,
+  "copy-outline": copyOutline,
+  "hand-left": handLeft,
 } as const;
 
 export type IconName = keyof typeof ICONS;

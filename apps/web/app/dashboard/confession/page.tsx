@@ -23,6 +23,7 @@ import {
   Switch,
   TextArea,
   cx,
+  useSeeMore,
 } from "../../../components/app/ui";
 import { useToast } from "../../../components/app/toast";
 import { formatConfessionRange, formatPhone, isSameDay, localDateKey, parseLocalDate } from "../../../lib/format";
@@ -131,6 +132,7 @@ function AdminConfession() {
     () => week.flatMap((day) => day.timeSlots.filter((s) => s.reservedBy && s.scheduleId).map((slot) => ({ day, slot }))),
     [week]
   );
+  const bookingList = useSeeMore(reservedSlots, 5);
 
   useEffect(() => {
     const missing = reservedSlots.filter(({ slot }) => !requested.current.has(slot.scheduleId!));
@@ -167,9 +169,7 @@ function AdminConfession() {
     setPending((prev) => new Set([...prev, ...targets.map((s) => s.id)]));
     const dateStr = localDateKey(day.date);
     const results = await Promise.all(
-      targets.map((slot) =>
-        ConfessionService.updateScheduleAvailability(parish!.id, dateStr, slotParts(slot).dbTime, available)
-      )
+      targets.map((slot) => ConfessionService.updateScheduleAvailability(parish!.id, dateStr, slotParts(slot).dbTime, available))
     );
     const failed = results.filter((r) => !r.success);
     if (failed.length) toast(failed[0].error || "Failed to update some slots", "error");
@@ -258,9 +258,7 @@ function AdminConfession() {
                             )}
                           >
                             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{day.dayName}</p>
-                            <p className="font-display text-[18px] leading-tight text-zinc-900 dark:text-white">
-                              {day.date.getDate()}
-                            </p>
+                            <p className="font-display text-[18px] leading-tight text-zinc-900 dark:text-white">{day.date.getDate()}</p>
                             <div className="mt-1 flex justify-center gap-1">
                               <button
                                 type="button"
@@ -339,30 +337,33 @@ function AdminConfession() {
             ) : reservedSlots.length === 0 ? (
               <EmptyState compact icon="people-outline" title="No bookings yet" />
             ) : (
-              <ul className="space-y-1">
-                {reservedSlots.map(({ day, slot }) => {
-                  const d = details[slot.scheduleId!];
-                  const name = d?.user_profiles?.full_name || "Loading…";
-                  return (
-                    <li key={slot.id}>
-                      <button
-                        type="button"
-                        disabled={!d}
-                        onClick={() => d && setOpenReservation(d)}
-                        className="flex w-full items-center gap-3 rounded-2xl p-2 text-left hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
-                      >
-                        <Avatar name={name} size={32} />
-                        <span className="min-w-0">
-                          <span className="block truncate font-sans-semibold text-[13px] text-zinc-900 dark:text-white">{name}</span>
-                          <span className="block text-[12px] text-zinc-500">
-                            {day.dayName} {day.dateString} · {slot.time}
+              <>
+                <ul className="space-y-1">
+                  {bookingList.visible.map(({ day, slot }) => {
+                    const d = details[slot.scheduleId!];
+                    const name = d?.user_profiles?.full_name || "Loading…";
+                    return (
+                      <li key={slot.id}>
+                        <button
+                          type="button"
+                          disabled={!d}
+                          onClick={() => d && setOpenReservation(d)}
+                          className="flex w-full items-center gap-3 rounded-2xl p-2 text-left hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
+                        >
+                          <Avatar name={name} size={32} />
+                          <span className="min-w-0">
+                            <span className="block truncate font-sans-semibold text-[13px] text-zinc-900 dark:text-white">{name}</span>
+                            <span className="block text-[12px] text-zinc-500">
+                              {day.dayName} {day.dateString} · {slot.time}
+                            </span>
                           </span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {bookingList.toggle}
+              </>
             )}
           </Card>
         </div>
@@ -491,6 +492,7 @@ function MemberConfession() {
         `${b.confession_schedules.date}${b.confession_schedules.time_slot}`
       )
     );
+  const upcomingList = useSeeMore(upcoming, 3);
 
   const book = async () => {
     if (!booking?.slot.scheduleId) return;
@@ -521,8 +523,7 @@ function MemberConfession() {
     await Promise.all([reload(), loadMine()]);
   };
 
-  const openCount = (d: DaySchedule) =>
-    d.timeSlots.filter((s) => s.available && !s.reservedBy && !isSlotPassed(d, s)).length;
+  const openCount = (d: DaySchedule) => d.timeSlots.filter((s) => s.available && !s.reservedBy && !isSlotPassed(d, s)).length;
 
   return (
     <>
@@ -561,7 +562,12 @@ function MemberConfession() {
                       <span className={cx("font-display text-[22px] leading-tight", !active && "text-zinc-900 dark:text-white")}>
                         {d.date.getDate()}
                       </span>
-                      <span className={cx("text-[11px] font-semibold", active ? "text-white/90" : count ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400")}>
+                      <span
+                        className={cx(
+                          "text-[11px] font-semibold",
+                          active ? "text-white/90" : count ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400"
+                        )}
+                      >
                         {count ? `${count} open` : "—"}
                       </span>
                     </button>
@@ -575,8 +581,11 @@ function MemberConfession() {
                     {day.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </h3>
                 )}
-                {day && day.timeSlots.some((s) => (s.available && !s.reservedBy && !isSlotPassed(day, s)) || (s.reservationId && mineIds.has(s.reservationId))) ? (
-                  <div className="grid grid-cols-6 gap-2">
+                {day &&
+                day.timeSlots.some(
+                  (s) => (s.available && !s.reservedBy && !isSlotPassed(day, s)) || (s.reservationId && mineIds.has(s.reservationId))
+                ) ? (
+                  <div className="grid grid-cols-6 gap-2 2xl:grid-cols-8">
                     {day.timeSlots.map((slot) => {
                       const isMine = !!slot.reservationId && mineIds.has(slot.reservationId);
                       const bookable = slot.available && !slot.reservedBy && !isSlotPassed(day, slot);
@@ -619,29 +628,32 @@ function MemberConfession() {
           {upcoming.length === 0 ? (
             <EmptyState compact icon="calendar-outline" title="No upcoming confessions" />
           ) : (
-            <ul className="space-y-2">
-              {upcoming.map((r) => (
-                <li key={r.id} className="flex items-center gap-3 rounded-2xl bg-zinc-900/[0.03] p-3 dark:bg-white/[0.04]">
-                  <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl bg-red-600/10">
-                    <span className="text-[9px] font-bold uppercase text-red-600 dark:text-red-400">
-                      {parseLocalDate(r.confession_schedules.date).toLocaleDateString("en-US", { weekday: "short" })}
+            <>
+              <ul className="space-y-2">
+                {upcomingList.visible.map((r) => (
+                  <li key={r.id} className="flex items-center gap-3 rounded-2xl bg-zinc-900/[0.03] p-3 dark:bg-white/[0.04]">
+                    <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl bg-red-600/10">
+                      <span className="text-[9px] font-bold uppercase text-red-600 dark:text-red-400">
+                        {parseLocalDate(r.confession_schedules.date).toLocaleDateString("en-US", { weekday: "short" })}
+                      </span>
+                      <span className="font-display text-[18px] leading-none text-zinc-900 dark:text-white">
+                        {parseLocalDate(r.confession_schedules.date).getDate()}
+                      </span>
                     </span>
-                    <span className="font-display text-[18px] leading-none text-zinc-900 dark:text-white">
-                      {parseLocalDate(r.confession_schedules.date).getDate()}
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-sans-semibold text-[13px] text-zinc-900 dark:text-white">
+                        {formatConfessionRange(r.confession_schedules.time_slot)}
+                      </span>
+                      {r.notes && <span className="block truncate text-[12px] text-zinc-500">“{r.notes}”</span>}
                     </span>
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-sans-semibold text-[13px] text-zinc-900 dark:text-white">
-                      {formatConfessionRange(r.confession_schedules.time_slot)}
-                    </span>
-                    {r.notes && <span className="block truncate text-[12px] text-zinc-500">“{r.notes}”</span>}
-                  </span>
-                  <Button size="sm" variant="ghost" onClick={() => setCancelling(r)}>
-                    Cancel
-                  </Button>
-                </li>
-              ))}
-            </ul>
+                    <Button size="sm" variant="ghost" onClick={() => setCancelling(r)}>
+                      Cancel
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              {upcomingList.toggle}
+            </>
           )}
         </Card>
       </div>
@@ -650,7 +662,11 @@ function MemberConfession() {
         open={!!booking}
         onClose={() => setBooking(null)}
         eyebrow="Book confession"
-        title={booking ? `${booking.day.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} at ${booking.slot.time}` : ""}
+        title={
+          booking
+            ? `${booking.day.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} at ${booking.slot.time}`
+            : ""
+        }
         width={480}
         dismissible={!submitting}
         footer={

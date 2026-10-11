@@ -45,13 +45,14 @@ The dashboard is desktop-only. Phones are redirected to `/get-the-app`, and narr
 
 ### Web (Netlify)
 
-Site settings for the existing Netlify site:
+Site settings (Project configuration → Build & deploy → Build settings):
 
-- **Base directory:** `apps/web`
-- **Build command / publish:** from `apps/web/netlify.toml` (`npm run build`, `.next`)
+- **Base directory:** empty (repo root, where the lockfile lives)
+- **Package directory:** `apps/web` (Netlify reads `apps/web/netlify.toml` from here)
+- **Build command / publish:** leave empty in the UI; `netlify.toml` sets `npx turbo run build --filter=@parohia/web` and `apps/web/.next`
 - **Environment variables:** the `NEXT_PUBLIC_*` values above, with `NEXT_PUBLIC_SITE_URL=https://parohia.app`
 
-Netlify installs from the root lockfile, so the workspace package `@parohia/shared` resolves automatically.
+Pushes that only touch `apps/mobile` or `supabase/` skip the web build (the `ignore` command in `netlify.toml`). Turborepo runs in strict env mode; `NEXT_PUBLIC_*` vars pass through automatically, but any new server-only variable must be added to `turbo.json`.
 
 ### Supabase Auth redirect URLs
 
@@ -77,7 +78,7 @@ Run from the repo root (the `supabase/` folder lives there now).
 
 ## Cutover checklist
 
-1. Point the Netlify site at this repo with base directory `apps/web`, add the env vars, and deploy.
+1. Point the Netlify site at this repo with package directory `apps/web` (base directory empty), add the env vars, and deploy.
 2. Add the Supabase redirect URLs above.
 3. Smoke test on production: sign in, sign up + email code, password reset, onboarding, each dashboard page as both a member and an admin.
 4. Archive the old `Parohia-landing` GitHub repo (its history is preserved in `apps/web`).

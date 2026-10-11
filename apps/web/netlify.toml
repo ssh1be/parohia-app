@@ -1,7 +1,10 @@
-# Netlify site settings: Base directory = apps/web (dependencies install from the monorepo root).
+# Netlify site settings: Base directory unset (repo root), Package directory = apps/web.
+# Paths below are relative to the repo root.
 [build]
-  command = "npm run build"
-  publish = ".next"
+  command = "npx turbo run build --filter=@parohia/web"
+  publish = "apps/web/.next"
+  # Exit 0 skips the build: only rebuild when the web app, shared code, or root tooling changed.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/web packages/shared package.json package-lock.json turbo.json"
 
 [build.environment]
   NODE_VERSION = "22"

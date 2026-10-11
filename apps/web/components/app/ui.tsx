@@ -5,6 +5,7 @@ import {
   forwardRef,
   useEffect,
   useId,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -443,6 +444,31 @@ export function Pill({
       {icon && <Icon name={icon} size={11} />}
       {children}
     </span>
+  );
+}
+
+/** Caps a list at `limit` items and returns a "See more / See less" toggle when it overflows. */
+export function useSeeMore<T>(items: T[], limit: number) {
+  const [expanded, setExpanded] = useState(false);
+  const hidden = items.length - limit;
+  return {
+    visible: expanded || hidden <= 0 ? items : items.slice(0, limit),
+    toggle:
+      hidden > 0 ? <SeeMoreButton expanded={expanded} hidden={hidden} onClick={() => setExpanded((prev) => !prev)} /> : null,
+  };
+}
+
+export function SeeMoreButton({ expanded, hidden, onClick }: { expanded: boolean; hidden: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={expanded}
+      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl py-2 text-[13px] font-semibold text-zinc-500 outline-none transition-colors hover:bg-zinc-900/[0.04] hover:text-zinc-800 focus-visible:ring-2 focus-visible:ring-brand-red/50 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-zinc-100"
+    >
+      {expanded ? "See less" : `See ${hidden} more`}
+      <Icon name={expanded ? "chevron-up" : "chevron-down"} size={13} />
+    </button>
   );
 }
 

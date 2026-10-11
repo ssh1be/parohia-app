@@ -51,8 +51,8 @@ export default function SettingsPage() {
     <>
       <PageHeader eyebrow="Settings" title="Preferences" description="These settings apply to this browser." />
 
-      <div className="grid max-w-[860px] gap-6">
-        <Section title="Account">
+      <div className="grid grid-cols-2 items-start gap-6">
+        <Section title="Account" className="col-span-2">
           <div className="flex items-center gap-4">
             <Avatar name={profile?.full_name || email} size={52} />
             <div className="min-w-0 flex-1">
@@ -96,57 +96,49 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Liturgical calendar" footer={TRADITION_FOOTERS[tradition]}>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-sans-semibold text-[15px] text-zinc-900 dark:text-white">Calendar tradition</p>
-              <p className="text-[13px] text-zinc-500 dark:text-zinc-400">Used for readings, commemorations, and fasting.</p>
+        <div className="space-y-6">
+          <Section title="Liturgical calendar" footer={TRADITION_FOOTERS[tradition]}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-sans-semibold text-[15px] text-zinc-900 dark:text-white">Calendar tradition</p>
+                <p className="text-[13px] text-zinc-500 dark:text-zinc-400">Used for readings, commemorations, and fasting.</p>
+              </div>
+              <Segmented
+                value={tradition}
+                onChange={setTradition}
+                options={[
+                  { value: "greek", label: "Greek" },
+                  { value: "slavic", label: "Slavic" },
+                ]}
+              />
             </div>
-            <Segmented
-              value={tradition}
-              onChange={setTradition}
-              options={[
-                { value: "greek", label: "Greek" },
-                { value: "slavic", label: "Slavic" },
-              ]}
-            />
-          </div>
-        </Section>
+          </Section>
 
-        <Section title="Help">
-          <a
-            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Parohia feedback")}`}
-            className="flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-300">
-              <Icon name="mail-outline" size={16} />
-            </span>
-            <span className="flex-1">
-              <span className="block font-sans-semibold text-[14px] text-zinc-900 dark:text-white">Contact support</span>
-              <span className="block text-[12px] text-zinc-500">{SUPPORT_EMAIL}</span>
-            </span>
-            <Icon name="open-outline" size={14} className="text-zinc-400" />
-          </a>
-          <div className="mt-1 flex gap-4 px-2 text-[13px]">
-            <a href="/privacy" target="_blank" className="font-semibold text-zinc-500 hover:text-red-600">
-              Privacy Policy
+          <Section title="Support" footer="Send feedback, ideas, or bug reports. We'll get back to you as soon as we can.">
+            <a
+              href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Parohia feedback")}`}
+              className="flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-300">
+                <Icon name="mail-outline" size={16} />
+              </span>
+              <span className="flex-1">
+                <span className="block font-sans-semibold text-[14px] text-zinc-900 dark:text-white">Contact support</span>
+                <span className="block text-[12px] text-zinc-500">{SUPPORT_EMAIL}</span>
+              </span>
+              <Icon name="open-outline" size={14} className="text-zinc-400" />
             </a>
-            <a href="/terms" target="_blank" className="font-semibold text-zinc-500 hover:text-red-600">
-              Terms of Service
-            </a>
-          </div>
-        </Section>
+          </Section>
+        </div>
 
-        <Section title="Danger zone">
+        <Section title="Danger zone" className="col-span-2">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="font-sans-semibold text-[15px] text-zinc-900 dark:text-white">
                 {isAdmin ? "Delete parish account" : "Delete account"}
               </p>
               <p className="text-[13px] text-zinc-500 dark:text-zinc-400">
-                {isAdmin
-                  ? "Permanently removes your account and your parish from Parohia."
-                  : "Permanently removes your Parohia account."}
+                {isAdmin ? "Permanently removes your account and your parish from Parohia." : "Permanently removes your Parohia account."}
               </p>
             </div>
             <Button variant="danger" icon="trash-outline" onClick={() => setStep(1)}>
@@ -187,9 +179,9 @@ export default function SettingsPage() {
   );
 }
 
-function Section({ title, footer, children }: { title: string; footer?: string; children: ReactNode }) {
+function Section({ title, footer, className, children }: { title: string; footer?: string; className?: string; children: ReactNode }) {
   return (
-    <section>
+    <section className={className}>
       <h2 className="mb-2 px-1 font-sans-semibold text-[12px] uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">{title}</h2>
       <Card>{children}</Card>
       {footer && <p className="mt-2 px-1 text-[12px] leading-5 text-zinc-500 dark:text-zinc-400">{footer}</p>}
