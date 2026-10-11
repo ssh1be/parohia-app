@@ -97,6 +97,7 @@ export function EventDetailSheet({
   useEffect(() => {
     if (!visible) {
       setCopied(false);
+      // Drop nested sheet immediately (no exit anim) so it doesn't fight the parent sheet exit.
       setChantOpen(false);
     }
   }, [visible]);
@@ -266,16 +267,12 @@ export function EventDetailSheet({
               <View className="flex-1 pr-2">
                 <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Chanters</Text>
                 <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {chantSignup.loading
+                  {chantSignup.loading && chantSignup.signups.length === 0
                     ? 'Loading…'
-                    : chantSignup.signedUp
-                      ? 'You’re signed up'
-                      : chantSignup.signups.length === 0
-                        ? 'None yet'
-                        : `${chantSignup.signups.length} ${chantSignup.signups.length === 1 ? 'person' : 'people'} · tap to view`}
+                    : `${chantSignup.signups.length} ${chantSignup.signups.length === 1 ? 'person' : 'people'} signed up`}
                 </Text>
               </View>
-              {chantSignup.loading ? (
+              {chantSignup.loading && chantSignup.signups.length === 0 ? (
                 <Spinner size="sm" />
               ) : (
                 <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -283,101 +280,118 @@ export function EventDetailSheet({
             </Pressable>
           </View>
 
-          {/* Chanters modal */}
-          <Sheet visible={chantOpen} onClose={() => setChantOpen(false)} eyebrow={title} title="Chanters">
-            <View className="rounded-3xl bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden">
-              {chantSignup.loading ? (
-                <View className="flex-row items-center justify-center py-6">
-                  <Spinner size="sm" />
-                </View>
-              ) : chantSignup.signups.length === 0 ? (
-                <View className="items-center px-5 py-6">
-                  <View className="h-11 w-11 rounded-2xl bg-red-600/10 items-center justify-center mb-2.5">
-                    <Ionicons name="musical-notes-outline" size={20} color={palette.accent} />
+          {/*
+            Only mount while the parent sheet is visible so closing the event sheet
+            hard-unmounts this overlay (avoids stacked exit animations / flicker).
+          */}
+          {visible && (
+            <Sheet visible={chantOpen} onClose={() => setChantOpen(false)} eyebrow={title} title="Chanters">
+              <View className="rounded-3xl bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] overflow-hidden">
+                {chantSignup.loading && chantSignup.signups.length === 0 ? (
+                  <View className="flex-row items-center justify-center py-6">
+                    <Spinner size="sm" />
                   </View>
-                  <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white text-center">
-                    Be the first to chant
-                  </Text>
-                  <Text className="font-sans text-[12px] text-gray-500 dark:text-gray-400 text-center mt-1 leading-[17px]">
-                    Let others know you’ll be singing for this service.
-                  </Text>
-                </View>
-              ) : (
-                chantSignup.signups.map((person, i) => {
-                  const isYou = !!chantSignup.currentUserId && person.userId === chantSignup.currentUserId;
-                  return (
-                    <View
-                      key={person.userId}
-                      className={`flex-row items-center px-4 py-3 ${
-                        i > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
-                      }`}
-                    >
-                      <View className="h-8 w-8 rounded-full bg-red-600/10 items-center justify-center mr-3">
-                        <Text className="font-sans-bold text-[12px] text-red-700 dark:text-red-300">
-                          {(person.name.trim()[0] || '?').toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text className="font-sans-medium text-[14px] text-gray-900 dark:text-white flex-1" numberOfLines={1}>
-                        {person.name}
-                      </Text>
-                      {isYou && (
-                        <>
-                          <View className="rounded-full px-2 py-0.5 bg-emerald-500/15">
-                            <Text className="font-sans-bold text-[10px] text-emerald-700 dark:text-emerald-400">You</Text>
-                          </View>
-                          <Pressable
-                            onPress={chantSignup.onToggle}
-                            disabled={chantSignup.loading || chantSignup.toggling}
-                            accessibilityRole="button"
-                            accessibilityLabel="Remove me from chanters"
-                            accessibilityState={{
-                              disabled: chantSignup.loading || chantSignup.toggling,
-                              busy: !!chantSignup.toggling,
-                            }}
-                            className={`ml-2 h-7 min-w-[64px] px-2.5 rounded-full flex-row items-center justify-center bg-red-600/10 active:opacity-70 ${
-                              chantSignup.loading || chantSignup.toggling ? 'opacity-50' : ''
-                            }`}
-                          >
-                            {chantSignup.toggling ? (
-                              <Spinner size="sm" />
-                            ) : (
-                              <Text className="font-sans-bold text-[11px] text-red-700 dark:text-red-300">Remove</Text>
-                            )}
-                          </Pressable>
-                        </>
-                      )}
+                ) : chantSignup.signups.length === 0 ? (
+                  <View className="items-center px-5 py-6">
+                    <View className="h-11 w-11 rounded-2xl bg-red-600/10 items-center justify-center mb-2.5">
+                      <Ionicons name="musical-notes-outline" size={20} color={palette.accent} />
                     </View>
-                  );
-                })
-              )}
-            </View>
-
-            {!chantSignup.signedUp && (
-              <PressableScale
-                onPress={chantSignup.onToggle}
-                disabled={chantSignup.loading || chantSignup.toggling}
-                haptic
-                accessibilityRole="button"
-                accessibilityLabel="I can chant"
-                accessibilityState={{ disabled: chantSignup.loading || chantSignup.toggling, busy: !!chantSignup.toggling }}
-                style={{ alignSelf: 'stretch' }}
-                className={`mt-4 h-12 rounded-2xl flex-row items-center justify-center bg-red-600/[0.1] border border-red-500/35 ${
-                  chantSignup.loading || chantSignup.toggling ? 'opacity-50' : ''
-                }`}
-              >
-                {chantSignup.toggling ? (
-                  <Spinner size="sm" />
-                ) : (
-                  <>
-                    <Ionicons name="hand-left" size={18} color={palette.accent} />
-                    <Text className="font-sans-bold text-[15px] text-red-700 dark:text-red-300 ml-2">
-                      I can chant
+                    <Text className="font-sans-semibold text-[14px] text-gray-900 dark:text-white text-center">
+                      Be the first to chant
                     </Text>
-                  </>
+                    <Text className="font-sans text-[12px] text-gray-500 dark:text-gray-400 text-center mt-1 leading-[17px]">
+                      Let others know you’ll be singing for this service.
+                    </Text>
+                  </View>
+                ) : (
+                  chantSignup.signups.map((person, i) => {
+                    const isYou = !!chantSignup.currentUserId && person.userId === chantSignup.currentUserId;
+                    return (
+                      <View
+                        key={person.userId}
+                        className={`flex-row items-center px-4 py-3 ${
+                          i > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
+                        }`}
+                      >
+                        <View className="h-8 w-8 rounded-full bg-red-600/10 items-center justify-center mr-3">
+                          <Text className="font-sans-bold text-[12px] text-red-700 dark:text-red-300">
+                            {(person.name.trim()[0] || '?').toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text className="font-sans-medium text-[14px] text-gray-900 dark:text-white flex-1" numberOfLines={1}>
+                          {person.name}
+                        </Text>
+                        {isYou && (
+                          <>
+                            <View className="rounded-full px-2 py-0.5 bg-emerald-500/15">
+                              <Text className="font-sans-bold text-[10px] text-emerald-700 dark:text-emerald-400">You</Text>
+                            </View>
+                            <Pressable
+                              onPress={chantSignup.onToggle}
+                              disabled={chantSignup.loading || chantSignup.toggling}
+                              accessibilityRole="button"
+                              accessibilityLabel="Remove me from chanters"
+                              accessibilityState={{
+                                disabled: chantSignup.loading || chantSignup.toggling,
+                                busy: !!chantSignup.toggling,
+                              }}
+                              className={`ml-2 h-7 min-w-[64px] px-2.5 rounded-full flex-row items-center justify-center bg-red-600/10 active:opacity-70 ${
+                                chantSignup.loading || chantSignup.toggling ? 'opacity-50' : ''
+                              }`}
+                            >
+                              {chantSignup.toggling ? (
+                                <Spinner size="sm" />
+                              ) : (
+                                <>
+                                  <Ionicons name="close-circle" size={13} color={colors.isDark ? '#fca5a5' : '#b91c1c'} />
+                                  <Text className="font-sans-bold text-[11px] text-red-700 dark:text-red-300 ml-1">Remove</Text>
+                                </>
+                              )}
+                            </Pressable>
+                          </>
+                        )}
+                      </View>
+                    );
+                  })
                 )}
-              </PressableScale>
-            )}
-          </Sheet>
+              </View>
+
+              <View className="mt-4" style={{ minHeight: 48 }}>
+                {!chantSignup.signedUp ? (
+                  <PressableScale
+                    onPress={chantSignup.onToggle}
+                    disabled={chantSignup.loading || chantSignup.toggling}
+                    haptic
+                    accessibilityRole="button"
+                    accessibilityLabel="I can chant"
+                    accessibilityState={{ disabled: chantSignup.loading || chantSignup.toggling, busy: !!chantSignup.toggling }}
+                    style={{ alignSelf: 'stretch' }}
+                    className={`h-12 rounded-2xl flex-row items-center justify-center bg-red-600/[0.1] border border-red-500/35 ${
+                      chantSignup.loading || chantSignup.toggling ? 'opacity-50' : ''
+                    }`}
+                  >
+                    {chantSignup.toggling ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <>
+                        <Ionicons name="hand-left" size={18} color={palette.accent} />
+                        <Text className="font-sans-bold text-[15px] text-red-700 dark:text-red-300 ml-2">
+                          I can chant
+                        </Text>
+                      </>
+                    )}
+                  </PressableScale>
+                ) : (
+                  <View className="h-12 rounded-2xl flex-row items-center justify-center bg-emerald-500/[0.08] border border-emerald-500/15 px-4">
+                    <Ionicons name="checkmark-circle" size={18} color={palette.green} />
+                    <Text className="font-sans-semibold text-[14px] text-emerald-700 dark:text-emerald-400 ml-2">
+                      You’re signed up to chant
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Sheet>
+          )}
         </>
       )}
     </Sheet>

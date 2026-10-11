@@ -830,7 +830,7 @@ export default function Calendar() {
   };
 
   const loadChantSignups = async (event: ParishEvent) => {
-    if (!user || !parishId || !chantSubscribed) {
+    if (!user || !parishId || (!chantSubscribed && !isParishAdmin)) {
       setChantSignups([]);
       return;
     }
@@ -853,6 +853,21 @@ export default function Calendar() {
   const toggleChantSignup = async () => {
     if (!user || !parishId || !activeEvent || chantToggling) return;
     const signedUp = chantSignups.some((s) => s.userId === user.id);
+    const previous = chantSignups;
+    // Optimistic update so the nested sheet doesn't flash loading/empty states.
+    if (signedUp) {
+      setChantSignups((prev) => prev.filter((s) => s.userId !== user.id));
+    } else {
+      setChantSignups((prev) => [
+        ...prev,
+        {
+          id: `optimistic-${user.id}`,
+          userId: user.id,
+          name: 'You',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
     try {
       setChantToggling(true);
       const result = signedUp
@@ -870,11 +885,15 @@ export default function Calendar() {
           });
       if (!result.success) {
         console.error('Chant signup failed:', result.error);
+        setChantSignups(previous);
         return;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       const list = await ChantService.listSignups(parishId, activeEvent.id);
       setChantSignups(list);
+    } catch (error) {
+      console.error('Chant signup failed:', error);
+      setChantSignups(previous);
     } finally {
       setChantToggling(false);
     }
@@ -899,7 +918,7 @@ export default function Calendar() {
   const showChantSignup =
     !activePersonal &&
     !!activeEvent &&
-    chantSubscribed &&
+    (chantSubscribed || isParishAdmin) &&
     isChantServiceEvent(activeEvent.title, activeEvent.startTime, activeEvent.endTime);
 
   const personalKind = (item: PersonalItem) =>

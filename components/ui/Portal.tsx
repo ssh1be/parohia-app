@@ -47,14 +47,20 @@ export function Portal({ children }: { children: ReactNode }) {
   const api = useContext(PortalContext);
   const key = useId();
 
+  // Update portaled content in place. Do NOT unmount in this effect's cleanup when
+  // `children` changes — that cleanup→remount gap flashes nested sheets (e.g. Chanters)
+  // on every parent re-render.
   useEffect(() => {
     if (children == null || children === false) {
       api?.unmount(key);
       return;
     }
     api?.mount(key, children);
-    return () => api?.unmount(key);
   }, [api, key, children]);
+
+  useEffect(() => {
+    return () => api?.unmount(key);
+  }, [api, key]);
 
   return null;
 }

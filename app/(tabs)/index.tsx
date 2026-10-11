@@ -93,7 +93,7 @@ export default function Index() {
     if (
       !user ||
       !parishId ||
-      !chantSubscribed ||
+      (!chantSubscribed && !isParishAdmin) ||
       item.type !== 'parish' ||
       !item.startTime ||
       !isChantServiceEvent(item.title, item.startTime, item.endTime)
@@ -116,6 +116,21 @@ export default function Index() {
   const toggleChantSignup = async () => {
     if (!user || !parishId || !activeItem || activeItem.type !== 'parish' || chantToggling) return;
     const signedUp = chantSignups.some((s) => s.userId === user.id);
+    const previous = chantSignups;
+    // Optimistic update so the nested sheet doesn't flash loading/empty states.
+    if (signedUp) {
+      setChantSignups((prev) => prev.filter((s) => s.userId !== user.id));
+    } else {
+      setChantSignups((prev) => [
+        ...prev,
+        {
+          id: `optimistic-${user.id}`,
+          userId: user.id,
+          name: 'You',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
     try {
       setChantToggling(true);
       const result = signedUp
@@ -133,11 +148,15 @@ export default function Index() {
           });
       if (!result.success) {
         console.error('Chant signup failed:', result.error);
+        setChantSignups(previous);
         return;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       const list = await ChantService.listSignups(parishId, activeItem.id);
       setChantSignups(list);
+    } catch (error) {
+      console.error('Chant signup failed:', error);
+      setChantSignups(previous);
     } finally {
       setChantToggling(false);
     }
@@ -684,7 +703,7 @@ export default function Index() {
         }
         chantSignup={
           activeItem?.type === 'parish' &&
-          chantSubscribed &&
+          (chantSubscribed || isParishAdmin) &&
           !!activeItem.startTime &&
           isChantServiceEvent(activeItem.title, activeItem.startTime, activeItem.endTime)
             ? {
