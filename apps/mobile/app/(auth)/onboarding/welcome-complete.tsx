@@ -11,8 +11,8 @@ import { useThemeColors } from '../../../components/ui/useThemeColors';
 import { entrance } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnboarding } from '../../../contexts/OnboardingContext';
-import { saveOnboardingData } from '../../../services/onboardingService';
-import { setOnboardingComplete } from '../../../utils/onboardingStorage';
+import { saveOnboardingData } from '@parohia/shared';
+import { setOnboardingComplete } from '@parohia/shared';
 
 export default function WelcomeCompleteScreen() {
   const { data } = useOnboarding();

@@ -22,16 +22,15 @@ import { SettingsHeader } from "../../components/ui/Settings";
 import { Sheet } from "../../components/ui/Sheet";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { useThemeColors } from "../../components/ui/useThemeColors";
-import { supabase } from "../../config/supabase";
 import { contentBottomPadding, entrance, palette } from "../../constants/theme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useParishScope } from "../../contexts/ParishScopeContext";
-import { ChannelService } from "../../services/channelService";
-import { getParishes, getUserProfile } from "../../services/onboardingService";
-import { getParishByAdminId, getParishByUserId, getParishMembers, ParishMember, ParishMemberRole, updateParishDonationSettings, updateParishPriestInfo } from "../../services/parishService";
+import { ChannelService } from "@parohia/shared";
+import { getParishes, getUserProfile } from "@parohia/shared";
+import { getParishByAdminId, getParishByUserId, getParishMembers, ParishMember, ParishMemberRole, switchUserParish, updateParishDetails, updateParishDonationSettings, updateParishPriestInfo } from "@parohia/shared";
 import { PayPalService } from "../../services/paypalService";
 import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
-import { filterParishesBySearch } from "../../utils/parishSearch";
+import { filterParishesBySearch } from "@parohia/shared";
 
 const memberRoleStyle = (role: ParishMemberRole) => {
   if (role === 'admin') {
@@ -227,42 +226,7 @@ export default function Parish() {
     if (!selectedParishId || !user) return;
     
     try {
-      // Insert the new parish first, then remove any other connections (including the
-      // "No Parish" sentinel). Delete-then-insert orphans the user if insert fails.
-      const { data: existing, error: existingError } = await supabase
-        .from('user_parish_connections')
-        .select('id, parish_id')
-        .eq('user_id', user.id);
-      if (existingError) throw existingError;
-
-      const alreadyLinked = (existing || []).some(
-        (row) => row.parish_id === selectedParishId
-      );
-
-      if (!alreadyLinked) {
-        const { error: insertError } = await supabase
-          .from('user_parish_connections')
-          .insert({
-            user_id: user.id,
-            parish_id: selectedParishId,
-          });
-        if (insertError) throw insertError;
-      }
-
-      const { error: deleteError } = await supabase
-        .from('user_parish_connections')
-        .delete()
-        .eq('user_id', user.id)
-        .neq('parish_id', selectedParishId);
-      if (deleteError) throw deleteError;
-
-      await ChannelService.ensureGeneralSubscription(user.id, selectedParishId);
-      await ChannelService.ensureChantChannel(selectedParishId);
-      
-      const newParish = await getParishByUserId(user.id);
-      if (!newParish) {
-        throw new Error('Parish connection saved but could not be loaded');
-      }
+      const newParish = await switchUserParish(user.id, selectedParishId);
       setParish(newParish);
       setShowParishSelector(false);
       setSelectedParishId('');
@@ -287,23 +251,8 @@ export default function Parish() {
     try {
       setEditLoading(true);
       
-      const { error } = await supabase
-        .from('parishes')
-        .update({
-          name: editForm.name,
-          jurisdiction: editForm.jurisdiction,
-          address: editForm.address,
-          city: editForm.city,
-          state: editForm.state,
-          zip_code: editForm.zip_code || null,
-          phone_number: editForm.phone_number || null,
-          website: editForm.website || null,
-          email: editForm.email || null,
-          parish_calendar_id: editForm.parish_calendar_id || null,
-        })
-        .eq('id', parish.id);
-      
-      if (error) throw error;
+      const result = await updateParishDetails(parish.id, editForm);
+      if (!result.success) throw new Error(result.error);
       
       // Refresh parish data
       const updatedParish = await getParishByAdminId(user.id);

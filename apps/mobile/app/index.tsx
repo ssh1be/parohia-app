@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { Spinner } from "../components/ui/Spinner";
 import { useAuth } from "../contexts/AuthContext";
-import { AuthDestination, resolveAuthDestination } from "../utils/onboardingStorage";
+import { AuthDestination, resolveAuthDestination } from "@parohia/shared";
 
 export default function Index() {
   const { user, loading } = useAuth();

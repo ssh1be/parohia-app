@@ -12,9 +12,9 @@ import { useThemeColors } from '../../../components/ui/useThemeColors';
 import { palette } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnboarding } from '../../../contexts/OnboardingContext';
-import { NO_PARISH_ID } from '../../../constants/parishes';
-import { getParishes, getUserProfile } from '../../../services/onboardingService';
-import { filterParishesBySearch } from '../../../utils/parishSearch';
+import { NO_PARISH_ID } from '@parohia/shared';
+import { getParishes, getUserProfile } from '@parohia/shared';
+import { filterParishesBySearch } from '@parohia/shared';
 
 interface Parish {
   id: string;

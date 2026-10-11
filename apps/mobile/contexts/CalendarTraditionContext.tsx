@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import type { CalendarTradition } from '../services/calendarService';
+import type { CalendarTradition } from '@parohia/shared';
 
 export type { CalendarTradition };
 

@@ -6,7 +6,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { eventKindStyle, palette, TAB_BAR_GAP, TAB_BAR_HEIGHT } from '../constants/theme';
-import { BulletinChannel } from '../services/channelService';
+import { BulletinChannel } from '@parohia/shared';
 import { Portal } from './ui/Portal';
 import { PressableScale } from './ui/PressableScale';
 import { Sheet } from './ui/Sheet';

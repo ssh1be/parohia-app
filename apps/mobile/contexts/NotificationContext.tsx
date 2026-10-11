@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { InteractionManager } from 'react-native';
 import { NotificationEvent, NotificationPreferences, notificationService } from '../services/notificationService';
-import { ParishEvent } from '../services/calendarService';
+import { ParishEvent } from '@parohia/shared';
 import { useAuth } from './AuthContext';
 
 interface NotificationContextType {

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { palette } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
-import { getParishByAdminId, updateParishCalendarId } from '../services/parishService';
+import { getParishByAdminId, updateParishCalendarId } from '@parohia/shared';
 import { Button } from './ui/Button';
 import { Field } from './ui/Field';
 import { Sheet } from './ui/Sheet';

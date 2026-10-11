@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCalendarTradition } from '../contexts/CalendarTraditionContext';
 import { useParishScope } from '../contexts/ParishScopeContext';
-import { fetchOrthodoxCalendarData, fetchParishEventsForToday, OrthodoxCalendarData, ParishEvent } from '../services/calendarService';
+import { fetchOrthodoxCalendarData, fetchParishEventsForToday, OrthodoxCalendarData, ParishEvent } from '@parohia/shared';
 import { getDayOfWeek, getGreeting, getTodayDate } from '../utils/dateUtils';
 
 interface UseOrthodoxCalendarReturn {

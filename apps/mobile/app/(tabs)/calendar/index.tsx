@@ -37,7 +37,7 @@ import { useCalendarTradition } from "../../../contexts/CalendarTraditionContext
 import { useNotifications } from "../../../contexts/NotificationContext";
 import { useParishScope } from "../../../contexts/ParishScopeContext";
 import { useTabScrollToTop } from "../../../hooks/useTabScrollToTop";
-import { BulletinEvent, BulletinService } from "../../../services/bulletinService";
+import { BulletinEvent, BulletinService } from "@parohia/shared";
 import {
     Commemoration,
     fetchOrthodoxCalendarData,
@@ -45,12 +45,12 @@ import {
     fetchParishEventsForToday,
     OrthodoxCalendarData,
     ParishEvent,
-} from "../../../services/calendarService";
-import { ChannelService } from "../../../services/channelService";
-import { ChantService, ChantSignup, isChantServiceEvent } from "../../../services/chantService";
-import { ConfessionReservationWithSchedule, ConfessionService } from "../../../services/confessionService";
-import { getUserProfile } from "../../../services/onboardingService";
-import { getParishByAdminId, getParishByUserId } from "../../../services/parishService";
+} from "@parohia/shared";
+import { ChannelService } from "@parohia/shared";
+import { ChantService, ChantSignup, isChantServiceEvent } from "@parohia/shared";
+import { ConfessionReservationWithSchedule, ConfessionService } from "@parohia/shared";
+import { getUserProfile } from "@parohia/shared";
+import { getParishByAdminId, getParishByUserId } from "@parohia/shared";
 
 type PersonalItem = {
   id: string;

@@ -5,11 +5,15 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 import { supabase } from '../config/supabase';
-import { BulletinService } from './bulletinService';
-import { fetchParishEventsForMultipleDays, ParishEvent } from './calendarService';
-import { ConfessionService } from './confessionService';
-import { getUserProfile } from './onboardingService';
-import { getParishByAdminId, getParishByUserId } from './parishService';
+import {
+  BulletinService,
+  ConfessionService,
+  fetchParishEventsForMultipleDays,
+  getParishByAdminId,
+  getParishByUserId,
+  getUserProfile,
+  ParishEvent,
+} from '@parohia/shared';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({

@@ -53,12 +53,12 @@ import { supabase } from "../../config/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useParishScope } from "../../contexts/ParishScopeContext";
 import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
-import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "../../services/bulletinService";
-import { BulletinChannel, ChannelService } from "../../services/channelService";
-import { ConfessionService, DaySchedule, TimeSlot } from "../../services/confessionService";
+import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "@parohia/shared";
+import { BulletinChannel, ChannelService } from "@parohia/shared";
+import { ConfessionService, DaySchedule, TimeSlot } from "@parohia/shared";
 import { notificationService } from "../../services/notificationService";
-import { getUserProfile } from "../../services/onboardingService";
-import { getParishByAdminId, getParishByUserId, updateParishConfessionEnabled } from "../../services/parishService";
+import { getUserProfile } from "@parohia/shared";
+import { getParishByAdminId, getParishByUserId, updateParishConfessionEnabled } from "@parohia/shared";
 
 type TabType = 'confession' | 'bulletin';
 type BulletinFilter = 'all' | 'announcement' | 'event' | 'volunteer';

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { Session, supabase, User } from '../config/supabase';
 import { notificationService } from '../services/notificationService';
-import { isOnboardingComplete } from '../utils/onboardingStorage';
+import { isOnboardingComplete, signUpWithEmail, type SignUpResult } from '@parohia/shared';
 
 interface AuthContextType {
   user: User | null;
@@ -15,12 +15,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
 }
 
-export type SignUpResult =
-  | 'needs_otp'
-  | 'needs_onboarding'
-  | 'already_complete'
-  | 'already_registered'
-  | 'error';
+export type { SignUpResult };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -108,37 +103,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return 'already_complete';
       }
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+      const outcome = await signUpWithEmail(email, password);
 
-      if (error) {
-        const alreadyRegistered =
-          error.message?.toLowerCase().includes('already registered') ||
-          error.message?.toLowerCase().includes('already been registered') ||
-          (error as { code?: string }).code === 'user_already_exists' ||
-          (error as { code?: string }).code === 'email_exists';
-
-        if (alreadyRegistered) {
-          Alert.alert(
-            'Account already exists',
-            'An account with this email is already registered. Please sign in instead.',
-          );
-          return 'already_registered';
-        }
-
-        throw error;
-      }
-
-      // With email confirmation enabled, Supabase returns a fake user (empty identities)
-      // for an existing confirmed email instead of an error — treat that as already registered.
-      if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      if (outcome.status === 'already_registered') {
         Alert.alert(
           'Account already exists',
           'An account with this email is already registered. Please sign in instead.',
         );
         return 'already_registered';
+      }
+
+      if (outcome.status === 'error') {
+        throw new Error(outcome.message);
       }
 
       return 'needs_otp';

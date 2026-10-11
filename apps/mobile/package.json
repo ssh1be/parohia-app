@@ -1,5 +1,5 @@
 {
-  "name": "parohia",
+  "name": "@parohia/mobile",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -8,12 +8,14 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
     "@expo-google-fonts/manrope": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
+    "@parohia/shared": "*",
     "@fortawesome/fontawesome-free": "^7.0.0",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
@@ -23,7 +25,7 @@
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
-    "@supabase/supabase-js": "^2.52.0",
+    "@supabase/supabase-js": "^2.108.2",
     "expo": "^57.0.0",
     "expo-auth-session": "~57.0.13",
     "expo-blur": "~57.0.3",

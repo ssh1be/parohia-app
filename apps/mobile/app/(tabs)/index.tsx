@@ -28,12 +28,12 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import { useParishScope } from "../../contexts/ParishScopeContext";
 import { useOrthodoxCalendar } from "../../hooks/useOrthodoxCalendar";
 import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
-import { BulletinEvent, BulletinService } from '../../services/bulletinService';
-import { ChannelService } from '../../services/channelService';
-import { ChantService, ChantSignup, isChantServiceEvent } from '../../services/chantService';
-import { ConfessionReservationWithSchedule, ConfessionService } from '../../services/confessionService';
-import { getUserProfile } from '../../services/onboardingService';
-import { getParishByAdminId, getParishByUserId } from '../../services/parishService';
+import { BulletinEvent, BulletinService } from '@parohia/shared';
+import { ChannelService } from '@parohia/shared';
+import { ChantService, ChantSignup, isChantServiceEvent } from '@parohia/shared';
+import { ConfessionReservationWithSchedule, ConfessionService } from '@parohia/shared';
+import { getUserProfile } from '@parohia/shared';
+import { getParishByAdminId, getParishByUserId } from '@parohia/shared';
 
 type ScheduleItem = {
   id: string;

@@ -8,7 +8,7 @@ import { Field } from '../../components/ui/Field';
 import { Reveal } from '../../components/ui/Reveal';
 import { useThemeColors } from '../../components/ui/useThemeColors';
 import { useAuth } from '../../contexts/AuthContext';
-import { resolveAuthDestination } from '../../utils/onboardingStorage';
+import { resolveAuthDestination } from '@parohia/shared';
 
 export default function LoginScreen() {
   const params = useLocalSearchParams();

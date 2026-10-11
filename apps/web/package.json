@@ -1,19 +1,24 @@
 {
-  "name": "parohia-landing",
+  "name": "@parohia/web",
   "private": true,
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev -p 3030",
     "build": "next build",
     "start": "next start -p 3030",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@parohia/shared": "*",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.108.2",
     "ionicons": "^8.1.0",
     "motion": "^13.5.0",
     "next": "^16.1.6",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "20.12.12",

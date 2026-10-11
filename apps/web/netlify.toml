@@ -1,0 +1,7 @@
+# Netlify site settings: Base directory = apps/web (dependencies install from the monorepo root).
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"

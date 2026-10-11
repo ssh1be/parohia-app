@@ -14,6 +14,8 @@ import { useColorScheme } from 'nativewind';
 import { useEffect, useState } from "react";
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+// Registers the Supabase client with @parohia/shared before any service runs
+import "../config/supabase";
 import { PortalHost } from "../components/ui/Portal";
 import { preloadBrandAssets } from "../constants/assets";
 import { AuthProvider } from "../contexts/AuthContext";

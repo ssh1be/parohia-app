@@ -1,0 +1,143 @@
+"use client";
+
+import {
+  ChannelService,
+  getParishByAdminId,
+  getParishByUserId,
+  getUserProfile,
+  type CalendarTradition,
+  type Parish,
+  type UserProfile,
+} from "@parohia/shared";
+import { useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { getBrowserSupabase } from "../../lib/supabase/client";
+
+const TRADITION_KEY = "@calendar_tradition";
+
+interface DashboardContextValue {
+  userId: string;
+  email: string;
+  profile: UserProfile | null;
+  parish: Parish | null;
+  isAdmin: boolean;
+  /** Channels a non-admin member manages (admins can post anywhere). */
+  managedChannelIds: string[];
+  canPost: boolean;
+  chantSubscribed: boolean;
+  setChantSubscribed: (value: boolean) => void;
+  tradition: CalendarTradition;
+  setTradition: (value: CalendarTradition) => void;
+  /** Re-reads profile, parish, and roles from Supabase. */
+  refresh: () => Promise<void>;
+  setParish: (parish: Parish | null) => void;
+  signOut: () => Promise<void>;
+}
+
+const DashboardContext = createContext<DashboardContextValue | null>(null);
+
+export function useDashboard() {
+  const ctx = useContext(DashboardContext);
+  if (!ctx) throw new Error("useDashboard must be used inside the dashboard layout");
+  return ctx;
+}
+
+export function DashboardProvider({
+  userId,
+  email,
+  loading,
+  children,
+}: {
+  userId: string;
+  email: string;
+  loading: ReactNode;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [parish, setParish] = useState<Parish | null>(null);
+  const [managedChannelIds, setManagedChannelIds] = useState<string[]>([]);
+  const [chantSubscribed, setChantSubscribed] = useState(false);
+  const [tradition, setTraditionState] = useState<CalendarTradition>("greek");
+
+  const isAdmin = profile?.user_type === "parish_admin";
+
+  const refresh = useCallback(async () => {
+    const nextProfile = await getUserProfile(userId);
+    setProfile(nextProfile);
+    const admin = nextProfile?.user_type === "parish_admin";
+    const nextParish = admin ? await getParishByAdminId(userId) : await getParishByUserId(userId);
+    setParish(nextParish);
+
+    if (!nextParish) {
+      setManagedChannelIds([]);
+      setChantSubscribed(false);
+      return;
+    }
+
+    if (admin) {
+      await ChannelService.ensureGeneralChannel(nextParish.id, userId);
+      await ChannelService.ensureChantChannel(nextParish.id, userId);
+    } else {
+      await ChannelService.ensureGeneralSubscription(userId, nextParish.id);
+      await ChannelService.ensureChantChannel(nextParish.id);
+    }
+
+    const [managed, chant] = await Promise.all([
+      admin ? Promise.resolve([]) : ChannelService.getManagedChannelIds(userId, nextParish.id).catch(() => []),
+      ChannelService.isUserSubscribedToChant(userId, nextParish.id),
+    ]);
+    setManagedChannelIds(managed);
+    setChantSubscribed(chant);
+  }, [userId]);
+
+  useEffect(() => {
+    getBrowserSupabase();
+    try {
+      const stored = localStorage.getItem(TRADITION_KEY);
+      if (stored === "greek" || stored === "slavic") setTraditionState(stored);
+    } catch {
+      // Storage unavailable
+    }
+    refresh().finally(() => setReady(true));
+  }, [refresh]);
+
+  const setTradition = useCallback((value: CalendarTradition) => {
+    setTraditionState(value);
+    try {
+      localStorage.setItem(TRADITION_KEY, value);
+    } catch {
+      // Storage unavailable
+    }
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await getBrowserSupabase().auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  }, [router]);
+
+  return (
+    <DashboardContext.Provider
+      value={{
+        userId,
+        email,
+        profile,
+        parish,
+        isAdmin,
+        managedChannelIds,
+        canPost: isAdmin || managedChannelIds.length > 0,
+        chantSubscribed,
+        setChantSubscribed,
+        tradition,
+        setTradition,
+        refresh,
+        setParish,
+        signOut,
+      }}
+    >
+      {ready ? children : loading}
+    </DashboardContext.Provider>
+  );
+}

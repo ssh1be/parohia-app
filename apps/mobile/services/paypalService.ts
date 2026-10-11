@@ -1,3 +1,4 @@
+import { cleanDonationUrl, validatePayPalDonationUrl } from '@parohia/shared';
 import { Linking, Alert } from 'react-native';
 
 export interface PayPalDonationSettings {
@@ -13,9 +14,7 @@ export class PayPalService {
    * @returns true if valid, false otherwise
    */
   static validatePayPalDonationUrl(url: string): boolean {
-    // Check if it's a valid PayPal donation URL
-    const paypalUrlRegex = /^https?:\/\/(www\.)?paypal\.com\/(donate|cgi-bin\/webscr|us\/cgi-bin\/webscr)/;
-    return paypalUrlRegex.test(url.trim());
+    return validatePayPalDonationUrl(url);
   }
 
   /**
@@ -24,19 +23,7 @@ export class PayPalService {
    * @returns Cleaned PayPal donation URL
    */
   static cleanPayPalDonationUrl(url: string): string {
-    let cleanedUrl = url.trim();
-    
-    // Add https:// if missing
-    if (!cleanedUrl.startsWith('http://') && !cleanedUrl.startsWith('https://')) {
-      cleanedUrl = `https://${cleanedUrl}`;
-    }
-    
-    // Ensure it's https
-    if (cleanedUrl.startsWith('http://')) {
-      cleanedUrl = cleanedUrl.replace('http://', 'https://');
-    }
-    
-    return cleanedUrl;
+    return cleanDonationUrl(url);
   }
 
   /**
