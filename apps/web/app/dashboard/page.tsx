@@ -182,7 +182,7 @@ export default function TodayPage() {
           <Card>
             <CardHeader
               eyebrow="Today"
-              title="Your schedule"
+              title="Parish schedule"
               action={
                 <Link href="/dashboard/calendar" className="mt-1 text-[13px] font-semibold text-red-600 hover:underline dark:text-red-400">
                   Open calendar

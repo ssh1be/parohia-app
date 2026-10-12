@@ -3,7 +3,7 @@ import { Icon, type IconName } from "../Icon";
 
 const HIGHLIGHTS: { icon: IconName; title: string; body: string }[] = [
   { icon: "calendar-outline", title: "The liturgical year at a glance", body: "Fasting, readings, and feasts beside your parish services." },
-  { icon: "megaphone-outline", title: "Run the parish bulletin", body: "Post to channels, rally volunteers, and notify the app instantly." },
+  { icon: "megaphone-outline", title: "Run the parish bulletin", body: "Post to channels, rally volunteers, and notify parishioners." },
   { icon: "time-outline", title: "Confession, organized", body: "Open slots for the week and see who has booked." },
 ];
 
@@ -19,7 +19,7 @@ export function AuthBrandPanel() {
         }}
       />
       <a href="/" className="relative flex items-center gap-3">
-        <img src="/App_store_1024_1x.png" alt="" className="h-11 w-11 rounded-full ring-2 ring-white/30" />
+        <img src="/App_store_1024_1x.png" alt="" className="h-11 w-11 rounded-full ring-1 ring-white/30" />
         <span className="font-display text-[26px] leading-none">Parohia</span>
       </a>
 

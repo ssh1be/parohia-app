@@ -365,7 +365,6 @@ function MapCard({ query, address, directionsUrl }: { query: string; address: st
         <div className="min-w-0">
           <p className="mb-1 font-sans-semibold text-[11px] uppercase tracking-[0.14em] text-red-600 dark:text-red-400">Location</p>
           <h2 className="font-display text-[24px] leading-tight text-zinc-900 dark:text-white">Find us</h2>
-          {address && <p className="mt-1 text-[13px] leading-5 text-zinc-500 dark:text-zinc-400">{address}</p>}
         </div>
         <a
           href={directionsUrl}
