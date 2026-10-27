@@ -246,7 +246,7 @@ function ParishOverview({ parish }: { parish: Parish }) {
                       <th className="pb-2 font-semibold">Email</th>
                       <th className="pb-2 font-semibold">Phone</th>
                       <th className="pb-2 font-semibold">Role</th>
-                      <th className="pb-2 text-right font-semibold">Last sign-in</th>
+                      <th className="pb-2 text-right font-semibold">Joined parish</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.06]">
@@ -360,7 +360,7 @@ function ParishOverview({ parish }: { parish: Parish }) {
 
 function MapCard({ query, address, directionsUrl }: { query: string; address: string; directionsUrl: string }) {
   return (
-    <Card className="flex min-h-[320px] flex-1 flex-col overflow-hidden" padded={false}>
+    <Card className="flex min-h-[320px] max-h-[440px] flex-1 flex-col overflow-hidden" padded={false}>
       <div className="flex items-start justify-between gap-4 p-6 pb-4">
         <div className="min-w-0">
           <p className="mb-1 font-sans-semibold text-[11px] uppercase tracking-[0.14em] text-red-600 dark:text-red-400">Location</p>

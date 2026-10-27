@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isRunningInExpoGo } from 'expo';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -14,6 +15,9 @@ import {
   getUserProfile,
   ParishEvent,
 } from '@parohia/shared';
+
+// Remote push is not available in Expo Go on Android from SDK 53.
+const canUseRemotePush = !(isRunningInExpoGo() && Platform.OS === 'android');
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -91,7 +95,7 @@ export class NotificationService {
       }
 
       // Get push token for remote notifications (only if project is properly configured)
-      if (Device.isDevice) {
+      if (Device.isDevice && canUseRemotePush) {
         try {
           const resolvedProjectId = (Constants as any)?.easConfig?.projectId || (Constants as any)?.expoConfig?.extra?.eas?.projectId;
           const token = resolvedProjectId

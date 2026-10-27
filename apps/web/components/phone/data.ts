@@ -56,7 +56,6 @@ export const SEPTEMBER_10: LiturgicalDay = {
     { id: "coffee", kind: "parish", title: "Wednesday Coffee Hour", time: "11:00 AM - 12:00 PM", reminder: false },
     { id: "paraklesis", kind: "parish", title: "Paraklesis to St. John the Baptist", time: "6:00 PM - 7:00 PM", meta: "Church", reminder: true },
     { id: "catechism", kind: "parish", title: "Growing in the Faith: \u201cAsk Father\u201d Q&A", time: "7:00 PM - 8:00 PM", reminder: false },
-    { id: "philoptochos", kind: "parish", title: "Philoptochos Board Meeting", time: "7:00 PM - 8:30 PM", reminder: false },
   ],
   personal: [],
   readings: [
