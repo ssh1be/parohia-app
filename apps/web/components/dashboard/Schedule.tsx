@@ -8,11 +8,10 @@ import {
   type OrthodoxCalendarData,
   type ParishEvent,
 } from "@parohia/shared";
-import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Icon } from "../Icon";
 import { eventKindStyle, fastingStyle, palette, type EventKind } from "../phone/tokens";
-import { Card, EmptyState, Skeleton, cx, useSeeMore } from "../app/ui";
+import { Card, Dialog, EmptyState, Skeleton, cx, useSeeMore } from "../app/ui";
 import { eventStartDate, formatClockTime, formatConfessionRange, formatEventRange, isSameDay, parseLocalDate } from "../../lib/format";
 import type { PersonalDetail } from "./EventDetailDialog";
 
@@ -200,8 +199,7 @@ export function LiturgicalDayCard({
   date: Date;
   className?: string;
 }) {
-  const [openStory, setOpenStory] = useState<number | null>(null);
-  const [openReading, setOpenReading] = useState<number | null>(null);
+  const [reader, setReader] = useState<{ eyebrow: string; title: string; body: string } | null>(null);
   const saints = useSeeMore(data?.saintsFull ?? [], 4);
   const readings = useSeeMore(data?.readingsFull ?? [], 3);
 
@@ -257,16 +255,16 @@ export function LiturgicalDayCard({
             </h3>
             <ul className="divide-y divide-zinc-100 dark:divide-white/[0.06]">
               {saints.visible.map((saint, index) => {
-                const open = openStory === index;
                 const isFeast = saint.kind === "feast";
                 return (
                   <li key={`${saint.title}-${index}`}>
                     <button
                       type="button"
                       disabled={!saint.story}
-                      onClick={() => setOpenStory(open ? null : index)}
-                      aria-expanded={saint.story ? open : undefined}
-                      className="flex w-full items-center gap-3 py-2.5 text-left disabled:cursor-default"
+                      onClick={() =>
+                        setReader({ eyebrow: "Synaxarion", title: saint.title, body: saint.story })
+                      }
+                      className="flex w-full items-center gap-3 rounded-xl py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-red/50 disabled:cursor-default"
                     >
                       <span
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
@@ -286,20 +284,8 @@ export function LiturgicalDayCard({
                           </span>
                         )}
                       </span>
-                      {saint.story && <Icon name={open ? "chevron-up" : "chevron-down"} size={14} className="text-zinc-400" />}
+                      {saint.story && <Icon name="chevron-forward" size={14} className="text-zinc-400" />}
                     </button>
-                    <AnimatePresence initial={false}>
-                      {open && (
-                        <motion.p
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden pb-3 pl-12 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400"
-                        >
-                          {saint.story}
-                        </motion.p>
-                      )}
-                    </AnimatePresence>
                   </li>
                 );
               })}
@@ -314,34 +300,22 @@ export function LiturgicalDayCard({
               Scripture readings
             </h3>
             <ul className="space-y-1.5">
-              {readings.visible.map((reading, index) => {
-                const open = openReading === index;
-                return (
-                  <li key={`${reading.display}-${index}`} className="rounded-2xl border border-zinc-100 dark:border-white/[0.06]">
-                    <button
-                      type="button"
-                      onClick={() => setOpenReading(open ? null : index)}
-                      className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
-                    >
-                      <Icon name="book-outline" size={15} className="text-red-500" />
-                      <span className="flex-1 font-sans-semibold text-[14px] text-zinc-800 dark:text-zinc-200">{reading.display}</span>
-                      <Icon name={open ? "chevron-up" : "chevron-down"} size={14} className="text-zinc-400" />
-                    </button>
-                    <AnimatePresence initial={false}>
-                      {open && reading.passage && (
-                        <motion.p
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden px-3.5 pb-4 font-display text-[16px] leading-[1.7] text-zinc-700 dark:text-zinc-300"
-                        >
-                          {reading.passage}
-                        </motion.p>
-                      )}
-                    </AnimatePresence>
-                  </li>
-                );
-              })}
+              {readings.visible.map((reading, index) => (
+                <li key={`${reading.display}-${index}`}>
+                  <button
+                    type="button"
+                    disabled={!reading.passage}
+                    onClick={() =>
+                      setReader({ eyebrow: "Scripture reading", title: reading.display, body: reading.passage })
+                    }
+                    className="flex w-full items-center gap-3 rounded-2xl border border-zinc-100 px-3.5 py-3 text-left outline-none transition-colors hover:bg-zinc-900/[0.03] focus-visible:ring-2 focus-visible:ring-brand-red/50 disabled:cursor-default disabled:hover:bg-transparent dark:border-white/[0.06] dark:hover:bg-white/[0.04]"
+                  >
+                    <Icon name="book-outline" size={15} className="text-red-500" />
+                    <span className="flex-1 font-sans-semibold text-[14px] text-zinc-800 dark:text-zinc-200">{reading.display}</span>
+                    {reading.passage && <Icon name="chevron-forward" size={14} className="text-zinc-400" />}
+                  </button>
+                </li>
+              ))}
             </ul>
             {readings.toggle}
           </section>
@@ -356,6 +330,12 @@ export function LiturgicalDayCard({
           />
         )}
       </div>
+
+      <Dialog open={!!reader} onClose={() => setReader(null)} eyebrow={reader?.eyebrow} title={reader?.title ?? ""} width={680}>
+        <p className="whitespace-pre-line pb-3 font-display text-[19px] leading-[1.75] text-zinc-800 dark:text-zinc-200">
+          {reader?.body}
+        </p>
+      </Dialog>
     </Card>
   );
 }

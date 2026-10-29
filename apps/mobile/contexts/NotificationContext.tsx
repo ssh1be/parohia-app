@@ -1,6 +1,5 @@
 import * as Notifications from 'expo-notifications';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { InteractionManager } from 'react-native';
 import { NotificationEvent, NotificationPreferences, notificationService } from '../services/notificationService';
 import { ParishEvent } from '@parohia/shared';
 import { useAuth } from './AuthContext';
@@ -174,10 +173,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     // Defer heavy notification initialization until after initial render/interaction
-    const task = InteractionManager.runAfterInteractions(() => {
+    const handle = requestIdleCallback(() => {
       initializeNotifications();
     });
-    return () => task.cancel();
+    return () => cancelIdleCallback(handle);
   }, []);
 
   useEffect(() => {

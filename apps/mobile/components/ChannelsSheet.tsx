@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { palette } from '../constants/theme';
+import { channelIcon } from '../utils/channelIcon';
 import { BulletinChannel, ChannelService } from '@parohia/shared';
 import { getParishMembers, ParishMember } from '@parohia/shared';
 import { Button } from './ui/Button';
@@ -424,7 +425,7 @@ export function ChannelsSheet({
               <View className="flex-row items-start">
                 <View className="h-10 w-10 rounded-xl bg-red-600/10 items-center justify-center mr-3">
                   <Ionicons
-                    name={channel.is_default ? 'home' : channel.is_chant ? 'musical-notes' : 'radio-outline'}
+                    name={channelIcon(channel)}
                     size={18}
                     color={palette.accent}
                   />

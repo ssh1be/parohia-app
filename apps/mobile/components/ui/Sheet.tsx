@@ -11,6 +11,8 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type ScrollViewInstance,
+  type ViewInstance,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
@@ -31,7 +33,7 @@ import { useThemeColors } from './useThemeColors';
 
 type SheetScrollContextValue = {
   /** Scroll a focused field into view inside the sheet body. */
-  ensureVisible: (node: View | null) => void;
+  ensureVisible: (node: ViewInstance | null) => void;
 };
 
 const SheetScrollContext = createContext<SheetScrollContextValue | null>(null);
@@ -91,7 +93,7 @@ export function Sheet({
   const translateY = useSharedValue(height);
   const backdrop = useSharedValue(0);
   const keyboardHeight = useSharedValue(0);
-  const scrollRef = useRef<RNScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const scrollOffsetRef = useRef(0);
 
   const pendingEnter = useRef(false);
@@ -126,7 +128,7 @@ export function Sheet({
     requestAnimationFrame(enter);
   };
 
-  const ensureVisible = useCallback((node: View | null) => {
+  const ensureVisible = useCallback((node: ViewInstance | null) => {
     if (!node || !scrollRef.current) return;
     if (scrollFocusTimer.current) clearTimeout(scrollFocusTimer.current);
 

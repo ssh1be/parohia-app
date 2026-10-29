@@ -1,18 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Icon } from "../../../components/Icon";
-import { AuthHeader, FormError, FormNotice } from "../../../components/app/AuthChrome";
+import { AuthHeader, FormError } from "../../../components/app/AuthChrome";
 import { Button, TextField } from "../../../components/app/ui";
-import { getSiteUrl } from "../../../lib/auth";
 import { getBrowserSupabase } from "../../../lib/supabase/client";
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -23,15 +23,13 @@ export default function ForgotPasswordPage() {
     }
     setLoading(true);
     setError(null);
-    const { error: resetError } = await getBrowserSupabase().auth.resetPasswordForEmail(trimmed, {
-      redirectTo: `${getSiteUrl()}/auth/callback?next=/reset-password`,
-    });
+    const { error: resetError } = await getBrowserSupabase().auth.resetPasswordForEmail(trimmed);
     setLoading(false);
     if (resetError) {
       setError(resetError.message);
       return;
     }
-    setSent(true);
+    router.push(`/verify?type=recovery&email=${encodeURIComponent(trimmed)}`);
   };
 
   return (
@@ -39,10 +37,9 @@ export default function ForgotPasswordPage() {
       <AuthHeader
         eyebrow="Account recovery"
         title="Reset password"
-        subtitle="We'll email you a link to choose a new password. Open it on this computer."
+        subtitle="We'll email you a 6-digit code to choose a new password."
       />
 
-      <FormNotice message={sent ? "Check your email for a password reset link." : null} />
       <FormError message={error} />
 
       <form onSubmit={handleSubmit} noValidate>
@@ -57,7 +54,7 @@ export default function ForgotPasswordPage() {
           autoFocus
         />
         <Button type="submit" size="lg" fullWidth loading={loading} icon="mail-outline" className="mt-2">
-          Send reset link
+          Send reset code
         </Button>
       </form>
 

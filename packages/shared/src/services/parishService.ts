@@ -16,10 +16,8 @@ export interface Parish {
   admin_user_id: string;
   parish_calendar_id?: string;
   is_verified: boolean;
-  // Priest Information
-  priest_name?: string;
-  priest_phone_number?: string;
-  priest_email?: string;
+  /** Oldest first, so the parish priest added at setup leads the list. */
+  clergy?: ClergyMember[];
   // Donation fields
   paypal_donation_url?: string;
   donation_enabled?: boolean;
@@ -30,12 +28,48 @@ export interface Parish {
   updated_at: string;
 }
 
+export interface ClergyMember {
+  id: string;
+  parish_id: string;
+  name: string;
+  /** e.g. "Parish Priest", "Deacon", "Assistant Priest". */
+  title?: string | null;
+  phone_number?: string | null;
+  email?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClergyInput {
+  name: string;
+  title?: string;
+  phone_number?: string;
+  email?: string;
+}
+
+const CLERGY_COLUMNS = 'id, parish_id, name, title, phone_number, email, created_at, updated_at';
+const CLERGY_EMBED = `clergy:parish_clergy(${CLERGY_COLUMNS})`;
+
+const byCreatedAt = (a: ClergyMember, b: ClergyMember) => a.created_at.localeCompare(b.created_at);
+
+const withSortedClergy = (parish: Parish): Parish => ({
+  ...parish,
+  clergy: [...(parish.clergy ?? [])].sort(byCreatedAt),
+});
+
+/** Titles of clergy who don't hear confession, so they're skipped when naming the confessor. */
+const NON_CONFESSOR_TITLE = /deacon|reader|chanter|cantor/i;
+
+/** The clergy member parishioners book confession with: the first listed priest. */
+export const confessionPriest = (parish: Pick<Parish, 'clergy'> | null | undefined): ClergyMember | null =>
+  parish?.clergy?.find((member) => !NON_CONFESSOR_TITLE.test(member.title ?? '')) ?? null;
+
 // Get parish by user ID (for parish admins)
 export const getParishByAdminId = async (adminUserId: string): Promise<Parish | null> => {
   try {
     const { data, error } = await supabase
       .from('parishes')
-      .select('*')
+      .select(`*, ${CLERGY_EMBED}`)
       .eq('admin_user_id', adminUserId)
       .single();
 
@@ -43,7 +77,7 @@ export const getParishByAdminId = async (adminUserId: string): Promise<Parish | 
       throw error;
     }
 
-    return data;
+    return data ? withSortedClergy(data as Parish) : null;
   } catch (error: any) {
     console.error('Error fetching parish by admin ID:', error);
     return null;
@@ -73,9 +107,7 @@ export const getParishByUserId = async (userId: string): Promise<Parish | null> 
           admin_user_id,
           parish_calendar_id,
           is_verified,
-          priest_name,
-          priest_phone_number,
-          priest_email,
+          ${CLERGY_EMBED},
           paypal_donation_url,
           donation_enabled,
           donation_message,
@@ -95,7 +127,7 @@ export const getParishByUserId = async (userId: string): Promise<Parish | null> 
     for (const row of rows) {
       const parish = row.parishes as any;
       if (parish && !isNoParishId(parish.id)) {
-        return parish;
+        return withSortedClergy(parish);
       }
     }
     return null;
@@ -184,40 +216,70 @@ export const switchUserParish = async (userId: string, parishId: string): Promis
   return newParish;
 };
 
-// Update parish priest information
-export const updateParishPriestInfo = async (
+const cleanClergyInput = (input: ClergyInput) => ({
+  name: input.name.trim(),
+  title: input.title?.trim() || null,
+  phone_number: input.phone_number?.trim() || null,
+  email: input.email?.trim() || null,
+});
+
+export const getParishClergy = async (parishId: string): Promise<ClergyMember[]> => {
+  const { data, error } = await supabase
+    .from('parish_clergy')
+    .select(CLERGY_COLUMNS)
+    .eq('parish_id', parishId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.error('Error fetching parish clergy:', error);
+    return [];
+  }
+  return data ?? [];
+};
+
+export const addClergyMember = async (
   parishId: string,
-  priestInfo: {
-    priest_name?: string;
-    priest_phone_number?: string;
-    priest_email?: string;
+  input: ClergyInput
+): Promise<{ success: boolean; clergy?: ClergyMember; error?: string }> => {
+  const cleaned = cleanClergyInput(input);
+  if (!cleaned.name) return { success: false, error: 'Please enter a name.' };
+  const { data, error } = await supabase
+    .from('parish_clergy')
+    .insert({ parish_id: parishId, ...cleaned })
+    .select(CLERGY_COLUMNS)
+    .single();
+  if (error) {
+    console.error('Error adding clergy member:', error);
+    return { success: false, error: error.message || 'Failed to add clergy member' };
   }
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    // Convert empty strings to null for proper database storage
-    const cleanedPriestInfo = {
-      priest_name: priestInfo.priest_name?.trim() || null,
-      priest_phone_number: priestInfo.priest_phone_number?.trim() || null,
-      priest_email: priestInfo.priest_email?.trim() || null,
-    };
+  return { success: true, clergy: data };
+};
 
-    const { error } = await supabase
-      .from('parishes')
-      .update(cleanedPriestInfo)
-      .eq('id', parishId);
-
-    if (error) {
-      throw error;
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error updating parish priest info:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to update priest information'
-    };
+export const updateClergyMember = async (
+  clergyId: string,
+  input: ClergyInput
+): Promise<{ success: boolean; clergy?: ClergyMember; error?: string }> => {
+  const cleaned = cleanClergyInput(input);
+  if (!cleaned.name) return { success: false, error: 'Please enter a name.' };
+  const { data, error } = await supabase
+    .from('parish_clergy')
+    .update({ ...cleaned, updated_at: new Date().toISOString() })
+    .eq('id', clergyId)
+    .select(CLERGY_COLUMNS)
+    .single();
+  if (error) {
+    console.error('Error updating clergy member:', error);
+    return { success: false, error: error.message || 'Failed to update clergy member' };
   }
+  return { success: true, clergy: data };
+};
+
+export const deleteClergyMember = async (clergyId: string): Promise<{ success: boolean; error?: string }> => {
+  const { error } = await supabase.from('parish_clergy').delete().eq('id', clergyId);
+  if (error) {
+    console.error('Error removing clergy member:', error);
+    return { success: false, error: error.message || 'Failed to remove clergy member' };
+  }
+  return { success: true };
 };
 
 // Update parish calendar ID

@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Icon } from "../../Icon";
+import { channelById, channelIcon } from "../data";
 import { palette } from "../tokens";
 import { Pressable } from "../ui";
 import { EventsScreen, POSTS } from "./EventsScreen";
@@ -12,6 +13,7 @@ const SHEET_EASE = [0.32, 0.72, 0, 1] as const;
 /** The volunteer post opened as a sheet over the bulletin board, with a working sign-up. */
 export function PostDetailScreen() {
   const post = POSTS.find((p) => p.kind === "volunteer")!;
+  const channel = channelById(post.channel);
   const needed = post.volunteers!.needed;
   const [checked, setChecked] = useState(false);
   const [sent, setSent] = useState(false);
@@ -43,6 +45,10 @@ export function PostDetailScreen() {
         </div>
 
         <div data-scroll className="no-scrollbar overflow-y-auto px-6 pb-[50px] pt-1">
+          <span className="mb-3 inline-flex items-center rounded-full bg-red-600/10 py-1 pl-1.5 pr-2.5">
+            <Icon name={channelIcon(channel)} size={11} color={palette.accent} />
+            <span className="ml-1 font-sans-semibold text-[11px] text-red-700 dark:text-red-300">{channel.name}</span>
+          </span>
           <p className="font-sans text-[16px] leading-[25px] text-gray-700 dark:text-gray-200">{post.description}</p>
           <div className="mt-5 overflow-hidden rounded-2xl bg-gray-50 dark:bg-white/[0.04]">
             {[

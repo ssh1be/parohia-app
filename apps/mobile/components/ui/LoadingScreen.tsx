@@ -76,7 +76,7 @@ export function LoadingScreen({ onReady }: LoadingScreenProps) {
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: LOADING_SCREEN_BG,
     alignItems: 'center',
     justifyContent: 'center',

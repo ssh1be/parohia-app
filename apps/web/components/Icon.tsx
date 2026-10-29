@@ -105,6 +105,11 @@ import {
   warningOutline,
   copyOutline,
   handLeft,
+  appsOutline,
+  briefcase,
+  cafeOutline,
+  exitOutline,
+  chatbubbles,
 } from "ionicons/icons";
 
 /** Ionicons, the same set the mobile app uses, keyed by the app's kebab-case names. */
@@ -116,6 +121,7 @@ const ICONS = {
   book,
   calendar,
   "calendar-outline": calendarOutline,
+  "cafe-outline": cafeOutline,
   call,
   "call-outline": callOutline,
   camera,
@@ -214,6 +220,10 @@ const ICONS = {
   "warning-outline": warningOutline,
   "copy-outline": copyOutline,
   "hand-left": handLeft,
+  "apps-outline": appsOutline,
+  briefcase,
+  "exit-outline": exitOutline,
+  chatbubbles,
 } as const;
 
 export type IconName = keyof typeof ICONS;

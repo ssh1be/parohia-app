@@ -18,6 +18,7 @@ import { SettingsGroup, SettingsRow } from './ui/Settings';
 import { Spinner } from './ui/Spinner';
 
 const SUPPORT_EMAIL = 'support@parohia.app';
+const DONATE_URL = 'https://buymeacoffee.com/parohia';
 
 async function openSupportEmail() {
   const subject = encodeURIComponent('Parohia feedback');
@@ -238,21 +239,31 @@ export default function GeneralSettings() {
       </Animated.View>
 
       <Animated.View entering={entrance.card(80)}>
-        <SettingsGroup
-          title="Support"
-          footer="Send feedback, ideas, or bug reports. We'll get back to you as soon as we can."
-        >
+        <SettingsGroup title="Support">
           <SettingsRow
             first
             icon="mail-outline"
             iconColor={palette.blue}
             title="Contact support"
-            subtitle={SUPPORT_EMAIL}
+            subtitle="Send feedback, ideas, or bug reports"
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
               openSupportEmail();
             }}
             right={<Ionicons name="chevron-forward" size={16} color={palette.blue} />}
+          />
+          <SettingsRow
+            icon="cafe-outline"
+            iconColor={palette.amber}
+            title="Buy me a coffee"
+            subtitle="Your generosity keeps Parohia free for everyone"
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              Linking.openURL(DONATE_URL).catch(() => {
+                Alert.alert('Unable to open link', `Visit ${DONATE_URL.replace('https://', '')} to support Parohia.`);
+              });
+            }}
+            right={<Ionicons name="open-outline" size={16} color={palette.amber} />}
           />
         </SettingsGroup>
       </Animated.View>

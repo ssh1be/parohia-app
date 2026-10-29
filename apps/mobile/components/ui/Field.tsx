@@ -1,5 +1,5 @@
 import { ReactNode, useRef, useState } from 'react';
-import { Platform, Text, TextInput, TextInputProps, View } from 'react-native';
+import { Platform, Text, TextInput, TextInputProps, View, type ViewInstance } from 'react-native';
 import { palette } from '../../constants/theme';
 import { useSheetScroll } from './Sheet';
 import { useThemeColors } from './useThemeColors';
@@ -31,7 +31,7 @@ export function Field({
   const [focused, setFocused] = useState(false);
   const colors = useThemeColors();
   const sheetScroll = useSheetScroll();
-  const fieldRef = useRef<View>(null);
+  const fieldRef = useRef<ViewInstance>(null);
   // Explicit background beats iOS autofill's yellow fill; className alone does not.
   const fill = colors.isDark ? 'rgba(255,255,255,0.05)' : '#F3F4F6';
 

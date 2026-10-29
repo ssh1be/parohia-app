@@ -2,7 +2,7 @@
 
 import type { BulletinEvent } from "@parohia/shared";
 import { motion } from "motion/react";
-import { Icon } from "../../../components/Icon";
+import { Icon, type IconName } from "../../../components/Icon";
 import { eventKindStyle } from "../../../components/phone/tokens";
 import { parseLocalDate } from "../../../lib/format";
 
@@ -16,6 +16,9 @@ export const RESPONSE_LABEL: Record<string, string> = {
   attending: "Attending",
   volunteer: "Volunteering",
 };
+
+export const channelIcon = (channel: { is_default?: boolean; is_chant?: boolean }): IconName =>
+  channel.is_chant ? "musical-notes-outline" : channel.is_default ? "home-outline" : "chatbubbles-outline";
 
 export const isDatedPost = (event: Pick<BulletinEvent, "event_type">) =>
   event.event_type === "event" || event.event_type === "volunteer";

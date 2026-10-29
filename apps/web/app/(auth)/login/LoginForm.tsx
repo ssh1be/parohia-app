@@ -49,6 +49,11 @@ export function LoginForm() {
 
     setLoading(true);
     const supabase = getBrowserSupabase();
+    // Success paths navigate away and keep the button spinning until the next page mounts.
+    const stay = (update: () => void) => {
+      update();
+      setLoading(false);
+    };
     try {
       if (isSignUp) {
         const outcome = await signUpWithEmail(trimmedEmail, password, supabase);
@@ -57,12 +62,12 @@ export function LoginForm() {
           return;
         }
         if (outcome.status === "already_registered") {
-          setIsSignUp(false);
-          setNotice("An account with this email is already registered. Sign in instead.");
-          return;
+          return stay(() => {
+            setIsSignUp(false);
+            setNotice("An account with this email is already registered. Sign in instead.");
+          });
         }
-        setError(outcome.message);
-        return;
+        return stay(() => setError(outcome.message));
       }
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -70,16 +75,15 @@ export function LoginForm() {
         password,
       });
       if (signInError || !data.user) {
-        setError(signInError?.message ?? "Unable to sign in.");
-        return;
+        return stay(() => setError(signInError?.message ?? "Unable to sign in."));
       }
 
       const destination = await resolveAuthDestination(data.user.id, supabase);
       const next = destination === "tabs" ? safeNext(params.get("next")) : null;
       router.replace(next ?? destinationPath(destination));
       router.refresh();
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      stay(() => setError(err instanceof Error ? err.message : "Something went wrong."));
     }
   };
 
@@ -117,6 +121,7 @@ export function LoginForm() {
             !isSignUp ? (
               <Link
                 href="/forgot-password"
+                tabIndex={-1}
                 className="font-sans-semibold text-[12px] text-red-600 hover:underline dark:text-red-400"
               >
                 Forgot password?

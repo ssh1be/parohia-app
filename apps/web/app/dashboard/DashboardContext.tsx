@@ -84,10 +84,10 @@ export function DashboardProvider({
       await ChannelService.ensureChantChannel(nextParish.id);
     }
 
-    const [managed, chant] = await Promise.all([
-      admin ? Promise.resolve([]) : ChannelService.getManagedChannelIds(userId, nextParish.id).catch(() => []),
-      ChannelService.isUserSubscribedToChant(userId, nextParish.id),
-    ]);
+    const managed = admin
+      ? []
+      : await ChannelService.ensureManagedSubscriptions(userId, nextParish.id).catch(() => []);
+    const chant = await ChannelService.isUserSubscribedToChant(userId, nextParish.id);
     setManagedChannelIds(managed);
     setChantSubscribed(chant);
   }, [userId]);

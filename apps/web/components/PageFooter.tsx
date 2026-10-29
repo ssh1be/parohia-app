@@ -50,7 +50,7 @@ export default function PageFooter() {
                   </li>
                 ))}
                 {column.title === "Product" && (
-                  <li>
+                  <li className="hidden lg:list-item">
                     <AccountLink className="text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-white" />
                   </li>
                 )}

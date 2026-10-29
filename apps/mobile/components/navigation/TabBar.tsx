@@ -21,7 +21,7 @@ const ICONS: Record<string, { active: IconName; inactive: IconName }> = {
 
 const INSET = 6;
 
-export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export function TabBar({ state, descriptors, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const [width, setWidth] = useState(0);
@@ -97,7 +97,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           const tint = focused ? palette.accent : colors.textMuted;
 
           const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (event.defaultPrevented) return;
             if (focused) {
               // Re-press while focused — screens may listen (e.g. Events toggles bulletin filters).
@@ -105,11 +105,11 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               return;
             }
             Haptics.selectionAsync().catch(() => {});
-            navigation.navigate(route.name, route.params);
+            navigateToTab(route.key);
           };
 
           const onLongPress = () => {
-            navigation.emit({ type: 'tabLongPress', target: route.key });
+            emitter.emit({ type: 'tabLongPress', target: route.key });
           };
 
           return (

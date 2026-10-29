@@ -13,9 +13,6 @@ CREATE TABLE public.user_profiles (
   CONSTRAINT user_profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.parishes (
-  priest_name text,
-  priest_phone_number text,
-  priest_email text,
   name text NOT NULL,
   jurisdiction text NOT NULL,
   address text NOT NULL,
@@ -37,6 +34,18 @@ CREATE TABLE public.parishes (
   confession_enabled boolean DEFAULT false,
   CONSTRAINT parishes_pkey PRIMARY KEY (id),
   CONSTRAINT parishes_admin_user_id_fkey FOREIGN KEY (admin_user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.parish_clergy (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  parish_id uuid NOT NULL,
+  name text NOT NULL,
+  title text,
+  phone_number text,
+  email text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT parish_clergy_pkey PRIMARY KEY (id),
+  CONSTRAINT parish_clergy_parish_id_fkey FOREIGN KEY (parish_id) REFERENCES public.parishes(id)
 );
 CREATE TABLE public.user_parish_connections (
   user_name text,

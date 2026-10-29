@@ -33,7 +33,7 @@ import { ChannelService } from '@parohia/shared';
 import { ChantService, ChantSignup, isChantServiceEvent } from '@parohia/shared';
 import { ConfessionReservationWithSchedule, ConfessionService } from '@parohia/shared';
 import { getUserProfile } from '@parohia/shared';
-import { getParishByAdminId, getParishByUserId } from '@parohia/shared';
+import { confessionPriest, getParishByAdminId, getParishByUserId } from '@parohia/shared';
 
 type ScheduleItem = {
   id: string;
@@ -360,6 +360,7 @@ export default function Index() {
 
   const buildSchedule = (): ScheduleItem[] => {
     const allEvents: ScheduleItem[] = [];
+    const priestName = confessionPriest(parishDetails)?.name;
 
     personalConfessions.forEach((confession) => {
       const details = confessionDetails[confession.id];
@@ -369,8 +370,8 @@ export default function Index() {
       let title = "Confession";
       if (isParishAdmin && details?.user_profiles?.full_name) {
         title = `Confession with ${details.user_profiles.full_name}`;
-      } else if (!isParishAdmin && parishDetails?.priest_name) {
-        title = `Confession with ${parishDetails.priest_name}`;
+      } else if (!isParishAdmin && priestName) {
+        title = `Confession with ${priestName}`;
       }
 
       allEvents.push({

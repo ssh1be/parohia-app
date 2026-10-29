@@ -3,6 +3,7 @@
 import {
   BulletinService,
   ConfessionService,
+  confessionPriest,
   fetchParishEventsForMultipleDays,
   getFastingKind,
   isChantServiceEvent,
@@ -191,11 +192,12 @@ export default function CalendarPage() {
     return map;
   }, [bulletin, chantEnabled, parishEvents, reservations]);
 
+  const priestName = confessionPriest(parish)?.name;
   const confessionTitle = (personName?: string) =>
     isAdmin
       ? `Confession with ${personName || "a parishioner"}`
-      : parish?.priest_name
-        ? `Confession with ${parish.priest_name}`
+      : priestName
+        ? `Confession with ${priestName}`
         : "Confession";
 
   const itemsFor = (day: Date): ScheduleItem[] => {

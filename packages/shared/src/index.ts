@@ -3,6 +3,7 @@ export * from './theme';
 export * from './constants/parishes';
 export * from './types/onboarding';
 export * from './auth/onboardingStorage';
+export * from './auth/passwordReset';
 export * from './auth/signUp';
 export * from './utils/parishSearch';
 export * from './utils/donation';

@@ -2,10 +2,10 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { Icon } from "../Icon";
-import { AUGUST_30, SEPTEMBER_10, SEPTEMBER_14, PARISH } from "../phone/data";
+import { Icon, type IconName } from "../Icon";
+import { AUGUST_30, CHANNELS, SEPTEMBER_10, SEPTEMBER_14, PARISH, channelById, channelIcon } from "../phone/data";
 import { PostCard, POSTS } from "../phone/screens/EventsScreen";
-import { palette, snappySpring } from "../phone/tokens";
+import { cardSpring, eventKindStyle, palette, snappySpring } from "../phone/tokens";
 import { FastingBadge, Pressable, Switch } from "../phone/ui";
 import { Reveal } from "../Reveal";
 
@@ -21,12 +21,29 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 const SURFACE =
   "border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(9,9,11,0.04),0_12px_28px_-16px_rgba(9,9,11,0.18)] dark:border-white/10 dark:bg-white/[0.06] dark:shadow-none";
 
-function Tile({ title, body, children, className = "", delay = 0 }: { title: string; body: string; children: ReactNode; className?: string; delay?: number }) {
+function Tile({
+  title,
+  body,
+  children,
+  className = "",
+  delay = 0,
+  inline = false,
+}: {
+  title: string;
+  body: string;
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+  /** On large screens, set the copy beside the demo instead of under it. */
+  inline?: boolean;
+}) {
   return (
     <Reveal delay={delay} className={className}>
-      <div className="flex h-full flex-col overflow-hidden rounded-[28px] border border-zinc-200 bg-zinc-100/60 dark:border-white/[0.07] dark:bg-white/[0.025]">
+      <div
+        className={`flex h-full flex-col overflow-hidden rounded-[28px] border border-zinc-200 bg-zinc-100/60 dark:border-white/[0.07] dark:bg-white/[0.025] ${inline ? "lg:flex-row-reverse" : ""}`}
+      >
         <div className="app-screen relative flex-1 p-5 sm:p-6">{children}</div>
-        <div className="px-6 pb-7 pt-1 sm:px-7">
+        <div className={`px-6 pb-7 pt-1 sm:px-7 ${inline ? "lg:flex lg:w-[300px] lg:shrink-0 lg:flex-col lg:justify-center lg:py-6 lg:pr-0" : ""}`}>
           <h3 className="font-display text-[28px] leading-[1.12] text-zinc-900 dark:text-white">{title}</h3>
           <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">{body}</p>
         </div>
@@ -317,13 +334,136 @@ function ParishLifeTile({ slot, onSlot, remindersOn }: { slot: string | null; on
   );
 }
 
+const MANAGED_CHANNEL = "festival";
+const TILE_CHANNELS = CHANNELS.filter((c) => c.id !== "youth");
+
+function ChannelBadge({ icon, label, color, tint }: { icon: IconName; label: string; color: string; tint: string }) {
+  return (
+    <span className="mr-1.5 flex shrink-0 items-center rounded-full py-0.5 pl-1.5 pr-2" style={{ backgroundColor: tint }}>
+      <Icon name={icon} size={9} color={color} />
+      <span className="ml-1 font-sans-semibold text-[10px]" style={{ color }}>
+        {label}
+      </span>
+    </span>
+  );
+}
+
+function ChannelsTile() {
+  const [joined, setJoined] = useState<Set<string>>(() => new Set(["general", MANAGED_CHANNEL]));
+  const feed = POSTS.filter((p) => joined.has(p.channel));
+
+  const toggle = (id: string) =>
+    setJoined((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className={`rounded-3xl border p-4 ${SURFACE}`}>
+        <p className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Parish channels</p>
+        <p className="mt-0.5 font-sans text-[12.5px] text-gray-500 dark:text-gray-400">Join channels to add their posts to your bulletin.</p>
+        <div className="mt-3 flex flex-col gap-2">
+          {TILE_CHANNELS.map((channel) => {
+            const required = channel.kind === "general";
+            const managing = channel.id === MANAGED_CHANNEL;
+            const member = joined.has(channel.id);
+            return (
+              <div key={channel.id} className="flex items-center rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2.5 dark:border-white/[0.06] dark:bg-white/[0.04]">
+                <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-600/10">
+                  <Icon name={channelIcon(channel)} size={16} color={palette.accent} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-sans-bold text-[14px] text-gray-900 dark:text-white">{channel.name}</span>
+                  <span className="mt-0.5 flex min-w-0 items-center">
+                    {required && <ChannelBadge icon="lock-closed" label="Required" color={palette.gray500} tint="rgba(156,163,175,0.2)" />}
+                    {managing && <ChannelBadge icon="briefcase" label="Manager" color={palette.blue} tint="rgba(59,130,246,0.14)" />}
+                    <span className="min-w-0 truncate font-sans text-[12px] text-gray-500 dark:text-gray-400">{channel.description}</span>
+                  </span>
+                </span>
+                {required || managing ? (
+                  <span
+                    title={managing ? "Managing" : "Joined"}
+                    className="ml-3 flex h-8 shrink-0 items-center rounded-xl bg-gray-100 px-2.5 font-sans-semibold text-[12px] text-gray-500 dark:bg-white/5 dark:text-gray-400"
+                  >
+                    <Icon name={managing ? "lock-closed" : "checkmark-circle"} size={13} color={managing ? palette.gray400 : palette.green} />
+                    <span className="ml-1 max-sm:sr-only">{managing ? "Managing" : "Joined"}</span>
+                  </span>
+                ) : (
+                  <Pressable
+                    scaleTo={0.94}
+                    onClick={() => toggle(channel.id)}
+                    aria-pressed={member}
+                    aria-label={`${member ? "Leave" : "Join"} ${channel.name}`}
+                    className={`ml-3 flex h-8 w-[74px] shrink-0 items-center justify-center rounded-xl border font-sans-bold text-[12px] transition-colors duration-200 ${
+                      member
+                        ? "border-gray-200 text-gray-700 dark:border-white/10 dark:text-gray-200"
+                        : "border-red-600 bg-red-600 text-white"
+                    }`}
+                  >
+                    {member && <Icon name="exit-outline" size={13} className="mr-1" />}
+                    {member ? "Leave" : "Join"}
+                  </Pressable>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className={`flex flex-col rounded-3xl border p-4 ${SURFACE}`}>
+        <p className="font-sans-semibold text-[15px] text-gray-900 dark:text-white">Your bulletin</p>
+        <p className="mt-0.5 font-sans text-[12.5px] text-gray-500 dark:text-gray-400">
+          {feed.length} {feed.length === 1 ? "post" : "posts"}
+        </p>
+        <div className="mt-3 flex flex-col" aria-live="polite">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {feed.map((post) => {
+              const kind = eventKindStyle[post.kind];
+              return (
+                <motion.div
+                  key={post.id}
+                  layout
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
+                  transition={cardSpring}
+                  className="mb-2 flex items-center rounded-2xl border border-gray-100 px-3 py-2.5 last:mb-0 dark:border-white/[0.06]"
+                >
+                  <span className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: kind.tint }}>
+                    <Icon name={kind.icon} size={15} color={kind.color} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-sans-semibold text-[14px] text-gray-900 dark:text-white">{post.title}</span>
+                    <span className="mt-0.5 flex items-center font-sans text-[12px] text-gray-500 dark:text-gray-400">
+                      {channelById(post.channel).kind !== "general" && (
+                        <>
+                          <span className="truncate font-sans-semibold">#{channelById(post.channel).name}</span>
+                          <span className="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
+                        </>
+                      )}
+                      <span className="shrink-0">{post.posted}</span>
+                    </span>
+                  </span>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FeatureBento() {
   const [remindersOn, setRemindersOn] = useState(true);
   const [lead, setLead] = useState("30 min");
   const [slot, setSlot] = useState<string | null>(null);
 
   return (
-    <div className="grid gap-4 md:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
       <Tile
         className="md:col-span-3"
         title="The Orthodox calendar, every day"
@@ -344,6 +484,14 @@ export function FeatureBento() {
         body="Volunteer for events, RSVP, and book confession with your priest in a few taps."
       >
         <ParishLifeTile slot={slot} onSlot={setSlot} remindersOn={remindersOn} />
+      </Tile>
+      <Tile
+        inline
+        className="max-md:order-last md:col-span-5"
+        title="Channels for every ministry"
+        body="Follow the choir or the festival committee, and your bulletin fills with those posts. Managers post to the channels they run."
+      >
+        <ChannelsTile />
       </Tile>
     </div>
   );

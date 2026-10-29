@@ -7,6 +7,7 @@ import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { eventKindStyle, palette, TAB_BAR_GAP, TAB_BAR_HEIGHT } from '../constants/theme';
 import { BulletinChannel } from '@parohia/shared';
+import { channelIcon } from '../utils/channelIcon';
 import { Portal } from './ui/Portal';
 import { PressableScale } from './ui/PressableScale';
 import { Sheet } from './ui/Sheet';
@@ -101,13 +102,13 @@ interface BulletinFeedHeaderProps {
   onOpenChannels: () => void;
   /** Only show the floating helper while the bulletin tab is active. */
   floatingEnabled: boolean;
+  /** Controlled so the screen can hide its other floating controls while the sheet is up. */
+  showFiltersSheet: boolean;
+  onFiltersSheetChange: (open: boolean) => void;
 }
 
-function channelIcon(channel: BulletinChannel | { id: 'all' }): keyof typeof Ionicons.glyphMap {
-  if (channel.id === 'all') return 'apps-outline';
-  if ('is_default' in channel && channel.is_default) return 'home';
-  if ('is_chant' in channel && channel.is_chant) return 'musical-notes';
-  return 'radio-outline';
+function filterIcon(channel: BulletinChannel | { id: 'all'; is_default?: boolean }): keyof typeof Ionicons.glyphMap {
+  return channel.id === 'all' ? 'apps-outline' : channelIcon(channel);
 }
 
 function OptionRow({
@@ -168,10 +169,11 @@ export function BulletinFeedHeader({
   isParishAdmin,
   onOpenChannels,
   floatingEnabled,
+  showFiltersSheet,
+  onFiltersSheetChange: setShowFiltersSheet,
 }: BulletinFeedHeaderProps) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const [showFiltersSheet, setShowFiltersSheet] = useState(false);
   const [filterPicker, setFilterPicker] = useState<'type' | 'time'>('type');
 
   const channelItems: Array<BulletinChannel | { id: 'all'; name: string; is_default?: boolean }> = [
@@ -215,7 +217,7 @@ export function BulletinFeedHeader({
           const active = channelFilter === channel.id;
           const count =
             channel.id === 'all' ? totalCount : countsByChannel[channel.id] ?? 0;
-          const icon = channelIcon(channel);
+          const icon = filterIcon(channel);
 
           return (
             <Pressable

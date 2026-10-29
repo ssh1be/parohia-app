@@ -3,6 +3,7 @@
 import { ChannelService, getParishMembers, type BulletinChannel, type ParishMember } from "@parohia/shared";
 import { useEffect, useState } from "react";
 import { Icon } from "../../../components/Icon";
+import { channelIcon } from "./shared";
 import {
   Avatar,
   Button,
@@ -85,7 +86,7 @@ export function ManageChannelsDialog({
                   )}
                 >
                   <Icon
-                    name={channel.is_chant ? "musical-notes-outline" : channel.is_default ? "home-outline" : "chatbubbles-outline"}
+                    name={channelIcon(channel)}
                     size={15}
                   />
                   <span className="flex-1 truncate">{channel.name}</span>

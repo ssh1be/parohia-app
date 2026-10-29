@@ -10,6 +10,7 @@ import { useDashboard } from "../DashboardContext";
 import { PageHeader } from "../DashboardShell";
 
 const SUPPORT_EMAIL = "support@parohia.app";
+const DONATE_URL = "https://buymeacoffee.com/parohia";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: IconName; description: string }[] = [
   { value: "light", label: "Light", icon: "sunny-outline", description: "Always use the light theme" },
@@ -114,7 +115,7 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          <Section title="Support" footer="Send feedback, ideas, or bug reports. We'll get back to you as soon as we can.">
+          <Section title="Support">
             <a
               href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Parohia feedback")}`}
               className="flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
@@ -124,7 +125,22 @@ export default function SettingsPage() {
               </span>
               <span className="flex-1">
                 <span className="block font-sans-semibold text-[14px] text-zinc-900 dark:text-white">Contact support</span>
-                <span className="block text-[12px] text-zinc-500">{SUPPORT_EMAIL}</span>
+                <span className="block text-[12px] text-zinc-500">Send feedback, ideas, or bug reports</span>
+              </span>
+              <Icon name="open-outline" size={14} className="text-zinc-400" />
+            </a>
+            <a
+              href={DONATE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-zinc-900/[0.04] dark:hover:bg-white/[0.05]"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300">
+                <Icon name="cafe-outline" size={16} />
+              </span>
+              <span className="flex-1">
+                <span className="block font-sans-semibold text-[14px] text-zinc-900 dark:text-white">Buy me a coffee</span>
+                <span className="block text-[12px] text-zinc-500">Your generosity keeps Parohia free for everyone</span>
               </span>
               <Icon name="open-outline" size={14} className="text-zinc-400" />
             </a>

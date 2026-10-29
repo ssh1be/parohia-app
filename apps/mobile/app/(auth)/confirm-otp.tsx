@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   View,
+  type TextInputInstance,
 } from 'react-native';
 import { AuthHeader, AuthScaffold } from '../../components/auth/AuthChrome';
 import { Button } from '../../components/ui/Button';
@@ -21,12 +22,13 @@ const OTP_LENGTH = 6;
 export default function ConfirmOTPScreen() {
   const params = useLocalSearchParams();
   const email = (params.email as string) || '';
+  const isRecovery = params.type === 'recovery';
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [focused, setFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const verifyingRef = useRef(false);
 
   useEffect(() => {
@@ -58,12 +60,12 @@ export default function ConfirmOTPScreen() {
       const { error } = await supabase.auth.verifyOtp({
         email,
         token: code,
-        type: 'signup',
+        type: isRecovery ? 'recovery' : 'signup',
       });
 
       if (error) throw error;
 
-      router.replace('/(auth)/onboarding/user-type');
+      router.replace(isRecovery ? '/(auth)/reset-password' : '/(auth)/onboarding/user-type');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to verify OTP');
       verifyingRef.current = false;
@@ -84,10 +86,9 @@ export default function ConfirmOTPScreen() {
 
     setResendLoading(true);
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-      });
+      const { error } = isRecovery
+        ? await supabase.auth.resetPasswordForEmail(email)
+        : await supabase.auth.resend({ type: 'signup', email });
 
       if (error) throw error;
 
@@ -113,8 +114,8 @@ export default function ConfirmOTPScreen() {
   return (
     <AuthScaffold>
       <AuthHeader
-        eyebrow="Almost there"
-        title="Verify Email"
+        eyebrow={isRecovery ? 'Account recovery' : 'Almost there'}
+        title={isRecovery ? 'Enter Reset Code' : 'Verify Email'}
         subtitle="Enter the 6-digit code we sent to your inbox."
         onBack={() => router.back()}
       />
@@ -167,7 +168,6 @@ export default function ConfirmOTPScreen() {
             keyboardType="number-pad"
             textContentType="oneTimeCode"
             autoComplete="sms-otp"
-            maxLength={OTP_LENGTH}
             autoFocus
             editable={!loading}
             onSubmitEditing={() => handleConfirmOTP()}
@@ -176,7 +176,7 @@ export default function ConfirmOTPScreen() {
           />
 
           <Button
-            label="Verify Email"
+            label={isRecovery ? 'Continue' : 'Verify Email'}
             icon="checkmark-circle-outline"
             size="lg"
             fullWidth

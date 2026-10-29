@@ -6,7 +6,7 @@ import { Icon } from "../../../components/Icon";
 import { Avatar, Button, ConfirmDialog, Dialog, EmptyState, Pill, Spinner, TextArea, cx } from "../../../components/app/ui";
 import { useToast } from "../../../components/app/toast";
 import { formatClockTime, formatRelativeTime, parseLocalDate } from "../../../lib/format";
-import { KindBadge, RESPONSE_LABEL, VolunteerProgress, isDatedPost } from "./shared";
+import { KindBadge, RESPONSE_LABEL, VolunteerProgress, channelIcon, isDatedPost } from "./shared";
 
 interface ResponseRow {
   user_id: string;
@@ -145,7 +145,7 @@ export function PostDialog({
           <div className="space-y-5">
             <div className="-mt-2 flex flex-wrap items-center gap-2">
               <KindBadge kind={post_.event_type} />
-              {post_.channel && <Pill icon="chatbubbles-outline">{post_.channel.name}</Pill>}
+              {post_.channel && <Pill icon={channelIcon(post_.channel)}>{post_.channel.name}</Pill>}
               <span className="text-[12px] text-zinc-500 dark:text-zinc-400">
                 {post_.created_by_profile?.full_name ? `${post_.created_by_profile.full_name} · ` : ""}
                 {formatRelativeTime(post_.created_at)}

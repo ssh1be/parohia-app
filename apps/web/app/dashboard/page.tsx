@@ -4,6 +4,7 @@ import {
   BulletinService,
   ChannelService,
   ConfessionService,
+  confessionPriest,
   fetchParishEventsForMultipleDays,
   isChantServiceEvent,
   type BulletinEvent,
@@ -106,6 +107,7 @@ export default function TodayPage() {
   const todayEvents = weekEvents.filter((e) => isSameDay(eventStartDate(e.startTime), today));
   const upcomingChant = chantEnabled ? weekEvents.filter((e) => isChantServiceEvent(e.title, e.startTime, e.endTime)) : [];
   const chantList = useSeeMore(upcomingChant, 3);
+  const priestName = confessionPriest(parish)?.name;
 
   const items: ScheduleItem[] = [
     ...todayEvents.map((e) =>
@@ -114,8 +116,8 @@ export default function TodayPage() {
     ...confessions.map((c) => {
       const title = isAdmin
         ? `Confession with ${c.personName || "a parishioner"}`
-        : parish?.priest_name
-          ? `Confession with ${parish.priest_name}`
+        : priestName
+          ? `Confession with ${priestName}`
           : "Confession";
       return confessionItem(c, title, () => setActivePersonal(confessionDetail(c, title)));
     }),

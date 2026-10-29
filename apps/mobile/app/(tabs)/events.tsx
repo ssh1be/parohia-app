@@ -53,12 +53,13 @@ import { supabase } from "../../config/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useParishScope } from "../../contexts/ParishScopeContext";
 import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
+import { channelIcon } from "../../utils/channelIcon";
 import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "@parohia/shared";
 import { BulletinChannel, ChannelService } from "@parohia/shared";
 import { ConfessionService, DaySchedule, TimeSlot } from "@parohia/shared";
 import { notificationService } from "../../services/notificationService";
 import { getUserProfile } from "@parohia/shared";
-import { getParishByAdminId, getParishByUserId, updateParishConfessionEnabled } from "@parohia/shared";
+import { confessionPriest, getParishByAdminId, getParishByUserId, updateParishConfessionEnabled } from "@parohia/shared";
 
 type TabType = 'confession' | 'bulletin';
 type BulletinFilter = 'all' | 'announcement' | 'event' | 'volunteer';
@@ -72,8 +73,7 @@ const RESPONSE_LABEL: Record<string, string> = {
 };
 
 /** Duration of the volunteer bar update ease — keep in sync with close stagger on remove. */
-const VOLUNTEER_PROGRESS_MS = 320;
-const VOLUNTEER_CLOSE_STAGGER_MS = 140;
+const VOLUNTEER_PROGRESS_MS = 320;const VOLUNTEER_CLOSE_STAGGER_MS = 140;
 /** Stored in `volunteers_needed` when a post accepts any number of volunteers. */
 const VOLUNTEERS_UNLIMITED = -1;
 const isUnlimitedVolunteers = (needed?: number | null) =>
@@ -198,8 +198,7 @@ export default function Events() {
   const { user, session } = useAuth();
   const { parishEpoch } = useParishScope();
   const { scrollY, onScroll } = useScrollHeader();
-  const scrollRef = useRef<Animated.ScrollView>(null);
-  useTabScrollToTop(scrollRef);
+  const scrollRef = useRef<Animated.ScrollView>(null);  useTabScrollToTop(scrollRef);
   const reduceMotion = useReducedMotion();
   const navigation = useNavigation();
   const [isFocused, setIsFocused] = useState(true);
@@ -234,12 +233,14 @@ export default function Events() {
   const [channels, setChannels] = useState<BulletinChannel[]>([]);
   const [subscribedChannels, setSubscribedChannels] = useState<BulletinChannel[]>([]);
   const [showChannelsSheet, setShowChannelsSheet] = useState(false);
+  const [showFiltersSheet, setShowFiltersSheet] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [slotsExpanded, setSlotsExpanded] = useState(false);
   const [weekSchedule, setWeekSchedule] = useState<DaySchedule[]>([]);
   const [parishId, setParishId] = useState<string | null>(null);
   const [parish, setParish] = useState<any>(null);
+  const priestName = confessionPriest(parish)?.name;
   const [isParishAdmin, setIsParishAdmin] = useState(false);
   const [managedChannelIds, setManagedChannelIds] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -480,9 +481,11 @@ export default function Events() {
   const loadChannels = async () => {
     if (!parishId || !user) return [];
     try {
+      let managedIds: string[] = [];
       if (!isParishAdmin) {
         await ChannelService.ensureGeneralSubscription(user.id, parishId);
         await ChannelService.ensureChantChannel(parishId);
+        managedIds = await ChannelService.ensureManagedSubscriptions(user.id, parishId);
       } else {
         await ChannelService.ensureGeneralChannel(parishId, user.id);
         await ChannelService.ensureChantChannel(parishId, user.id);
@@ -495,10 +498,6 @@ export default function Events() {
         : list.filter((c) => c.is_subscribed || c.is_default);
       setSubscribedChannels(subscribed);
 
-      let managedIds: string[] = [];
-      if (!isParishAdmin) {
-        managedIds = await ChannelService.getManagedChannelIds(user.id, parishId);
-      }
       setManagedChannelIds(managedIds);
 
       // Keep create form defaulted to an allowed channel
@@ -1305,7 +1304,7 @@ export default function Events() {
             </View>
             <View className="flex-1">
               <Text className="font-display text-[24px] leading-[28px] text-gray-900 dark:text-white">
-                Confession{parish?.priest_name ? ` with ${parish.priest_name}` : ''}
+                Confession{priestName ? ` with ${priestName}` : ''}
               </Text>
               <Text className="font-sans text-[13px] text-gray-500 dark:text-gray-400 mt-0.5">
                 {isParishAdmin ? 'Tap slots to enable or disable availability' : 'Choose a time to schedule your confession'}
@@ -1528,6 +1527,8 @@ export default function Events() {
           !showEventDetailsModal &&
           !showChannelsSheet
         }
+        showFiltersSheet={showFiltersSheet}
+        onFiltersSheetChange={setShowFiltersSheet}
       />
 
       <View className="px-5 pt-1">
@@ -1552,7 +1553,7 @@ export default function Events() {
               const kind = eventKindStyle[event.event_type];
               const isDated = (event.event_type === 'volunteer' || event.event_type === 'event') && !!event.event_date;
               const hasMeta = (event.event_type === 'volunteer' || event.event_type === 'event') && (!!event.event_time || !!event.location);
-              const channelName = event.channel?.name;
+              const channel = event.channel;
 
               return (
                 <Animated.View
@@ -1578,10 +1579,8 @@ export default function Events() {
                           <Ionicons name={kind.icon as keyof typeof Ionicons.glyphMap} size={11} color={kind.color} />
                           <Text className="font-sans-bold text-[11px] ml-1" style={{ color: kind.color }}>{kind.label}</Text>
                         </View>
-                        {!!channelName && (
-                          <View className="rounded-full px-2.5 py-1 bg-gray-100 dark:bg-white/10">
-                            <Text className="font-sans-semibold text-[11px] text-gray-600 dark:text-gray-300">{channelName}</Text>
-                          </View>
+                        {!!channel?.name && !channel.is_default && (
+                          <Text className="font-sans-semibold text-xs text-gray-500 dark:text-gray-400">#{channel.name}</Text>
                         )}
                         {event.created_by === user?.id && (
                           <View className="rounded-full px-2.5 py-1 bg-gray-100 dark:bg-white/10">
@@ -1701,8 +1700,8 @@ export default function Events() {
     isFocused &&
     !showCreateEventModal &&
     !showEventDetailsModal &&
-    !showChannelsSheet;
-
+    !showChannelsSheet &&
+    !showFiltersSheet;
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <CompactHeader title="Events" scrollY={scrollY} />
@@ -1760,7 +1759,8 @@ export default function Events() {
       {showPostFab && (
         <Portal>
           <Animated.View
-            entering={entrance.pop()}
+            entering={FadeInDown.duration(180)}
+            exiting={entrance.exit()}
             pointerEvents="box-none"
             style={{ position: 'absolute', right: 20, bottom: fabBottom, zIndex: 10 }}
           >
@@ -1797,10 +1797,10 @@ export default function Events() {
           </View>
         }
       >
-        {parish?.priest_name && (
+        {!!priestName && (
           <View className="flex-row items-center rounded-2xl p-4 mb-5 bg-gray-50 dark:bg-white/[0.04]">
             <Ionicons name="person-circle-outline" size={22} color={colors.textMuted} />
-            <Text className="font-sans-medium text-sm text-gray-700 dark:text-gray-300 ml-2">With {parish.priest_name}</Text>
+            <Text className="font-sans-medium text-sm text-gray-700 dark:text-gray-300 ml-2">With {priestName}</Text>
           </View>
         )}
         <Field
@@ -2124,8 +2124,9 @@ export default function Events() {
           <View>
             <View className="flex-row flex-wrap mb-3" style={{ rowGap: 6, columnGap: 6 }}>
               {!!selectedEvent.channel?.name && (
-                <View className="self-start rounded-full px-2.5 py-1 bg-red-600/10">
-                  <Text className="font-sans-semibold text-[11px] text-red-700 dark:text-red-300">
+                <View className="self-start flex-row items-center rounded-full pl-1.5 pr-2.5 py-1 bg-red-600/10">
+                  <Ionicons name={channelIcon(selectedEvent.channel)} size={11} color={palette.accent} />
+                  <Text className="font-sans-semibold text-[11px] ml-1 text-red-700 dark:text-red-300">
                     {selectedEvent.channel.name}
                   </Text>
                 </View>

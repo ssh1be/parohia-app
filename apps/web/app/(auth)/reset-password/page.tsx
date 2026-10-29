@@ -1,5 +1,6 @@
 "use client";
 
+import { validateNewPassword } from "@parohia/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { AuthHeader, FormError } from "../../../components/app/AuthChrome";
@@ -22,12 +23,9 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords don't match.");
+    const validationError = validateNewPassword(password, confirm);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     setLoading(true);
@@ -54,12 +52,12 @@ export default function ResetPasswordPage() {
     return (
       <>
         <AuthHeader
-          eyebrow="Link expired"
+          eyebrow="Session expired"
           title="Reset password"
-          subtitle="This reset link is invalid or has expired. Request a new one to continue."
+          subtitle="Your reset session has expired. Request a new code to continue."
         />
         <Button size="lg" fullWidth icon="refresh-outline" onClick={() => router.push("/forgot-password")}>
-          Request a new link
+          Request a new code
         </Button>
       </>
     );

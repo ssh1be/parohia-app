@@ -11,7 +11,10 @@ const OTP_LENGTH = 6;
 
 export function VerifyForm() {
   const router = useRouter();
-  const email = useSearchParams().get("email") ?? "";
+  const params = useSearchParams();
+  const email = params.get("email") ?? "";
+  const isRecovery = params.get("type") === "recovery";
+  const startPath = isRecovery ? "/forgot-password" : "/login?mode=signup";
   const [otp, setOtp] = useState("");
   const [focused, setFocused] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -23,8 +26,8 @@ export function VerifyForm() {
   const verifyingRef = useRef(false);
 
   useEffect(() => {
-    if (!email) router.replace("/login?mode=signup");
-  }, [email, router]);
+    if (!email) router.replace(startPath);
+  }, [email, router, startPath]);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -40,7 +43,7 @@ export function VerifyForm() {
     const { error: verifyError } = await getBrowserSupabase().auth.verifyOtp({
       email,
       token: code,
-      type: "signup",
+      type: isRecovery ? "recovery" : "signup",
     });
     if (verifyError) {
       setError(verifyError.message || "Failed to verify code.");
@@ -48,7 +51,7 @@ export function VerifyForm() {
       setLoading(false);
       return;
     }
-    router.replace("/onboarding/user-type");
+    router.replace(isRecovery ? "/reset-password" : "/onboarding/user-type");
     router.refresh();
   };
 
@@ -63,7 +66,10 @@ export function VerifyForm() {
     setResendLoading(true);
     setError(null);
     setNotice(null);
-    const { error: resendError } = await getBrowserSupabase().auth.resend({ type: "signup", email });
+    const auth = getBrowserSupabase().auth;
+    const { error: resendError } = isRecovery
+      ? await auth.resetPasswordForEmail(email)
+      : await auth.resend({ type: "signup", email });
     setResendLoading(false);
     if (resendError) {
       setError(resendError.message || "Failed to resend code.");
@@ -78,8 +84,8 @@ export function VerifyForm() {
   return (
     <>
       <AuthHeader
-        eyebrow="Almost there"
-        title="Verify email"
+        eyebrow={isRecovery ? "Account recovery" : "Almost there"}
+        title={isRecovery ? "Enter reset code" : "Verify email"}
         subtitle={
           <>
             Enter the 6-digit code we sent to{" "}
@@ -120,7 +126,6 @@ export function VerifyForm() {
           onBlur={() => setFocused(false)}
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={OTP_LENGTH}
           autoFocus
           disabled={loading}
           aria-label="Verification code"
@@ -136,7 +141,7 @@ export function VerifyForm() {
         disabled={otp.length < OTP_LENGTH}
         onClick={() => void verify(otp)}
       >
-        Verify email
+        {isRecovery ? "Continue" : "Verify email"}
       </Button>
 
       <div className="mt-8 flex flex-col items-center gap-2">
@@ -147,7 +152,7 @@ export function VerifyForm() {
       </div>
 
       <a
-        href="/login?mode=signup"
+        href={startPath}
         className="mt-8 flex items-center justify-center gap-1.5 text-[13px] text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
       >
         <Icon name="arrow-back" size={13} />

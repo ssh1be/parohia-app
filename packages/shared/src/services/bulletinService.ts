@@ -63,7 +63,7 @@ export class BulletinService {
         .from('bulletin_events')
         .select(`
           *,
-          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_archived),
+          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_chant, is_archived),
           created_by_profile:user_profiles!bulletin_events_created_by_fkey(full_name, email)
         `)
         .eq('parish_id', parishId)
@@ -161,7 +161,7 @@ export class BulletinService {
         })
         .select(`
           *,
-          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default)
+          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_chant)
         `)
         .single();
 
@@ -329,7 +329,7 @@ export class BulletinService {
             is_active,
             created_at,
             updated_at,
-            channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default),
+            channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_chant),
             created_by_profile:user_profiles!bulletin_events_created_by_fkey(full_name, email)
           )
         `)

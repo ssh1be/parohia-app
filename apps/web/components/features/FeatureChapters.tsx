@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { AUGUST_30, SEPTEMBER_10 } from "../phone/data";
 import { CalendarScreen } from "../phone/screens/CalendarScreen";
 import { EventsScreen } from "../phone/screens/EventsScreen";
@@ -10,8 +11,50 @@ import { FloatingChapterNav } from "./ChapterNav";
 import { FeatureTour } from "./FeatureTour";
 import { usePinnedTours } from "./usePinnedTours";
 
+/** Scroll down past this to hide the header, so small jitters don't toggle it. */
+const HEADER_HIDE_SLACK = 8;
+/** Scroll back up this far from the lowest point to bring the header back. */
+const HEADER_REVEAL_SLACK = 120;
+
+/** Slides the site header out while scrolling down and back in after a deliberate scroll up. */
+function useHideHeaderOnScroll(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const root = document.documentElement;
+    let anchor = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const hidden = root.dataset.immersive === "true";
+      if (root.dataset.autoScroll) {
+        anchor = y;
+      } else if (y < 80) {
+        root.dataset.immersive = "false";
+        anchor = y;
+      } else if (hidden) {
+        anchor = Math.max(anchor, y);
+        if (anchor - y > HEADER_REVEAL_SLACK) {
+          root.dataset.immersive = "false";
+          anchor = y;
+        }
+      } else {
+        anchor = Math.min(anchor, y);
+        if (y - anchor > HEADER_HIDE_SLACK) {
+          root.dataset.immersive = "true";
+          anchor = y;
+        }
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      delete root.dataset.immersive;
+    };
+  }, [enabled]);
+}
+
 export function FeatureChapters() {
   const pinned = usePinnedTours();
+  useHideHeaderOnScroll(!pinned);
   return (
     <>
       {pinned && <FloatingChapterNav />}
@@ -75,7 +118,7 @@ export function FeatureChapters() {
           pinned={pinned}
           id="announcements-events"
           title="Parish news, the moment it's posted"
-          intro="Clergy and parish administrators share announcements and events. Parishioners respond with a tap."
+          intro="Clergy, administrators, and ministry leaders share announcements and events. Parishioners respond with a tap."
           screens={[
             { label: "Bulletin board", render: () => <EventsScreen admin /> },
             { label: "Lock screen", render: () => <LockScreen />, statusTone: "light" },
@@ -90,6 +133,13 @@ export function FeatureChapters() {
             },
             {
               screen: 0,
+              spot: "channel-chips",
+              side: "right",
+              title: "Channels for every ministry",
+              body: "Follow the choir, youth group, or festival committee. Channel managers post to the channels they run.",
+            },
+            {
+              screen: 0,
               spot: "volunteer-card",
               side: "left",
               title: "RSVP with ease",
@@ -100,7 +150,7 @@ export function FeatureChapters() {
               spot: "push",
               side: "right",
               title: "Everyone hears it at once",
-              body: "Admins can notify the whole parish with any post, straight to the lock screen.",
+              body: "Any post can notify its channel's followers, straight to the lock screen.",
             },
           ]}
         />

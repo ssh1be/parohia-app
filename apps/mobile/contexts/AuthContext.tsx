@@ -12,7 +12,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<boolean>;
 }
 
 export type { SignUpResult };
@@ -175,21 +175,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = async (email: string): Promise<boolean> => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'parohia://reset-password',
-      });
-      
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+
       if (error) throw error;
-      
-      Alert.alert(
-        'Success!',
-        'Please check your email for a password reset link.',
-        [{ text: 'OK' }]
-      );
+      return true;
     } catch (error: any) {
       Alert.alert('Error', error.message);
+      return false;
     }
   };
 

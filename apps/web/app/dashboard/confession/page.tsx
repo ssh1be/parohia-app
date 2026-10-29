@@ -2,6 +2,7 @@
 
 import {
   ConfessionService,
+  confessionPriest,
   updateParishConfessionEnabled,
   type ConfessionReservationWithSchedule,
   type DaySchedule,
@@ -119,6 +120,7 @@ function useWeekSchedule(parishId: string, enabled: boolean) {
 function AdminConfession() {
   const toast = useToast();
   const { parish, setParish } = useDashboard();
+  const priestName = confessionPriest(parish)?.name;
   const enabled = !!parish!.confession_enabled;
   const { week, setWeek, loading, reload } = useWeekSchedule(parish!.id, enabled);
   const [toggling, setToggling] = useState(false);
@@ -200,7 +202,7 @@ function AdminConfession() {
     <>
       <PageHeader
         eyebrow="Confession"
-        title={parish!.priest_name ? `Confession with ${parish!.priest_name}` : "Confession schedule"}
+        title={priestName ? `Confession with ${priestName}` : "Confession schedule"}
         description="Open times for the coming week. Parishioners book from the app or the dashboard."
       />
 
@@ -464,6 +466,7 @@ function DetailRow({
 function MemberConfession() {
   const toast = useToast();
   const { parish, userId } = useDashboard();
+  const priestName = confessionPriest(parish)?.name;
   const { week, loading, reload } = useWeekSchedule(parish!.id, true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mine, setMine] = useState<ConfessionReservationWithSchedule[]>([]);
@@ -529,7 +532,7 @@ function MemberConfession() {
     <>
       <PageHeader
         eyebrow="Confession"
-        title={parish!.priest_name ? `Confession with ${parish!.priest_name}` : "Book confession"}
+        title={priestName ? `Confession with ${priestName}` : "Book confession"}
         description="Choose a time that works for you. Each slot is 15 minutes."
       />
 

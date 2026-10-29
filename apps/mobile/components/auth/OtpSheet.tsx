@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { supabase } from '../../config/supabase';
 import { palette } from '../../constants/theme';
 import { Button } from '../ui/Button';
@@ -22,7 +22,7 @@ export function OtpSheet({ visible, email, onClose, onVerified }: OtpSheetProps)
   const [resendLoading, setResendLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [focused, setFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -171,7 +171,6 @@ export function OtpSheet({ visible, email, onClose, onVerified }: OtpSheetProps)
         keyboardType="number-pad"
         textContentType="oneTimeCode"
         autoComplete="sms-otp"
-        maxLength={OTP_LENGTH}
         autoFocus={visible}
         onSubmitEditing={handleConfirmOTP}
         style={{ position: 'absolute', opacity: 0, height: 1, width: 1 }}

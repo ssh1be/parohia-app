@@ -19,7 +19,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   // Remount native TextInputs to clear stuck iOS Password Autofill / yellow lock state.
   const [fieldEpoch, setFieldEpoch] = useState(0);
-  const { signIn, signUp, resetPassword, user } = useAuth();
+  const { signIn, signUp, user } = useAuth();
   const colors = useThemeColors();
 
   useEffect(() => {
@@ -83,12 +83,13 @@ export default function LoginScreen() {
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email address');
-      return;
-    }
-    await resetPassword(email);
+  const handleForgotPassword = () => {
+    const trimmed = email.trim();
+    router.push(
+      trimmed
+        ? `/(auth)/forgot-password?email=${encodeURIComponent(trimmed)}`
+        : '/(auth)/forgot-password',
+    );
   };
 
   const toggleShowPassword = () => {
@@ -159,7 +160,7 @@ export default function LoginScreen() {
             {!isSignUp && (
               <Pressable
                 className="absolute right-0 top-0 z-10 active:opacity-70"
-                onPress={handleResetPassword}
+                onPress={handleForgotPassword}
                 hitSlop={8}
               >
                 <Text className="font-sans-semibold text-[12px] text-red-600 dark:text-red-400">

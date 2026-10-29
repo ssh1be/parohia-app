@@ -116,6 +116,19 @@ export class ChannelService {
     return (data || []).map((row: any) => row.channel_id);
   }
 
+  /** Managers always follow the channels they manage; subscribes any missing ones and returns the managed ids. */
+  static async ensureManagedSubscriptions(userId: string, parishId: string): Promise<string[]> {
+    const managedIds = await this.getManagedChannelIds(userId, parishId);
+    if (managedIds.length > 0) {
+      const { error } = await supabase.from('bulletin_channel_subscriptions').upsert(
+        managedIds.map((channelId) => ({ channel_id: channelId, user_id: userId })),
+        { onConflict: 'channel_id,user_id', ignoreDuplicates: true }
+      );
+      if (error) console.error('Error subscribing to managed channels:', error);
+    }
+    return managedIds;
+  }
+
   static async getParishManagerUserIds(parishId: string): Promise<string[]> {
     const { data, error } = await supabase
       .from('bulletin_channel_managers')
@@ -382,6 +395,19 @@ export class ChannelService {
       }
       if (channel.is_default) {
         return { success: false, error: 'You cannot leave the General channel' };
+      }
+
+      const { data: managing } = await supabase
+        .from('bulletin_channel_managers')
+        .select('id')
+        .eq('channel_id', channelId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (managing) {
+        return {
+          success: false,
+          error: 'Ask a parish admin to remove you as a manager before leaving this channel',
+        };
       }
 
       const { error } = await supabase

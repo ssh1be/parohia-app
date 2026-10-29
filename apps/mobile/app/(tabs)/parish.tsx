@@ -27,7 +27,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useParishScope } from "../../contexts/ParishScopeContext";
 import { ChannelService } from "@parohia/shared";
 import { getParishes, getUserProfile } from "@parohia/shared";
-import { getParishByAdminId, getParishByUserId, getParishMembers, ParishMember, ParishMemberRole, switchUserParish, updateParishDetails, updateParishDonationSettings, updateParishPriestInfo } from "@parohia/shared";
+import { addClergyMember, ClergyMember, deleteClergyMember, getParishByAdminId, getParishByUserId, getParishMembers, ParishMember, ParishMemberRole, switchUserParish, updateClergyMember, updateParishDetails, updateParishDonationSettings } from "@parohia/shared";
 import { PayPalService } from "../../services/paypalService";
 import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
 import { filterParishesBySearch } from "@parohia/shared";
@@ -70,9 +70,7 @@ interface Parish {
   parish_calendar_id?: string;
   created_at: string;
   updated_at: string;
-  priest_name?: string;
-  priest_phone_number?: string;
-  priest_email?: string;
+  clergy?: ClergyMember[];
   paypal_donation_url?: string;
   donation_enabled?: boolean;
   donation_message?: string;
@@ -126,14 +124,11 @@ export default function Parish() {
     parish_calendar_id: ''
   });
 
-  // Priest edit modal state
-  const [showPriestEditModal, setShowPriestEditModal] = useState(false);
-  const [priestEditLoading, setPriestEditLoading] = useState(false);
-  const [priestForm, setPriestForm] = useState({
-    priest_name: '',
-    priest_phone_number: '',
-    priest_email: ''
-  });
+  // Clergy editor state; editingClergy is null when adding someone new
+  const [showClergyEditor, setShowClergyEditor] = useState(false);
+  const [editingClergy, setEditingClergy] = useState<ClergyMember | null>(null);
+  const [clergySaving, setClergySaving] = useState(false);
+  const [clergyForm, setClergyForm] = useState({ name: '', title: '', phone_number: '', email: '' });
 
   // Donation modal state
   const [showDonationModal, setShowDonationModal] = useState(false);
@@ -268,34 +263,62 @@ export default function Parish() {
     }
   };
 
-  const handleEditPriest = async () => {
-    if (!parish || !user) return;
-    
-    try {
-      setPriestEditLoading(true);
-      
-      const result = await updateParishPriestInfo(parish.id, {
-        priest_name: priestForm.priest_name,
-        priest_phone_number: priestForm.priest_phone_number,
-        priest_email: priestForm.priest_email,
-      });
-      
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-      
-      // Refresh parish data
-      const updatedParish = await getParishByAdminId(user.id);
-      setParish(updatedParish);
-      setShowPriestEditModal(false);
-      
-      Alert.alert('Success', 'Priest information updated successfully!');
-    } catch (error) {
-      console.error('Error updating priest info:', error);
-      Alert.alert('Error', 'Failed to update priest information. Please try again.');
-    } finally {
-      setPriestEditLoading(false);
+  const openClergyEditor = (member: ClergyMember | null) => {
+    setEditingClergy(member);
+    setClergyForm({
+      name: member?.name ?? '',
+      title: member?.title ?? '',
+      phone_number: member?.phone_number ?? '',
+      email: member?.email ?? '',
+    });
+    setShowClergyEditor(true);
+  };
+
+  const handleSaveClergy = async () => {
+    if (!parish) return;
+    if (!clergyForm.name.trim()) {
+      Alert.alert('Name required', 'Please enter a name.');
+      return;
     }
+    setClergySaving(true);
+    const result = editingClergy
+      ? await updateClergyMember(editingClergy.id, clergyForm)
+      : await addClergyMember(parish.id, clergyForm);
+    setClergySaving(false);
+    if (!result.success || !result.clergy) {
+      Alert.alert('Error', result.error || 'Failed to save clergy member. Please try again.');
+      return;
+    }
+    const saved = result.clergy;
+    const clergy = parish.clergy ?? [];
+    setParish({
+      ...parish,
+      clergy: editingClergy ? clergy.map((c) => (c.id === saved.id ? saved : c)) : [...clergy, saved],
+    });
+    setShowClergyEditor(false);
+  };
+
+  const handleRemoveClergy = () => {
+    if (!parish || !editingClergy) return;
+    const member = editingClergy;
+    Alert.alert(`Remove ${member.name}?`, "They'll no longer appear on your parish page.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setClergySaving(true);
+          const result = await deleteClergyMember(member.id);
+          setClergySaving(false);
+          if (!result.success) {
+            Alert.alert('Error', result.error || 'Failed to remove clergy member. Please try again.');
+            return;
+          }
+          setParish({ ...parish, clergy: (parish.clergy ?? []).filter((c) => c.id !== member.id) });
+          setShowClergyEditor(false);
+        },
+      },
+    ]);
   };
 
   // Preloaded so the selector sheet can render its full list offscreen before sliding in.
@@ -325,17 +348,6 @@ export default function Parish() {
       }
     } finally {
       setParishesLoading(false);
-    }
-  };
-
-  const openPriestEditModal = () => {
-    if (parish) {
-      setPriestForm({
-        priest_name: parish.priest_name || '',
-        priest_phone_number: parish.priest_phone_number || '',
-        priest_email: parish.priest_email || ''
-      });
-      setShowPriestEditModal(true);
     }
   };
 
@@ -670,50 +682,75 @@ export default function Parish() {
             <Reveal index={3} style={{ paddingHorizontal: 20, marginTop: 28 }}>
               <SectionHeader
                 title="Clergy"
-                actionLabel={isParishAdmin ? 'Edit' : undefined}
-                actionIcon={isParishAdmin ? 'create-outline' : undefined}
-                onAction={isParishAdmin ? openPriestEditModal : undefined}
+                actionLabel={isParishAdmin && parish.clergy?.length ? 'Add' : undefined}
+                actionIcon={isParishAdmin && parish.clergy?.length ? 'add' : undefined}
+                onAction={isParishAdmin && parish.clergy?.length ? () => openClergyEditor(null) : undefined}
               />
-              {parish.priest_name ? (
-                <View className="rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex-row items-center">
-                  <View className="h-14 w-14 rounded-full bg-red-600/10 items-center justify-center mr-4">
-                    <Text className="font-display text-[22px] text-red-600 dark:text-red-400">{initials(parish.priest_name) || 'Fr'}</Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="font-display text-[22px] leading-[26px] text-gray-900 dark:text-white">{parish.priest_name}</Text>
-                    <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 mt-0.5">Parish priest</Text>
-                  </View>
-                  {parish.priest_phone_number && (
+              {parish.clergy?.length ? (
+                parish.clergy.map((member, index) => {
+                  const content = (
+                    <>
+                      <View className="h-14 w-14 rounded-full bg-red-600/10 items-center justify-center mr-4">
+                        <Text className="font-display text-[22px] text-red-600 dark:text-red-400">{initials(member.name) || 'Fr'}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="font-display text-[22px] leading-[26px] text-gray-900 dark:text-white">{member.name}</Text>
+                        {!!member.title && (
+                          <Text className="font-sans-medium text-xs text-gray-500 dark:text-gray-400 mt-0.5">{member.title}</Text>
+                        )}
+                      </View>
+                      {!!member.phone_number && (
+                        <PressableScale
+                          onPress={() => handleSMS(member.phone_number!)}
+                          scaleTo={0.9}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Message ${member.name}`}
+                          style={{ marginLeft: 8 }}
+                          className="h-11 w-11 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center"
+                        >
+                          <Ionicons name="chatbubble" size={17} color={colors.icon} />
+                        </PressableScale>
+                      )}
+                      {!!member.email && (
+                        <PressableScale
+                          onPress={() => handleEmail(member.email!)}
+                          scaleTo={0.9}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Email ${member.name}`}
+                          style={{ marginLeft: 8 }}
+                          className="h-11 w-11 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center"
+                        >
+                          <Ionicons name="mail" size={17} color={colors.icon} />
+                        </PressableScale>
+                      )}
+                    </>
+                  );
+                  const rowClass = 'rounded-3xl p-5 bg-white dark:bg-white/[0.04] border border-gray-100 dark:border-white/[0.06] flex-row items-center';
+                  const rowStyle = index > 0 ? { marginTop: 10 } : undefined;
+                  return isParishAdmin ? (
                     <PressableScale
-                      onPress={() => handleSMS(parish.priest_phone_number!)}
-                      scaleTo={0.9}
+                      key={member.id}
+                      onPress={() => openClergyEditor(member)}
+                      scaleTo={0.985}
                       accessibilityRole="button"
-                      accessibilityLabel={`Message ${parish.priest_name}`}
-                      style={{ marginLeft: 8 }}
-                      className="h-11 w-11 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center"
+                      accessibilityLabel={`Edit ${member.name}`}
+                      style={rowStyle}
+                      className={rowClass}
                     >
-                      <Ionicons name="chatbubble" size={17} color={colors.icon} />
+                      {content}
                     </PressableScale>
-                  )}
-                  {parish.priest_email && (
-                    <PressableScale
-                      onPress={() => handleEmail(parish.priest_email!)}
-                      scaleTo={0.9}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Email ${parish.priest_name}`}
-                      style={{ marginLeft: 8 }}
-                      className="h-11 w-11 rounded-full bg-gray-100 dark:bg-white/10 items-center justify-center"
-                    >
-                      <Ionicons name="mail" size={17} color={colors.icon} />
-                    </PressableScale>
-                  )}
-                </View>
+                  ) : (
+                    <View key={member.id} style={rowStyle} className={rowClass}>
+                      {content}
+                    </View>
+                  );
+                })
               ) : (
                 <EmptyState
                   compact
                   icon="person-outline"
-                  title={isParishAdmin ? 'No priest information added yet' : 'No priest information available yet'}
-                  action={isParishAdmin ? <Button label="Add priest info" size="sm" onPress={openPriestEditModal} /> : undefined}
+                  title={isParishAdmin ? 'No clergy added yet' : 'No clergy listed yet'}
+                  action={isParishAdmin ? <Button label="Add clergy" size="sm" onPress={() => openClergyEditor(null)} /> : undefined}
                 />
               )}
             </Reveal>
@@ -1002,22 +1039,33 @@ export default function Parish() {
         />
       </Sheet>
 
-      {/* Edit priest */}
+      {/* Add / edit clergy */}
       <Sheet
-        visible={showPriestEditModal}
-        onClose={() => setShowPriestEditModal(false)}
+        visible={showClergyEditor}
+        onClose={() => setShowClergyEditor(false)}
         eyebrow="Clergy"
-        title="Edit priest information"
+        title={editingClergy ? 'Edit clergy member' : 'Add clergy member'}
         footer={
           <View className="flex-row">
-            <Button label="Cancel" variant="secondary" onPress={() => setShowPriestEditModal(false)} disabled={priestEditLoading} style={{ flex: 1, marginRight: 8 }} />
-            <Button label={priestEditLoading ? 'Saving…' : 'Save changes'} icon="checkmark" loading={priestEditLoading} onPress={handleEditPriest} style={{ flex: 1 }} />
+            {editingClergy ? (
+              <Button label="Remove" variant="danger" icon="trash-outline" onPress={handleRemoveClergy} disabled={clergySaving} style={{ flex: 1, marginRight: 8 }} />
+            ) : (
+              <Button label="Cancel" variant="secondary" onPress={() => setShowClergyEditor(false)} disabled={clergySaving} style={{ flex: 1, marginRight: 8 }} />
+            )}
+            <Button
+              label={clergySaving ? 'Saving…' : editingClergy ? 'Save changes' : 'Add'}
+              icon="checkmark"
+              loading={clergySaving}
+              onPress={handleSaveClergy}
+              style={{ flex: 1 }}
+            />
           </View>
         }
       >
-        <Field label="Priest name" value={priestForm.priest_name} onChangeText={(text) => setPriestForm({...priestForm, priest_name: text})} placeholder="Priest's full name" />
-        <Field label="Phone number" value={priestForm.priest_phone_number} onChangeText={(text) => setPriestForm({...priestForm, priest_phone_number: text})} placeholder="Phone number" keyboardType="phone-pad" />
-        <Field label="Email" value={priestForm.priest_email} onChangeText={(text) => setPriestForm({...priestForm, priest_email: text})} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" />
+        <Field label="Name" value={clergyForm.name} onChangeText={(text) => setClergyForm({ ...clergyForm, name: text })} placeholder="Fr. John Smith" />
+        <Field label="Title" value={clergyForm.title} onChangeText={(text) => setClergyForm({ ...clergyForm, title: text })} placeholder="Parish Priest, Deacon…" />
+        <Field label="Phone number" value={clergyForm.phone_number} onChangeText={(text) => setClergyForm({ ...clergyForm, phone_number: text })} placeholder="Phone number" keyboardType="phone-pad" />
+        <Field label="Email" value={clergyForm.email} onChangeText={(text) => setClergyForm({ ...clergyForm, email: text })} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" />
       </Sheet>
 
       {/* Member detail (admin) */}

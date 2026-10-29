@@ -38,7 +38,7 @@ const TABS: { key: TabKey; icon: IconName; title: string; body: string }[] = [
     key: "events",
     icon: "newspaper-outline",
     title: "Events",
-    body: "The parish bulletin board: announcements, events, volunteering, and confession times.",
+    body: "The parish bulletin, sorted into channels for each ministry, plus confession times.",
   },
   {
     key: "parish",
@@ -225,8 +225,8 @@ function StaticPreview() {
     <>
       <div className="flex w-full flex-col items-center lg:hidden">
         <div className="relative flex w-full justify-center">
-          <PhoneScreen tab={tab} onTab={setTab} className="[--s:0.85]" />
-          <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 flex w-[min(calc(100vw-0.5rem),calc(410px*0.85+7rem))] -translate-x-1/2 items-center justify-between">
+          <PhoneScreen tab={tab} onTab={setTab} className="[--s:0.72] sm:[--s:0.8]" />
+          <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 flex w-[min(calc(100vw-0.5rem),calc(410px*0.72+7rem))] -translate-x-1/2 items-center justify-between sm:w-[min(calc(100vw-0.5rem),calc(410px*0.8+7rem))]">
             <button
               type="button"
               aria-label="Previous screen"

@@ -52,18 +52,47 @@ const HOLD_STEPS = 0.6;
 /** Pin progress where note `i` of `n` appears. */
 const noteAt = (i: number, n: number) => (i + 0.05) / (n + HOLD_STEPS);
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
+/** Screen space kept free around the phone below lg. */
+const COMPACT_MARGIN = 40;
+const CARD_GAP = 28;
+/** How far the card may hang past the phone's screen before it has to close in on the highlight. */
+const CARD_OVERHANG = 56;
 
-function BlurPane({ show, style }: { show: boolean; style: MotionStyle }) {
-  return (
-    <motion.div
-      className="absolute left-0 top-0 bg-gray-50/25 backdrop-blur-[5px] dark:bg-black/35"
-      style={style}
-      initial={false}
-      animate={{ opacity: show ? 1 : 0 }}
-      transition={{ duration: 0.35 }}
-    />
-  );
+/** Space kept between the floating card and the viewport edge when the page scrolls it into view. */
+const CARD_VIEWPORT_PAD = 16;
+
+/** Scrolls the page while flagging it as automatic, so scroll-driven UI like the hiding header can ignore it. */
+function autoScrollBy(dy: number, instant: boolean) {
+  const root = document.documentElement;
+  root.dataset.autoScroll = "true";
+  let timer = 0;
+  const done = () => {
+    window.clearTimeout(timer);
+    window.removeEventListener("scrollend", done);
+    delete root.dataset.autoScroll;
+  };
+  window.addEventListener("scrollend", done);
+  timer = window.setTimeout(done, 1000);
+  window.scrollBy({ top: dy, behavior: instant ? "auto" : "smooth" });
 }
+
+/** Below lg the note card floats over the phone: under the highlight when it fits there, otherwise above it. */
+function placeCard(o: number, y: number, h: number, oh: number, ch: number) {
+  const below = oh - (y + h);
+  const need = ch + CARD_GAP;
+  const under = below >= need || (y < need && below >= y);
+  const top = under
+    ? Math.min(o + y + h + CARD_GAP, o + oh + CARD_OVERHANG - ch)
+    : Math.max(o + y - CARD_GAP - ch, o - CARD_OVERHANG);
+  return { under, top };
+}
+
+/**
+ * One continuous blur layer with the hole knocked out by a second mask layer.
+ * Chrome ignores clip-path holes on backdrop-filter, separate panes leave seams where their blurs meet,
+ * and a regenerated mask image decodes asynchronously, so the hole would lag its springs.
+ */
+const HOLE_MASK = "linear-gradient(#000 0 0), linear-gradient(#000 0 0)";
 
 export function FeatureTour({ id, title, intro, screens, notes, pinned = false }: FeatureTourProps) {
   const reduce = useReducedMotion();
@@ -78,13 +107,14 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const [hovering, setHovering] = useState(false);
   const [phoneHover, setPhoneHover] = useState(false);
   const [measured, setMeasured] = useState(false);
-  const [canHover, setCanHover] = useState(false);
   /** False while the highlighted area is scrolled partly out of the phone's visible screen. */
   const [attached, setAttached] = useState(true);
   const [direction, setDirection] = useState(1);
   /** How many notes the pinned scroll has revealed so far. */
   const [revealed, setRevealed] = useState(0);
   const [phoneScale, setPhoneScale] = useState(0.82);
+  /** Below lg, the phone shrinks so it and the note card fit on one screen together. */
+  const [compactScale, setCompactScale] = useState<number | null>(null);
   /** True once the pinned section starts scrolling away and the phone eases out. */
   const [leaving, setLeaving] = useState(false);
   /** Clears touch/scroll engagement so the ring returns once interaction settles. */
@@ -104,14 +134,6 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   };
 
   useEffect(() => () => window.clearTimeout(phoneIdle.current), []);
-
-  useEffect(() => {
-    const query = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const update = () => setCanHover(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
 
   const note = notes[active];
   const screenIndex = note.screen;
@@ -148,29 +170,38 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const RING = 3;
   /** Endpoint marker radius; kept outside the ring so only the tip touches. */
   const MARKER = 4.5;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const cardH = useMotionValue(0);
+  const placement = [raw.oy, hy, hh, raw.oh, cardH];
+  const cardUnder = useTransform(placement, ([o, y, h, oh, ch]: number[]): number => (placeCard(o, y, h, oh, ch).under ? 1 : 0));
+  const cardTarget = useTransform(placement, ([o, y, h, oh, ch]: number[]) => placeCard(o, y, h, oh, ch).top);
+  const cardTop = useSpring(cardTarget, FOLLOW);
+  const cardX = useTransform(raw.ox, (o) => o - 6);
+  const cardW = useTransform(raw.ow, (w) => w + 12);
   // The connector ends on the hole's edge, derived from the same springs so it can never drift off the red outline.
-  const ex = useTransform([raw.ox, hx, hw, raw.side, sx, raw.mobile], ([o, x, w, side, src, m]: number[]) => {
-    if (m) return Math.min(Math.max(src, o + x), o + x + w);
+  const ex = useTransform([raw.ox, hx, hw, raw.side, raw.mobile], ([o, x, w, side, m]: number[]) => {
+    if (m) return o + x + w / 2;
     return o + x + (side ? w + RING : -RING);
   });
-  const ey = useTransform([raw.oy, hy, hh, raw.mobile], ([o, y, h, m]: number[]) => o + y + (m ? h + RING : h / 2));
+  const ey = useTransform([raw.oy, hy, hh, raw.mobile, cardUnder], ([o, y, h, m, under]: number[]) => {
+    if (m) return under ? o + y + h + RING : o + y - RING;
+    return o + y + h / 2;
+  });
   const markerX = useTransform([ex, raw.side, raw.mobile], ([x, side, m]: number[]) => (m ? x : x + (side ? MARKER : -MARKER)));
-  const markerY = useTransform([ey, raw.mobile], ([y, m]: number[]) => (m ? y + MARKER : y));
+  const markerY = useTransform([ey, raw.mobile, cardUnder], ([y, m, under]: number[]) => (m ? y + (under ? MARKER : -MARKER) : y));
+  /** Where the mobile connector leaves the floating card; it collapses to nothing if the card has to overlap the highlight. */
+  const cardEdge = useTransform([cardTop, cardH, cardUnder, ey], ([top, ch, under, end]: number[]) =>
+    under ? Math.max(top, end) : Math.min(top + ch, end),
+  );
   const springs = [hx, hy, hw, hh, sx, sy];
   const [radius, setRadius] = useState(0);
-  const belowY = useTransform([hy, hh], ([y, h]: number[]) => y + h);
-  const belowH = useTransform([raw.oh, hy, hh], ([o, y, h]: number[]) => Math.max(o - y - h, 0));
-  const leftW = useTransform(hx, (x) => Math.max(x, 0));
-  const rightX = useTransform([hx, hw], ([x, w]: number[]) => x + w);
-  const rightW = useTransform([raw.ow, hx, hw], ([o, x, w]: number[]) => Math.max(o - x - w, 0));
+  const maskSize = useTransform([hw, hh], ([w, h]: number[]) => `${Math.max(w, 0)}px ${Math.max(h, 0)}px, 100% 100%`);
+  const maskPosition = useTransform([hx, hy], ([x, y]: number[]) => `${x}px ${y}px, 0 0`);
   const ringX = useTransform([raw.ox, hx], ([o, x]: number[]) => o + x);
   const ringY = useTransform([raw.oy, hy], ([o, y]: number[]) => o + y);
 
-  const path = useTransform([sx, sy, ex, ey, raw.mobile], ([a, b, c, d, m]: number[]) => {
-    if (m) {
-      const bend = (d - b) * 0.45;
-      return `M ${a} ${b} C ${a} ${b + bend}, ${c} ${d - bend}, ${c} ${d}`;
-    }
+  const path = useTransform([sx, sy, ex, ey, raw.mobile, cardEdge], ([a, b, c, d, m, edge]: number[]) => {
+    if (m) return `M ${c} ${edge} L ${c} ${d}`;
     const bend = (c - a) * 0.55;
     return `M ${a} ${b} C ${a + bend} ${b}, ${c - bend} ${d}, ${c} ${d}`;
   });
@@ -354,6 +385,48 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinned]);
 
+  useEffect(() => {
+    if (pinned) return;
+    const update = () => {
+      if (!window.matchMedia("(max-width: 1023px)").matches) return setCompactScale(null);
+      const byHeight = (window.innerHeight - COMPACT_MARGIN) / DEVICE.height;
+      const byWidth = (document.documentElement.clientWidth - COMPACT_MARGIN) / DEVICE.width;
+      setCompactScale(Math.max(0.5, Math.min(0.9, byHeight, byWidth)));
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [pinned]);
+
+  const compact = compactScale !== null;
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    let first = true;
+    const observer = new ResizeObserver(() => {
+      cardH.set(card.offsetHeight);
+      if (first) cardTop.jump(cardTarget.get());
+      first = false;
+    });
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [compact, cardH, cardTop, cardTarget]);
+
+  useEffect(() => {
+    if (measured) cardTop.jump(cardTarget.get());
+  }, [measured, cardTop, cardTarget]);
+
+  const cardVisibleRef = useRef(false);
+  cardVisibleRef.current = compact && measured && !phoneHover && inView;
+  // Once the card settles, nudge the page so a card hanging past the viewport comes fully into view.
+  useMotionValueEvent(cardTop, "animationComplete", () => {
+    const card = cardRef.current;
+    if (!card || !cardVisibleRef.current) return;
+    const r = card.getBoundingClientRect();
+    const dy = r.top < CARD_VIEWPORT_PAD ? r.top - CARD_VIEWPORT_PAD : Math.max(r.bottom - (window.innerHeight - CARD_VIEWPORT_PAD), 0);
+    if (Math.abs(dy) > 1) autoScrollBy(dy, !!reduce);
+  });
+
   const zoomFrame = useRef(0);
   useMotionValueEvent(phoneZoom, "change", () => {
     if (!pinned || zoomFrame.current) return;
@@ -429,7 +502,11 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   };
 
   const outlined = spotlight && attached && !phoneHover;
-  const blur = outlined && canHover;
+  const cardShown = measured && !phoneHover;
+  /** On mobile the connector hangs off the floating card, so it waits for the card to fade in before drawing. */
+  const connected = spotlight && (!compact || cardShown);
+  const drawDelay = reduce ? 0 : compact ? 0.32 : 0.18;
+  const blur = outlined;
 
   const grid = (
     <div
@@ -440,7 +517,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     >
       <ol className="hidden flex-col gap-12 lg:flex">{sides.left.map(renderNote)}</ol>
 
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center max-lg:min-h-[100dvh] max-lg:justify-center max-lg:py-5">
         <motion.div
           onPointerEnter={(e) => e.pointerType === "mouse" && engagePhone(true)}
           onPointerLeave={() => {
@@ -452,14 +529,20 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
             setAutoplay(false);
             if (e.pointerType !== "mouse") engagePhone(false);
           }}
-          style={pinned ? ({ opacity: phoneOpacity, scale: phoneZoom, "--s": phoneScale } as unknown as MotionStyle) : undefined}
+          style={
+            pinned
+              ? ({ opacity: phoneOpacity, scale: phoneZoom, "--s": phoneScale } as unknown as MotionStyle)
+              : compactScale
+                ? ({ "--s": compactScale } as unknown as MotionStyle)
+                : undefined
+          }
         >
           <PhoneFrame
             interactive
             label={`${title}: interactive preview`}
             screenRef={screenRef}
             statusTone={screens[screenIndex].statusTone}
-            className={pinned ? "" : "[--s:0.85] lg:[--s:0.82]"}
+            className={pinned || compactScale ? "" : "[--s:0.85] lg:[--s:0.82]"}
           >
             <AnimatePresence initial={false} custom={direction}>
               <motion.div
@@ -476,74 +559,6 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
             </AnimatePresence>
           </PhoneFrame>
         </motion.div>
-
-        {!pinned && (
-          <div className="relative z-30 mt-5 w-full max-w-md lg:hidden">
-            <span
-              data-note-dot={active}
-              className="absolute left-1/2 top-0 z-10 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand-red shadow-[0_0_0_5px_rgba(250,67,63,0.18)] dark:border-zinc-950"
-            />
-            <div className="overflow-hidden rounded-[24px] border border-zinc-200 bg-white/95 shadow-[0_16px_36px_-24px_rgba(9,9,11,0.35)] dark:border-white/10 dark:bg-zinc-950/95">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={active}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.28, ease: EASE }}
-                  className="px-4 pb-4 pt-5"
-                >
-                  <p className="font-display text-[24px] leading-[1.15] text-zinc-900 dark:text-white">{note.title}</p>
-                  <p className="mt-1.5 text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">{note.body}</p>
-                </motion.div>
-              </AnimatePresence>
-              <div className="h-0.5 w-full bg-zinc-100 dark:bg-white/[0.06]">
-                {playing && (
-                  <motion.span
-                    key={`${active}-progress`}
-                    className="block h-full w-full origin-left bg-brand-red"
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ duration: AUTOPLAY_MS / 1000, ease: "linear" }}
-                  />
-                )}
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => go((active + notes.length - 1) % notes.length)}
-                className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-800 outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/60 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-100"
-              >
-                <Icon name="chevron-back" size={16} />
-                Previous
-              </button>
-              <div className="flex items-center gap-1.5 px-1" role="tablist" aria-label={`${title} highlights`}>
-                {notes.map((n, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    role="tab"
-                    aria-selected={i === active}
-                    aria-label={n.title}
-                    onClick={() => go(i)}
-                    className={`h-2.5 rounded-full outline-none transition-all focus-visible:ring-2 focus-visible:ring-brand-red/60 ${
-                      i === active ? "w-6 bg-brand-red" : "w-2.5 bg-zinc-300 dark:bg-white/25"
-                    }`}
-                  />
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => go((active + 1) % notes.length)}
-                className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#8D0300] text-sm font-semibold text-white outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/60"
-              >
-                Next
-                <Icon name="chevron-forward" size={16} />
-              </button>
-            </div>
-          </div>
-        )}
 
         {screens.length > 1 && !pinned && (
           <div className="mt-8 hidden rounded-full border border-zinc-200 bg-zinc-100/80 p-1 lg:flex dark:border-white/10 dark:bg-white/[0.04]">
@@ -579,10 +594,24 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
         className="pointer-events-none absolute left-0 top-0 z-10 overflow-hidden"
         style={{ x: raw.ox, y: raw.oy, width: raw.ow, height: raw.oh, borderRadius: radius }}
       >
-        <BlurPane show={blur} style={{ width: raw.ow, height: hy }} />
-        <BlurPane show={blur} style={{ y: belowY, width: raw.ow, height: belowH }} />
-        <BlurPane show={blur} style={{ y: hy, width: leftW, height: hh }} />
-        <BlurPane show={blur} style={{ x: rightX, y: hy, width: rightW, height: hh }} />
+        <motion.div
+          className="absolute inset-0 bg-gray-50/25 backdrop-blur-[5px] dark:bg-black/35"
+          style={{
+            maskImage: HOLE_MASK,
+            WebkitMaskImage: HOLE_MASK,
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            maskSize,
+            WebkitMaskSize: maskSize,
+            maskPosition,
+            WebkitMaskPosition: maskPosition,
+            maskComposite: "exclude",
+            WebkitMaskComposite: "xor",
+          }}
+          initial={false}
+          animate={{ opacity: blur ? 1 : 0 }}
+          transition={{ duration: 0.35 }}
+        />
       </motion.div>
 
       <motion.div
@@ -602,7 +631,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
         transition={{ duration: 0.25 }}
       >
         <AnimatePresence>
-          {spotlight && (
+          {connected && (
             <motion.g key={active} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.2 } }}>
               <motion.path
                 d={path}
@@ -612,7 +641,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                 strokeLinecap="round"
                 initial={{ pathLength: 0 }}
                 animate={{ pathLength: 1 }}
-                transition={{ duration: reduce ? 0 : 0.75, ease: EASE, delay: reduce ? 0 : 0.18 }}
+                transition={{ duration: reduce ? 0 : 0.75, ease: EASE, delay: drawDelay }}
               />
               <motion.circle
                 cx={markerX}
@@ -621,12 +650,89 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                 fill="#FA433F"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ type: "spring", damping: 14, stiffness: 300, delay: reduce ? 0 : 0.8 }}
+                transition={{ type: "spring", damping: 14, stiffness: 300, delay: reduce ? 0 : drawDelay + 0.62 }}
               />
             </motion.g>
           )}
         </AnimatePresence>
       </motion.svg>
+
+      {compact && (
+        <motion.div
+          ref={cardRef}
+          className="absolute left-0 top-0 z-40 lg:hidden"
+          style={{ x: cardX, y: cardTop, width: cardW }}
+          initial={false}
+          animate={{ opacity: cardShown ? 1 : 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div
+            className={`overflow-hidden rounded-[22px] border border-zinc-200 bg-white/[0.97] shadow-[0_18px_40px_-18px_rgba(9,9,11,0.45)] backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/[0.97] ${
+              phoneHover ? "pointer-events-none" : ""
+            }`}
+          >
+            <div className="flex items-center justify-between px-4 pt-3.5">
+              <div className="flex items-center gap-1.5" role="tablist" aria-label={`${title} highlights`}>
+                {notes.map((n, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === active}
+                    aria-label={n.title}
+                    onClick={() => go(i)}
+                    className={`h-2 rounded-full outline-none transition-all focus-visible:ring-2 focus-visible:ring-brand-red/60 ${
+                      i === active ? "w-5 bg-brand-red" : "w-2 bg-zinc-300 dark:bg-white/25"
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Previous highlight"
+                  onClick={() => go((active + notes.length - 1) % notes.length)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-700 outline-none transition active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/60 dark:border-white/10 dark:text-zinc-200"
+                >
+                  <Icon name="chevron-back" size={15} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next highlight"
+                  onClick={() => go((active + 1) % notes.length)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[#8D0300] text-white outline-none transition active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/60"
+                >
+                  <Icon name="chevron-forward" size={15} />
+                </button>
+              </div>
+            </div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={active}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.24, ease: EASE }}
+                className="px-4 pb-4 pt-2"
+              >
+                <p className="font-display text-[22px] leading-[1.15] text-zinc-900 dark:text-white">{note.title}</p>
+                <p className="mt-1 text-[15px] leading-[1.5] text-zinc-600 dark:text-zinc-300">{note.body}</p>
+              </motion.div>
+            </AnimatePresence>
+            <div className="h-0.5 w-full bg-zinc-100 dark:bg-white/[0.06]">
+              {playing && (
+                <motion.span
+                  key={`${active}-progress`}
+                  className="block h-full w-full origin-left bg-brand-red"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: AUTOPLAY_MS / 1000, ease: "linear" }}
+                />
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 

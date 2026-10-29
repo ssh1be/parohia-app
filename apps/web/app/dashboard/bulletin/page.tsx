@@ -11,7 +11,7 @@ import { NoParishState, PageHeader } from "../DashboardShell";
 import { ManageChannelsDialog } from "./ManageChannelsDialog";
 import { PostDialog } from "./PostDialog";
 import { PostEditorDialog } from "./PostEditorDialog";
-import { DateTile, KindBadge, RESPONSE_LABEL, isDatedPost, isUnlimitedVolunteers } from "./shared";
+import { DateTile, KindBadge, RESPONSE_LABEL, channelIcon, isDatedPost, isUnlimitedVolunteers } from "./shared";
 
 type TypeFilter = "all" | BulletinEvent["event_type"];
 
@@ -199,7 +199,7 @@ function Bulletin({ parishId }: { parishId: string }) {
                           )}
                         >
                           <Icon
-                            name={channel.is_chant ? "musical-notes-outline" : channel.is_default ? "home-outline" : "chatbubbles-outline"}
+                            name={channelIcon(channel)}
                             size={15}
                             className={visible ? "text-zinc-500" : "text-zinc-300 dark:text-zinc-600"}
                           />
@@ -222,7 +222,15 @@ function Bulletin({ parishId }: { parishId: string }) {
                             </span>
                           )}
                         </button>
-                        {!isAdmin && !channel.is_default && (
+                        {!isAdmin && !channel.is_default && managed && channel.is_subscribed ? (
+                          <span
+                            title="You manage this channel. Ask a parish admin to remove you as a manager before leaving."
+                            aria-label={`Managing ${channel.name}`}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-300 dark:text-zinc-600"
+                          >
+                            <Icon name="lock-closed" size={13} />
+                          </span>
+                        ) : !isAdmin && !channel.is_default && (
                           <button
                             type="button"
                             disabled={togglingChannel === channel.id}
@@ -252,7 +260,8 @@ function Bulletin({ parishId }: { parishId: string }) {
             )}
             {!isAdmin && (
               <p className="mt-3 text-[12px] leading-5 text-zinc-500 dark:text-zinc-400">
-                Everyone follows General. Join other channels to see their posts.
+                Everyone follows General, and managers follow the channels they manage. Join other channels to see
+                their posts.
               </p>
             )}
           </Card>

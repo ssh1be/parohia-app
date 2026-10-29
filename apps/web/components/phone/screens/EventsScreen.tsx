@@ -3,16 +3,16 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useState } from "react";
 import { Icon } from "../../Icon";
-import { PARISH } from "../data";
+import { CHANNELS, PARISH, channelById, channelIcon } from "../data";
 import { cardSpring, eventKindStyle, palette, type EventKind } from "../tokens";
 import { EmptyState, Pressable, SegmentedControl, TabBar, type TabKey } from "../ui";
 
 type Tab = "bulletin" | "confession";
-type Filter = "all" | "announcement" | "event" | "volunteer";
 
 export interface Post {
   id: string;
   kind: Exclude<EventKind, "confession" | "parish">;
+  channel: string;
   title: string;
   description: string;
   posted: string;
@@ -27,6 +27,7 @@ export const POSTS: Post[] = [
   {
     id: "delay",
     kind: "announcement",
+    channel: "general",
     title: "Bible study delayed until 5 PM today",
     description: "Sorry for the inconvenience. We're on the Labor Day schedule this weekend.",
     posted: "Just now",
@@ -34,6 +35,7 @@ export const POSTS: Post[] = [
   {
     id: "festival",
     kind: "volunteer",
+    channel: "festival",
     title: "Help set up for the Greek Festival",
     description: "We need volunteers to help set up before the festival begins on Saturday!",
     posted: "3d ago",
@@ -45,6 +47,7 @@ export const POSTS: Post[] = [
   {
     id: "picnic",
     kind: "event",
+    channel: "youth",
     title: "Back to Sunday School Picnic",
     description: "Families are welcome after Divine Liturgy. Bring a dish to share.",
     posted: "5d ago",
@@ -53,13 +56,17 @@ export const POSTS: Post[] = [
     location: "Church Grounds",
     attending: true,
   },
-];
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "announcement", label: "Announcements" },
-  { key: "event", label: "Events" },
-  { key: "volunteer", label: "Volunteer" },
+  {
+    id: "chant-practice",
+    kind: "event",
+    channel: "chant",
+    title: "Chant Practice in the Choir Loft",
+    description: "We'll run through the hymns for Sunday's Divine Liturgy. All voices welcome.",
+    posted: "6d ago",
+    date: { month: "Sep", day: 3, weekday: "Thu" },
+    time: "7:00 PM",
+    location: "Choir Loft",
+  },
 ];
 
 export function EventsScreen({
@@ -106,37 +113,51 @@ export function EventsScreen({
 }
 
 function Bulletin({ admin, onOpenPost }: { admin: boolean; onOpenPost?: (post: Post) => void }) {
-  const [filter, setFilter] = useState<Filter>("all");
-  const posts = filter === "all" ? POSTS : POSTS.filter((p) => p.kind === filter);
+  const [channel, setChannel] = useState("all");
+  const posts = channel === "all" ? POSTS : POSTS.filter((p) => p.channel === channel);
+  const chips = [
+    { id: "all", name: "All", icon: "apps-outline" as const, count: POSTS.length },
+    ...CHANNELS.map((c) => ({ id: c.id, name: c.name, icon: channelIcon(c), count: POSTS.filter((p) => p.channel === c.id).length })),
+  ];
 
   return (
     <>
       <div data-scroll className="no-scrollbar absolute inset-0 overflow-y-auto overscroll-contain" style={{ paddingBottom: 34 + 64 + 12 + 32 + (admin ? 56 : 0) }}>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto px-5 pb-2 pt-4">
-          {FILTERS.map((f) => {
-            const active = filter === f.key;
-            const count = f.key === "all" ? POSTS.length : POSTS.filter((p) => p.kind === f.key).length;
+        <div data-spot="channel-chips" className="no-scrollbar flex gap-2 overflow-x-auto px-5 py-4">
+          {chips.map((chip) => {
+            const active = channel === chip.id;
             return (
               <button
-                key={f.key}
+                key={chip.id}
                 type="button"
-                onClick={() => setFilter(f.key)}
+                onClick={() => setChannel(chip.id)}
                 aria-pressed={active}
-                className={`flex h-9 shrink-0 items-center rounded-full border px-4 transition-colors duration-200 ${
-                  active ? "border-gray-900 bg-gray-900 dark:border-white dark:bg-white" : "border-gray-200 dark:border-white/10"
+                className={`flex h-10 shrink-0 items-center rounded-full border pl-3.5 pr-4 transition-colors duration-200 ${
+                  active
+                    ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
+                    : "border-gray-200 bg-white text-gray-500 dark:border-white/10 dark:bg-white/[0.05]"
                 }`}
               >
-                <span className={`font-sans-semibold text-[13px] ${active ? "text-white dark:text-gray-900" : "text-gray-600 dark:text-gray-300"}`}>{f.label}</span>
-                <span className={`ml-1.5 font-sans-semibold text-[12px] ${active ? "text-white/60 dark:text-gray-500" : "text-gray-400"}`}>{count}</span>
+                <Icon name={chip.icon} size={14} />
+                <span className={`ml-1.5 whitespace-nowrap font-sans-semibold text-[13px] ${active ? "" : "text-gray-700 dark:text-gray-300"}`}>{chip.name}</span>
+                <span className={`ml-1.5 font-sans-semibold text-[12px] ${active ? "text-white/55 dark:text-gray-500" : "text-gray-400"}`}>{chip.count}</span>
               </button>
             );
           })}
+          <button
+            type="button"
+            aria-label="Discover channels"
+            className="flex h-10 shrink-0 items-center rounded-full border border-dashed border-gray-300 pl-3.5 pr-4 text-gray-500 dark:border-white/20 dark:text-gray-400"
+          >
+            <Icon name="settings-outline" size={14} />
+            <span className="ml-1.5 font-sans-semibold text-[13px]">Manage</span>
+          </button>
         </div>
 
-        <div className="px-5 pt-3">
+        <div className="px-5">
           <AnimatePresence mode="popLayout" initial={false}>
             {posts.length === 0 ? (
-              <EmptyState icon="newspaper-outline" title="Nothing here" message="No posts match this filter." />
+              <EmptyState icon="newspaper-outline" title="Nothing here" message="No posts in this channel yet." />
             ) : (
               posts.map((post, index) => (
                 <motion.div
@@ -194,13 +215,18 @@ export function PostCard({
       className={`block w-full rounded-3xl border p-5 ${className}`}
     >
       <span className="mb-3 flex items-center justify-between">
-        <span className="flex items-center rounded-full py-1 pl-1.5 pr-2.5" style={{ backgroundColor: kind.tint }}>
-          <Icon name={kind.icon} size={11} color={kind.color} />
-          <span className="ml-1 font-sans-bold text-[11px]" style={{ color: kind.color }}>
-            {kind.label}
+        <span className="flex min-w-0 items-center">
+          <span className="flex shrink-0 items-center rounded-full py-1 pl-1.5 pr-2.5" style={{ backgroundColor: kind.tint }}>
+            <Icon name={kind.icon} size={11} color={kind.color} />
+            <span className="ml-1 font-sans-bold text-[11px]" style={{ color: kind.color }}>
+              {kind.label}
+            </span>
           </span>
+          {channelById(post.channel).kind !== "general" && (
+            <span className="ml-2 truncate font-sans-semibold text-xs text-gray-500 dark:text-gray-400">#{channelById(post.channel).name}</span>
+          )}
         </span>
-        <span className="font-sans text-xs text-gray-400 dark:text-gray-500">{post.posted}</span>
+        <span className="ml-2 shrink-0 font-sans text-xs text-gray-400 dark:text-gray-500">{post.posted}</span>
       </span>
 
       <span className="flex">

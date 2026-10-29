@@ -1,3 +1,4 @@
+import type { IconName } from "../Icon";
 import type { EventKind, FastingKind } from "./tokens";
 
 export const PARISH = {
@@ -11,6 +12,26 @@ export const PARISH = {
   phone: "(503) 555-0148",
   website: "stjohnsportland.org",
 };
+
+export interface DemoChannel {
+  id: string;
+  name: string;
+  description: string;
+  kind: "general" | "chant" | "custom";
+}
+
+/** Bulletin channels, mirroring the app: General is required, Chant is opt-in, the rest are parish-made. */
+export const CHANNELS: DemoChannel[] = [
+  { id: "general", name: "General", description: "News for the whole parish", kind: "general" },
+  { id: "festival", name: "Greek Festival", description: "Planning and volunteer calls", kind: "custom" },
+  { id: "youth", name: "Youth Ministry", description: "GOYA, Sunday school, and families", kind: "custom" },
+  { id: "chant", name: "Chant", description: "Opt-in channel for service chanting", kind: "chant" },
+];
+
+export const channelIcon = (channel: DemoChannel): IconName =>
+  channel.kind === "general" ? "home" : channel.kind === "chant" ? "musical-notes" : "chatbubbles";
+
+export const channelById = (id: string) => CHANNELS.find((c) => c.id === id)!;
 
 export interface ScheduleItem {
   id: string;

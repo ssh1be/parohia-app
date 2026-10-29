@@ -1,12 +1,15 @@
 "use client";
 
 import {
+  addClergyMember,
   cleanDonationUrl,
+  deleteClergyMember,
   getParishMembers,
   switchUserParish,
+  updateClergyMember,
   updateParishDetails,
   updateParishDonationSettings,
-  updateParishPriestInfo,
+  type ClergyMember,
   type Parish,
   type ParishMember,
 } from "@parohia/shared";
@@ -18,9 +21,11 @@ import {
   Card,
   CardHeader,
   Checkbox,
+  ConfirmDialog,
   cx,
   Dialog,
   EmptyState,
+  IconButton,
   Notice,
   Pill,
   Skeleton,
@@ -101,7 +106,6 @@ function ParishOverview({ parish }: { parish: Parish }) {
   const toast = useToast();
   const { userId, isAdmin, setParish, refresh } = useDashboard();
   const [editDetails, setEditDetails] = useState(false);
-  const [editPriest, setEditPriest] = useState(false);
   const [editDonation, setEditDonation] = useState(false);
   const [editCalendar, setEditCalendar] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
@@ -170,61 +174,7 @@ function ParishOverview({ parish }: { parish: Parish }) {
             <CalendarStatusRow calendarId={parish.parish_calendar_id} isAdmin={isAdmin} onSetup={() => setEditCalendar(true)} />
           </Card>
 
-          <Card>
-            <CardHeader
-              eyebrow="Clergy"
-              title="Parish priest"
-              action={
-                isAdmin && (
-                  <Button size="sm" variant="secondary" icon="create-outline" onClick={() => setEditPriest(true)}>
-                    Edit
-                  </Button>
-                )
-              }
-            />
-            {parish.priest_name ? (
-              <div className="flex items-center gap-4">
-                <Avatar name={parish.priest_name} size={56} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-sans-bold text-[17px] text-zinc-900 dark:text-white">{parish.priest_name}</p>
-                  <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
-                    {parish.priest_phone_number && (
-                      <a
-                        href={`tel:${parish.priest_phone_number}`}
-                        className="flex items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300"
-                      >
-                        <Icon name="call-outline" size={14} />
-                        {formatPhone(parish.priest_phone_number)}
-                      </a>
-                    )}
-                    {parish.priest_email && (
-                      <a
-                        href={`mailto:${parish.priest_email}`}
-                        className="flex items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300"
-                      >
-                        <Icon name="mail-outline" size={14} />
-                        {parish.priest_email}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                icon="person-outline"
-                title="No priest listed"
-                message={isAdmin ? "Add your priest's details so parishioners know who to contact." : undefined}
-                action={
-                  isAdmin && (
-                    <Button size="sm" icon="add" onClick={() => setEditPriest(true)}>
-                      Add priest
-                    </Button>
-                  )
-                }
-              />
-            )}
-          </Card>
+          <ClergyCard parish={parish} isAdmin={isAdmin} onChange={setParish} />
 
           {isAdmin && (
             <Card>
@@ -331,7 +281,6 @@ function ParishOverview({ parish }: { parish: Parish }) {
       {isAdmin && (
         <>
           <ParishDetailsDialog open={editDetails} onClose={() => setEditDetails(false)} parish={parish} onSaved={setParish} />
-          <PriestDialog open={editPriest} onClose={() => setEditPriest(false)} parish={parish} onSaved={setParish} />
           <DonationDialog open={editDonation} onClose={() => setEditDonation(false)} parish={parish} onSaved={setParish} />
           <CalendarSetupDialog
             open={editCalendar}
@@ -618,43 +567,176 @@ function ParishDetailsDialog({
   );
 }
 
-function PriestDialog({
+function ClergyCard({ parish, isAdmin, onChange }: { parish: Parish; isAdmin: boolean; onChange: (parish: Parish) => void }) {
+  const toast = useToast();
+  const clergy = parish.clergy ?? [];
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<ClergyMember | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [removing, setRemoving] = useState<ClergyMember | null>(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
+
+  const openEditor = (member: ClergyMember | null) => {
+    setEditing(member);
+    setEditorOpen(true);
+  };
+
+  const saved = (member: ClergyMember) => {
+    const exists = clergy.some((c) => c.id === member.id);
+    onChange({ ...parish, clergy: exists ? clergy.map((c) => (c.id === member.id ? member : c)) : [...clergy, member] });
+  };
+
+  const remove = async () => {
+    if (!removing) return;
+    setRemoveLoading(true);
+    const result = await deleteClergyMember(removing.id);
+    setRemoveLoading(false);
+    if (!result.success) return toast(result.error || "Couldn't remove clergy member", "error");
+    onChange({ ...parish, clergy: clergy.filter((c) => c.id !== removing.id) });
+    toast(`Removed ${removing.name}`, "success");
+    setConfirmOpen(false);
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        eyebrow="Clergy"
+        title="Parish clergy"
+        action={
+          isAdmin &&
+          clergy.length > 0 && (
+            <Button size="sm" variant="secondary" icon="add" onClick={() => openEditor(null)}>
+              Add clergy
+            </Button>
+          )
+        }
+      />
+      {clergy.length ? (
+        <ul className="divide-y divide-zinc-100 dark:divide-white/[0.06]">
+          {clergy.map((member) => (
+            <li key={member.id} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+              <Avatar name={member.name} size={48} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-sans-bold text-[16px] text-zinc-900 dark:text-white">{member.name}</p>
+                {member.title && <p className="text-[13px] text-zinc-500 dark:text-zinc-400">{member.title}</p>}
+                {(member.phone_number || member.email) && (
+                  <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
+                    {member.phone_number && (
+                      <a
+                        href={`tel:${member.phone_number}`}
+                        className="flex items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300"
+                      >
+                        <Icon name="call-outline" size={14} />
+                        {formatPhone(member.phone_number)}
+                      </a>
+                    )}
+                    {member.email && (
+                      <a
+                        href={`mailto:${member.email}`}
+                        className="flex min-w-0 items-center gap-1.5 text-zinc-600 hover:text-red-600 dark:text-zinc-300"
+                      >
+                        <Icon name="mail-outline" size={14} />
+                        <span className="truncate">{member.email}</span>
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+              {isAdmin && (
+                <div className="flex shrink-0 items-center">
+                  <IconButton icon="create-outline" label={`Edit ${member.name}`} onClick={() => openEditor(member)} />
+                  <IconButton
+                    icon="trash-outline"
+                    label={`Remove ${member.name}`}
+                    className="hover:text-red-600 dark:hover:text-red-400"
+                    onClick={() => {
+                      setRemoving(member);
+                      setConfirmOpen(true);
+                    }}
+                  />
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          compact
+          icon="person-outline"
+          title="No clergy listed"
+          message={isAdmin ? "Add your priests and deacons so parishioners know who to contact." : undefined}
+          action={
+            isAdmin && (
+              <Button size="sm" icon="add" onClick={() => openEditor(null)}>
+                Add clergy
+              </Button>
+            )
+          }
+        />
+      )}
+
+      {isAdmin && (
+        <>
+          <ClergyDialog open={editorOpen} onClose={() => setEditorOpen(false)} parishId={parish.id} member={editing} onSaved={saved} />
+          <ConfirmDialog
+            open={confirmOpen}
+            onClose={() => setConfirmOpen(false)}
+            onConfirm={remove}
+            title={`Remove ${removing?.name ?? "clergy member"}?`}
+            message="They'll no longer appear on your parish page."
+            confirmLabel="Remove"
+            destructive
+            loading={removeLoading}
+          />
+        </>
+      )}
+    </Card>
+  );
+}
+
+function ClergyDialog({
   open,
   onClose,
-  parish,
+  parishId,
+  member,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
-  parish: Parish;
-  onSaved: (parish: Parish) => void;
+  parishId: string;
+  /** Null when adding someone new. */
+  member: ClergyMember | null;
+  onSaved: (member: ClergyMember) => void;
 }) {
   const toast = useToast();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [form, setForm] = useState({ name: "", title: "", phone_number: "", email: "" });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    if (open) {
-      setName(parish.priest_name ?? "");
-      setPhone(parish.priest_phone_number ?? "");
-      setEmail(parish.priest_email ?? "");
-    }
-  }, [open, parish]);
+    if (!open) return;
+    setForm({
+      name: member?.name ?? "",
+      title: member?.title ?? "",
+      phone_number: member?.phone_number ?? "",
+      email: member?.email ?? "",
+    });
+    setError(undefined);
+  }, [open, member]);
+
+  const field = (key: keyof typeof form) => ({
+    value: form[key],
+    onChange: (e: { target: { value: string } }) => setForm((prev) => ({ ...prev, [key]: e.target.value })),
+  });
 
   const save = async () => {
+    if (!form.name.trim()) return setError("Please enter a name.");
     setSaving(true);
-    const result = await updateParishPriestInfo(parish.id, { priest_name: name, priest_phone_number: phone, priest_email: email });
+    const result = member ? await updateClergyMember(member.id, form) : await addClergyMember(parishId, form);
     setSaving(false);
-    if (!result.success) return toast(result.error || "Failed to update priest information", "error");
-    onSaved({
-      ...parish,
-      priest_name: name.trim() || undefined,
-      priest_phone_number: phone.trim() || undefined,
-      priest_email: email.trim() || undefined,
-    });
-    toast("Priest information updated", "success");
+    if (!result.success || !result.clergy) return toast(result.error || "Couldn't save clergy member", "error");
+    onSaved(result.clergy);
+    toast(member ? "Clergy updated" : `Added ${result.clergy.name}`, "success");
     onClose();
   };
 
@@ -662,9 +744,9 @@ function PriestDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      eyebrow="Parish admin"
-      title="Parish priest"
-      width={520}
+      eyebrow="Clergy"
+      title={member ? "Edit clergy member" : "Add clergy member"}
+      width={560}
       dismissible={!saving}
       footer={
         <>
@@ -672,14 +754,19 @@ function PriestDialog({
             Cancel
           </Button>
           <Button icon="checkmark" loading={saving} onClick={save}>
-            Save
+            {member ? "Save" : "Add"}
           </Button>
         </>
       }
     >
-      <TextField label="Name" placeholder="Fr. John Smith" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-      <TextField label="Phone" type="tel" placeholder="(503) 123-4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      <TextField label="Email" type="email" placeholder="frjohn@stmary.org" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <div className="grid grid-cols-2 gap-x-4">
+        <TextField label="Name" required placeholder="Fr. John Smith" error={error} autoFocus {...field("name")} />
+        <TextField label="Title" placeholder="Parish Priest, Deacon…" {...field("title")} />
+      </div>
+      <div className="grid grid-cols-2 gap-x-4">
+        <TextField label="Phone" type="tel" placeholder="(503) 123-4567" {...field("phone_number")} />
+        <TextField label="Email" type="email" placeholder="frjohn@stmary.org" {...field("email")} />
+      </div>
     </Dialog>
   );
 }
