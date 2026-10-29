@@ -4,6 +4,7 @@ import { useFocusEffect, useNavigation } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   Switch,
@@ -272,6 +273,7 @@ export default function Events() {
     event_time: '',
     location: '',
     contact_info: '',
+    link: '',
     volunteers_needed: undefined
   });
   const [creatingEvent, setCreatingEvent] = useState(false);
@@ -846,6 +848,7 @@ export default function Events() {
       event_time: '',
       location: '',
       contact_info: '',
+      link: '',
       volunteers_needed: undefined
     });
     setNotifyParishioners(false);
@@ -873,7 +876,8 @@ export default function Events() {
         description: createEventData.description,
         event_type: createEventData.event_type,
         channel_id: createEventData.channel_id,
-        contact_info: createEventData.contact_info
+        contact_info: createEventData.contact_info,
+        link: createEventData.link?.trim() || '',
       };
       
       // Only add date/time/location for volunteer and event types with valid values
@@ -1118,6 +1122,7 @@ export default function Events() {
       event_time: selectedEvent.event_type !== 'announcement' ? (selectedEvent.event_time || '') : '',
       location: selectedEvent.event_type !== 'announcement' ? (selectedEvent.location || '') : '',
       contact_info: selectedEvent.contact_info || '',
+      link: selectedEvent.link || '',
       volunteers_needed:
         selectedEvent.event_type === 'volunteer'
           ? (selectedEvent.volunteers_needed ?? undefined)
@@ -1873,22 +1878,27 @@ export default function Events() {
         eyebrow={editingEventId ? 'Edit post' : 'New post'}
         title={editingEventId ? 'Update your post' : 'Share with your parish'}
         footer={
-          <View className="flex-row">
-            <Button
-              label="Cancel"
-              variant="secondary"
-              onPress={() => { setShowCreateEventModal(false); setEditingEventId(null); }}
-              disabled={creatingEvent}
-              style={{ flex: 1, marginRight: 8 }}
-            />
-            <Button
-              label={creatingEvent ? (editingEventId ? 'Saving…' : 'Creating…') : (editingEventId ? 'Save changes' : 'Publish')}
-              icon="checkmark"
-              loading={creatingEvent}
-              disabled={!canSubmitPost}
-              onPress={handleSaveEvent}
-              style={{ flex: 1 }}
-            />
+          <View>
+            <Text className="font-sans text-xs text-gray-500 dark:text-gray-400 mb-3">
+              <Text className="font-sans-semibold text-red-600 dark:text-red-400">*</Text> Required field
+            </Text>
+            <View className="flex-row">
+              <Button
+                label="Cancel"
+                variant="secondary"
+                onPress={() => { setShowCreateEventModal(false); setEditingEventId(null); }}
+                disabled={creatingEvent}
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button
+                label={creatingEvent ? (editingEventId ? 'Saving…' : 'Creating…') : (editingEventId ? 'Save changes' : 'Publish')}
+                icon="checkmark"
+                loading={creatingEvent}
+                disabled={!canSubmitPost}
+                onPress={handleSaveEvent}
+                style={{ flex: 1 }}
+              />
+            </View>
           </View>
         }
       >
@@ -2082,6 +2092,17 @@ export default function Events() {
           </Animated.View>
         )}
 
+        <Field
+          label="Link"
+          value={createEventData.link || ''}
+          onChangeText={(text) => setCreateEventData({ ...createEventData, link: text })}
+          placeholder="https://example.com"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          textContentType="URL"
+        />
+
         <View className="flex-row items-center rounded-2xl p-4 mt-1 bg-gray-50 dark:bg-white/[0.04]">
           <View className="h-9 w-9 rounded-xl bg-red-600/10 items-center justify-center mr-3">
             <Ionicons name="notifications" size={16} color={palette.accent} />
@@ -2145,7 +2166,11 @@ export default function Events() {
             )}
 
             {(() => {
-              const rows: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [];
+              const rows: {
+                icon: keyof typeof Ionicons.glyphMap;
+                text: string;
+                onPress?: () => void;
+              }[] = [];
               const dated = selectedEvent.event_type === 'volunteer' || selectedEvent.event_type === 'event';
               if (dated && selectedEvent.event_date) {
                 rows.push({
@@ -2156,15 +2181,50 @@ export default function Events() {
               if (dated && selectedEvent.event_time) rows.push({ icon: 'time-outline', text: formatEventTime(selectedEvent.event_time) });
               if (dated && selectedEvent.location) rows.push({ icon: 'location-outline', text: selectedEvent.location });
               if (selectedEvent.contact_info) rows.push({ icon: 'call-outline', text: selectedEvent.contact_info });
+              if (selectedEvent.link?.trim()) {
+                const raw = selectedEvent.link.trim();
+                const url = raw.startsWith('http') ? raw : `https://${raw}`;
+                rows.push({
+                  icon: 'link-outline',
+                  text: raw.replace(/^https?:\/\//i, ''),
+                  onPress: () => Linking.openURL(url),
+                });
+              }
               if (rows.length === 0) return null;
               return (
                 <View className="rounded-2xl mt-5 bg-gray-50 dark:bg-white/[0.04] overflow-hidden">
-                  {rows.map((row, i) => (
-                    <View key={row.icon} className={`flex-row items-center px-4 py-3.5 ${i > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''}`}>
-                      <Ionicons name={row.icon} size={17} color={colors.textMuted} />
-                      <Text className="font-sans-medium text-[14px] text-gray-800 dark:text-gray-200 ml-3 flex-1">{row.text}</Text>
-                    </View>
-                  ))}
+                  {rows.map((row, i) => {
+                    const rowClass = `flex-row items-center px-4 py-3.5 ${i > 0 ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''}`;
+                    const content = (
+                      <>
+                        <Ionicons name={row.icon} size={17} color={colors.textMuted} />
+                        <Text
+                          className="font-sans-medium text-[14px] text-gray-800 dark:text-gray-200 ml-3 flex-1"
+                          numberOfLines={2}
+                        >
+                          {row.text}
+                        </Text>
+                        {row.onPress ? (
+                          <Ionicons name="open-outline" size={15} color={palette.accent} />
+                        ) : null}
+                      </>
+                    );
+                    return row.onPress ? (
+                      <Pressable
+                        key={row.icon}
+                        onPress={row.onPress}
+                        accessibilityRole="link"
+                        accessibilityLabel={`Open link ${row.text}`}
+                        className={`${rowClass} active:opacity-70`}
+                      >
+                        {content}
+                      </Pressable>
+                    ) : (
+                      <View key={row.icon} className={rowClass}>
+                        {content}
+                      </View>
+                    );
+                  })}
                 </View>
               );
             })()}

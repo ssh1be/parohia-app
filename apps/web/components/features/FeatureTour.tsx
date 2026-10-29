@@ -43,6 +43,10 @@ interface FeatureTourProps {
 }
 
 const AUTOPLAY_MS = 6500;
+/** Mobile: how long a tap keeps the phone clear (no blur or note card). */
+const PHONE_CLEAR_MS = 1000;
+/** Mobile: brief clear while the highlight moves to the next feature. */
+const FEATURE_CHANGE_CLEAR_MS = 480;
 const FOLLOW = { stiffness: 260, damping: 34, mass: 0.9 };
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -121,8 +125,11 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const phoneIdle = useRef(0);
   /** True while a fine pointer is hovering the phone, matching desktop ring hide. */
   const stickyHover = useRef(false);
+  /** True while revealTarget is scrolling the demo — don't treat that as a user peek. */
+  const autoScrolling = useRef(false);
+  const autoScrollDone = useRef(0);
 
-  const engagePhone = (sticky: boolean) => {
+  const engagePhone = (sticky: boolean, clearMs = PHONE_CLEAR_MS) => {
     setPhoneHover(true);
     window.clearTimeout(phoneIdle.current);
     if (sticky) {
@@ -130,15 +137,31 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
       return;
     }
     if (stickyHover.current) return;
-    phoneIdle.current = window.setTimeout(() => setPhoneHover(false), 700);
+    phoneIdle.current = window.setTimeout(() => setPhoneHover(false), clearMs);
   };
 
-  useEffect(() => () => window.clearTimeout(phoneIdle.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(phoneIdle.current);
+      window.clearTimeout(autoScrollDone.current);
+    },
+    [],
+  );
+
+  const prevActiveForClear = useRef(active);
+  useEffect(() => {
+    if (prevActiveForClear.current === active) return;
+    prevActiveForClear.current = active;
+    // Below lg the note card floats over the phone — clear briefly so the highlight can
+    // move, then restore blur/card on the new focus.
+    if (compactScale !== null) engagePhone(false, FEATURE_CHANGE_CLEAR_MS);
+  }, [active, compactScale]);
 
   const note = notes[active];
   const screenIndex = note.screen;
   const playing = autoplay && inView && !hovering && !reduce && !pinned;
-  const spotlight = measured && (!pinned || (revealed > 0 && !leaving));
+  /** Hide the highlight while the phone is easing out between sections (pinned or mobile). */
+  const spotlight = measured && !leaving && (!pinned || revealed > 0);
 
   const activeRef = useRef(active);
   activeRef.current = active;
@@ -213,7 +236,8 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const easeOut = useSpring(exit, { stiffness: 220, damping: 34, mass: 0.6 });
   const phoneOpacity = useTransform([easeIn, easeOut], ([i, o]: number[]) => Math.min(clamp01((i - 0.3) / 0.55), 1 - clamp01((o - 0.15) / 0.55)));
   const phoneZoom = useTransform([easeIn, easeOut], ([i, o]: number[]) => 0.9 + 0.1 * Math.min(clamp01((i - 0.3) / 0.7), 1 - clamp01(o / 0.7)));
-  useMotionValueEvent(exit, "change", (o) => setLeaving(o > 0.04));
+  // Match the phone opacity curve (starts dropping around 0.15) so overlays aren't yanked early.
+  useMotionValueEvent(exit, "change", (o) => setLeaving(o > 0.18));
 
   const firstMeasure = useRef(true);
 
@@ -310,7 +334,19 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     const visibleBottom = sc.bottom - 130 * scale;
     if (t.top >= visibleTop && t.bottom <= visibleBottom) return;
     const offset = (t.top - sc.top) / scale + scroller.scrollTop;
-    scroller.scrollTo({ top: Math.max(offset - scroller.clientHeight * 0.24, 0), behavior: reduce ? "auto" : "smooth" });
+    const top = Math.max(offset - scroller.clientHeight * 0.24, 0);
+    const behavior: ScrollBehavior = reduce ? "auto" : "smooth";
+
+    // Mark programmatic scrolls so they animate without resetting the mobile card clear timer.
+    const finish = () => {
+      autoScrolling.current = false;
+      window.clearTimeout(autoScrollDone.current);
+    };
+    autoScrolling.current = true;
+    window.clearTimeout(autoScrollDone.current);
+    scroller.addEventListener("scrollend", finish, { once: true });
+    autoScrollDone.current = window.setTimeout(finish, behavior === "smooth" ? 1500 : 80);
+    scroller.scrollTo({ top, behavior });
   }, [notes, reduce]);
 
   const previousScreen = useRef(screenIndex);
@@ -333,7 +369,9 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
     mutations.observe(screen, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-spot"] });
     let pending = 0;
     const onScroll = () => {
-      engagePhone(false);
+      // Only user peeks should clear the overlay — programmatic revealTarget scrolls must not
+      // keep resetting the mobile clear timer until a long smooth scroll settles.
+      if (!autoScrolling.current) engagePhone(false);
       if (pending) return;
       pending = requestAnimationFrame(() => {
         pending = 0;
@@ -417,7 +455,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   }, [measured, cardTop, cardTarget]);
 
   const cardVisibleRef = useRef(false);
-  cardVisibleRef.current = compact && measured && !phoneHover && inView;
+  cardVisibleRef.current = compact && measured && !phoneHover && !leaving && inView && phoneOpacity.get() > 0.55;
   // Once the card settles, nudge the page so a card hanging past the viewport comes fully into view.
   useMotionValueEvent(cardTop, "animationComplete", () => {
     const card = cardRef.current;
@@ -429,7 +467,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
 
   const zoomFrame = useRef(0);
   useMotionValueEvent(phoneZoom, "change", () => {
-    if (!pinned || zoomFrame.current) return;
+    if (zoomFrame.current) return;
     zoomFrame.current = requestAnimationFrame(() => {
       zoomFrame.current = 0;
       measure();
@@ -502,10 +540,11 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   };
 
   const outlined = spotlight && attached && !phoneHover;
+  /** Peek/hover only — section exit fades the card with the phone via `phoneOpacity`. */
   const cardShown = measured && !phoneHover;
   /** On mobile the connector hangs off the floating card, so it waits for the card to fade in before drawing. */
   const connected = spotlight && (!compact || cardShown);
-  const drawDelay = reduce ? 0 : compact ? 0.32 : 0.18;
+  const drawDelay = reduce ? 0 : compact ? 0.08 : 0.18;
   const blur = outlined;
 
   const grid = (
@@ -520,7 +559,9 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
       <div className="flex flex-col items-center max-lg:min-h-[100dvh] max-lg:justify-center max-lg:py-5">
         <motion.div
           onPointerEnter={(e) => e.pointerType === "mouse" && engagePhone(true)}
-          onPointerLeave={() => {
+          onPointerLeave={(e) => {
+            // Touch fires pointerleave on finger-up — don't cancel the tap clear delay.
+            if (e.pointerType !== "mouse") return;
             stickyHover.current = false;
             window.clearTimeout(phoneIdle.current);
             setPhoneHover(false);
@@ -530,11 +571,11 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
             if (e.pointerType !== "mouse") engagePhone(false);
           }}
           style={
-            pinned
-              ? ({ opacity: phoneOpacity, scale: phoneZoom, "--s": phoneScale } as unknown as MotionStyle)
-              : compactScale
-                ? ({ "--s": compactScale } as unknown as MotionStyle)
-                : undefined
+            {
+              opacity: phoneOpacity,
+              scale: phoneZoom,
+              ...(pinned ? { "--s": phoneScale } : compactScale ? { "--s": compactScale } : {}),
+            } as unknown as MotionStyle
           }
         >
           <PhoneFrame
@@ -548,10 +589,10 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
               <motion.div
                 key={screenIndex}
                 custom={direction}
-                initial={{ opacity: 0, x: direction * 48 }}
+                initial={{ opacity: 0, x: direction * (compact ? 28 : 48) }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: direction * -48 }}
-                transition={{ duration: 0.42, ease: EASE }}
+                exit={{ opacity: 0, x: direction * (compact ? -28 : -48) }}
+                transition={{ duration: compact ? 0.28 : 0.42, ease: EASE }}
                 className="absolute inset-0 bg-gray-50 dark:bg-black"
               >
                 {screens[screenIndex].render()}
@@ -632,7 +673,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
       >
         <AnimatePresence>
           {connected && (
-            <motion.g key={active} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.2 } }}>
+            <motion.g key={active} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.15 } }}>
               <motion.path
                 d={path}
                 fill="none"
@@ -641,7 +682,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                 strokeLinecap="round"
                 initial={{ pathLength: 0 }}
                 animate={{ pathLength: 1 }}
-                transition={{ duration: reduce ? 0 : 0.75, ease: EASE, delay: drawDelay }}
+                transition={{ duration: reduce ? 0 : compact ? 0.42 : 0.75, ease: EASE, delay: drawDelay }}
               />
               <motion.circle
                 cx={markerX}
@@ -650,7 +691,12 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                 fill="#FA433F"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ type: "spring", damping: 14, stiffness: 300, delay: reduce ? 0 : drawDelay + 0.62 }}
+                transition={{
+                  type: "spring",
+                  damping: 14,
+                  stiffness: 300,
+                  delay: reduce ? 0 : drawDelay + (compact ? 0.32 : 0.62),
+                }}
               />
             </motion.g>
           )}
@@ -661,12 +707,12 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
         <motion.div
           ref={cardRef}
           className="absolute left-0 top-0 z-40 lg:hidden"
-          style={{ x: cardX, y: cardTop, width: cardW }}
-          initial={false}
-          animate={{ opacity: cardShown ? 1 : 0 }}
-          transition={{ duration: 0.3 }}
+          style={{ x: cardX, y: cardTop, width: cardW, opacity: phoneOpacity }}
         >
-          <div
+          <motion.div
+            initial={false}
+            animate={{ opacity: cardShown ? 1 : 0 }}
+            transition={{ duration: 0.18 }}
             className={`overflow-hidden rounded-[22px] border border-zinc-200 bg-white/[0.97] shadow-[0_18px_40px_-18px_rgba(9,9,11,0.45)] backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/[0.97] ${
               phoneHover ? "pointer-events-none" : ""
             }`}
@@ -709,10 +755,10 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={active}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.24, ease: EASE }}
+                exit={{ opacity: 0, y: -3 }}
+                transition={{ duration: 0.16, ease: EASE }}
                 className="px-4 pb-4 pt-2"
               >
                 <p className="font-display text-[22px] leading-[1.15] text-zinc-900 dark:text-white">{note.title}</p>
@@ -730,7 +776,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
                 />
               )}
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </div>

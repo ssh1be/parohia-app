@@ -158,7 +158,7 @@ export function PostDialog({
               </p>
             )}
 
-            {(post_.event_date || post_.event_time || post_.location || post_.contact_info) && (
+            {(post_.event_date || post_.event_time || post_.location || post_.contact_info || post_.link) && (
               <dl className="grid grid-cols-2 gap-3">
                 {post_.event_date && (
                   <Meta icon="calendar-outline" label="Date">
@@ -182,6 +182,18 @@ export function PostDialog({
                 {post_.contact_info && (
                   <Meta icon="call-outline" label="Contact">
                     {post_.contact_info}
+                  </Meta>
+                )}
+                {post_.link && (
+                  <Meta icon="link-outline" label="Link">
+                    <a
+                      href={post_.link.startsWith("http") ? post_.link : `https://${post_.link}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-500 dark:decoration-zinc-600 dark:hover:decoration-zinc-400"
+                    >
+                      {post_.link.replace(/^https?:\/\//i, "")}
+                    </a>
                   </Meta>
                 )}
               </dl>
@@ -353,7 +365,15 @@ export function PostDialog({
   );
 }
 
-function Meta({ icon, label, children }: { icon: "calendar-outline" | "time-outline" | "location-outline" | "call-outline"; label: string; children: React.ReactNode }) {
+function Meta({
+  icon,
+  label,
+  children,
+}: {
+  icon: "calendar-outline" | "time-outline" | "location-outline" | "call-outline" | "link-outline";
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-start gap-3 rounded-2xl bg-zinc-900/[0.03] p-3 dark:bg-white/[0.04]">
       <Icon name={icon} size={16} className="mt-0.5 text-red-500" />

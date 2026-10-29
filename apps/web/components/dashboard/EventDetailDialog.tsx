@@ -27,6 +27,7 @@ export function EventDetailDialog({
   when,
   whenDetail,
   location,
+  link,
   description,
   notes,
   secondaryAction,
@@ -39,6 +40,7 @@ export function EventDetailDialog({
   when?: string;
   whenDetail?: string;
   location?: string;
+  link?: string;
   description?: string;
   notes?: string;
   secondaryAction?: { label: string; href: string };
@@ -92,6 +94,17 @@ export function EventDetailDialog({
                 Directions
               </a>
             )}
+            {link?.trim() && (
+              <a
+                href={link.trim().startsWith("http") ? link.trim() : `https://${link.trim()}`}
+                target="_blank"
+                rel="noreferrer"
+                className={pillLink}
+              >
+                <Icon name="open-outline" size={16} />
+                Open link
+              </a>
+            )}
             {secondaryAction && (
               <Link href={secondaryAction.href} onClick={onClose} className={pillLink}>
                 {secondaryAction.label}
@@ -105,7 +118,7 @@ export function EventDetailDialog({
         </>
       }
     >
-      {(when || location) && (
+      {(when || location || link?.trim()) && (
         <div className="overflow-hidden rounded-3xl border border-zinc-100 bg-zinc-50 dark:border-white/[0.06] dark:bg-white/[0.04]">
           {when && (
             <div className="flex items-center gap-3.5 px-5 py-4">
@@ -150,6 +163,31 @@ export function EventDetailDialog({
               />
             </button>
           )}
+
+          {link?.trim() && (
+            <a
+              href={link.trim().startsWith("http") ? link.trim() : `https://${link.trim()}`}
+              target="_blank"
+              rel="noreferrer"
+              className={cx(
+                "group flex w-full items-center gap-3.5 px-5 py-4 text-left outline-none transition-colors hover:bg-zinc-900/[0.03] focus-visible:bg-zinc-900/[0.03] dark:hover:bg-white/[0.04]",
+                (when || location) && "border-t border-zinc-100 dark:border-white/[0.06]"
+              )}
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-600/10 text-red-600 dark:text-red-400">
+                <Icon name="link-outline" size={20} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium leading-snug text-zinc-900 dark:text-white">
+                  {link.trim().replace(/^https?:\/\//i, "")}
+                </span>
+                <span className="mt-0.5 block text-[12px] font-semibold text-zinc-400 group-hover:text-zinc-500">
+                  Open in browser
+                </span>
+              </span>
+              <Icon name="open-outline" size={18} className="text-zinc-400" />
+            </a>
+          )}
         </div>
       )}
 
@@ -174,6 +212,7 @@ export interface PersonalDetail {
   when: string;
   whenDetail?: string;
   location?: string;
+  link?: string;
   description?: string;
   notes?: string;
   href: string;
@@ -195,6 +234,7 @@ export function PersonalEventDialog({ detail, onClose }: { detail: PersonalDetai
       when={shown?.when}
       whenDetail={shown?.whenDetail}
       location={shown?.location}
+      link={shown?.link}
       description={shown?.description}
       notes={shown?.notes}
       secondaryAction={shown ? { label: shown.hrefLabel, href: shown.href } : undefined}

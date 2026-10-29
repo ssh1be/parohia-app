@@ -60,6 +60,7 @@ type PersonalItem = {
   isAllDay: boolean;
   notes?: string;
   location?: string;
+  link?: string;
   eventType?: 'event' | 'volunteer' | 'announcement';
   data: any;
 };
@@ -758,6 +759,7 @@ export default function Calendar() {
         isAllDay: !!isAllDay,
         notes: event.user_response?.notes || undefined,
         location: event.location,
+        link: event.link || undefined,
         eventType: event.event_type,
         data: event
       });
@@ -1587,6 +1589,7 @@ export default function Calendar() {
               : undefined
         }
         location={activePersonal?.location ?? activeEvent?.location}
+        link={activePersonal?.link}
         description={activePersonal ? undefined : activeEvent?.description}
         notes={activePersonal?.notes}
         reminder={

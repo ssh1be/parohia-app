@@ -129,6 +129,7 @@ CREATE TABLE public.bulletin_events (
   event_time time without time zone,
   location text,
   contact_info text,
+  link text,
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),

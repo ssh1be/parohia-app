@@ -41,6 +41,7 @@ interface EventDetailSheetProps {
   when?: string;
   whenDetail?: string;
   location?: string;
+  link?: string;
   description?: string;
   notes?: string;
   reminder?: EventReminder;
@@ -76,6 +77,7 @@ export function EventDetailSheet({
   when,
   whenDetail,
   location,
+  link,
   description,
   notes,
   reminder,
@@ -152,6 +154,13 @@ export function EventDetailSheet({
     />
   ) : null;
 
+  const openLink = () => {
+    if (!link?.trim()) return;
+    const raw = link.trim();
+    const url = raw.startsWith('http') ? raw : `https://${raw}`;
+    Linking.openURL(url);
+  };
+
   const directionsButton = location ? (
     <Button label="Directions" icon="navigate" variant="secondary" onPress={() => openDirections(location)} fullWidth />
   ) : null;
@@ -208,10 +217,32 @@ export function EventDetailSheet({
           </Pressable>
         )}
 
+        {!!link?.trim() && (
+          <Pressable
+            onPress={openLink}
+            accessibilityRole="link"
+            accessibilityLabel={`Open link ${link.trim()}`}
+            className={`flex-row items-center px-4 py-3.5 active:bg-gray-100 dark:active:bg-white/5 ${
+              when || location ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
+            }`}
+          >
+            <View className="h-9 w-9 rounded-xl bg-red-600/10 items-center justify-center mr-3">
+              <Ionicons name="link-outline" size={17} color={palette.accent} />
+            </View>
+            <View className="flex-1 pr-2">
+              <Text className="font-sans-medium text-[14px] leading-5 text-gray-900 dark:text-white" numberOfLines={2}>
+                {link.trim().replace(/^https?:\/\//i, '')}
+              </Text>
+              <Text className="font-sans-semibold text-xs text-gray-400 mt-0.5">Tap to open in browser</Text>
+            </View>
+            <Ionicons name="open-outline" size={16} color={palette.accent} />
+          </Pressable>
+        )}
+
         {canRemind && (
           <View
             className={`flex-row items-center px-4 py-3.5 ${
-              when || location ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
+              when || location || link?.trim() ? 'border-t border-gray-100 dark:border-white/[0.06]' : ''
             }`}
           >
             <View className="h-9 w-9 rounded-xl bg-emerald-500/10 items-center justify-center mr-3">

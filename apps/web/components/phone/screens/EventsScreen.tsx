@@ -287,23 +287,23 @@ export function PostCard({
 type SlotStatus = "open" | "reserved" | "closed";
 
 const WEEK = [
-  { label: "Sat", date: 29, times: ["6:00", "6:15", "6:30", "6:45"] },
-  { label: "Sun", date: 30, times: ["9:00", "9:15", "9:30", "9:45", "10:00", "10:15", "10:30", "10:45", "11:00"] },
-  { label: "Mon", date: 31, times: [] },
-  { label: "Tue", date: 1, times: [] },
-  { label: "Wed", date: 2, times: ["5:30", "5:45", "6:00"] },
-  { label: "Thu", date: 3, times: ["6:00", "6:15", "6:30", "6:45", "7:00", "7:15"] },
-  { label: "Fri", date: 4, times: [] },
+  { label: "Fri", date: 29, times: ["6:00", "6:15", "6:30", "6:45"] },
+  { label: "Sat", date: 30, times: ["9:00", "9:15", "9:30", "9:45", "10:00", "10:15", "10:30", "10:45", "11:00"] },
+  { label: "Sun", date: 31, times: [] },
+  { label: "Mon", date: 1, times: [] },
+  { label: "Tue", date: 2, times: ["5:30", "5:45", "6:00"] },
+  { label: "Wed", date: 3, times: ["6:00", "6:15", "6:30", "6:45", "7:00", "7:15"] },
+  { label: "Thu", date: 4, times: [] },
 ];
 
 const FULL_DATES: Record<number, string> = {
-  29: "Saturday, August 29",
-  30: "Sunday, August 30",
-  31: "Monday, August 31",
-  1: "Tuesday, September 1",
-  2: "Wednesday, September 2",
-  3: "Thursday, September 3",
-  4: "Friday, September 4",
+  29: "Friday, August 29",
+  30: "Saturday, August 30",
+  31: "Sunday, August 31",
+  1: "Monday, September 1",
+  2: "Tuesday, September 2",
+  3: "Wednesday, September 3",
+  4: "Thursday, September 4",
 };
 
 const initialStatus = (date: number, i: number): SlotStatus => {

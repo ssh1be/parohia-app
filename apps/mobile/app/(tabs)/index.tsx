@@ -45,6 +45,7 @@ type ScheduleItem = {
   isAllDay: boolean;
   eventType?: 'event' | 'volunteer' | 'announcement';
   location?: string;
+  link?: string;
   startTime?: string;
   endTime?: string;
 };
@@ -407,6 +408,7 @@ export default function Index() {
         isAllDay: !!isAllDay,
         eventType: event.event_type,
         location: event.location,
+        link: event.link || undefined,
       });
     });
 
@@ -688,6 +690,7 @@ export default function Index() {
         when={activeItem?.timeRange}
         whenDetail={today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         location={activeItem?.location}
+        link={activeItem?.link}
         description={activeItem?.description}
         notes={activeItem?.notes}
         reminder={

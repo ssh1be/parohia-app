@@ -18,6 +18,7 @@ interface FormState {
   event_time: string;
   location: string;
   contact_info: string;
+  link: string;
   volunteers: string;
   unlimited: boolean;
 }
@@ -31,6 +32,7 @@ const emptyForm = (channelId: string): FormState => ({
   event_time: "",
   location: "",
   contact_info: "",
+  link: "",
   volunteers: "",
   unlimited: false,
 });
@@ -46,6 +48,7 @@ const fromPost = (post: BulletinEvent, fallbackChannel: string): FormState => {
     event_time: dated ? (post.event_time || "").slice(0, 5) : "",
     location: dated ? post.location || "" : "",
     contact_info: post.contact_info || "",
+    link: post.link || "",
     volunteers:
       post.event_type === "volunteer" && post.volunteers_needed && post.volunteers_needed > 0
         ? String(post.volunteers_needed)
@@ -106,6 +109,7 @@ export function PostEditorDialog({
       event_type: form.event_type,
       channel_id: form.channel_id,
       contact_info: form.contact_info.trim(),
+      link: form.link.trim(),
     };
     if (dated) {
       if (form.event_date) data.event_date = form.event_date;
@@ -154,12 +158,17 @@ export function PostEditorDialog({
       dismissible={!saving}
       footer={
         <>
-          {!editing && (
-            <label className="mr-auto flex items-center gap-3 text-[13px] font-semibold text-zinc-700 dark:text-zinc-300">
-              <Switch checked={notify} onChange={setNotify} label="Notify subscribers" />
-              Send push notification to subscribers
-            </label>
-          )}
+          <div className="mr-auto flex flex-wrap items-center gap-x-5 gap-y-2">
+            <p className="text-[12px] text-zinc-500 dark:text-zinc-400">
+              <span className="font-semibold text-red-600 dark:text-red-400">*</span> Required field
+            </p>
+            {!editing && (
+              <label className="flex items-center gap-3 text-[13px] font-semibold text-zinc-700 dark:text-zinc-300">
+                <Switch checked={notify} onChange={setNotify} label="Notify subscribers" />
+                Send push notification to subscribers
+              </label>
+            )}
+          </div>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
@@ -247,7 +256,14 @@ export function PostEditorDialog({
         value={form.contact_info}
         onChange={(e) => set("contact_info", e.target.value)}
         placeholder="Email or phone for questions"
-        helper="Optional"
+      />
+
+      <TextField
+        label="Link"
+        type="url"
+        value={form.link}
+        onChange={(e) => set("link", e.target.value)}
+        placeholder="https://example.com"
       />
     </Dialog>
   );

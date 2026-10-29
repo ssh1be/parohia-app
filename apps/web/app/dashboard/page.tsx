@@ -2,7 +2,6 @@
 
 import {
   BulletinService,
-  ChannelService,
   ConfessionService,
   confessionPriest,
   fetchParishEventsForMultipleDays,
@@ -16,7 +15,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "../../components/Icon";
 import { Button, Card, CardHeader, EmptyState, Skeleton, useSeeMore } from "../../components/app/ui";
-import { useToast } from "../../components/app/toast";
 import { CalendarSetupCallout, CalendarSetupDialog } from "../../components/dashboard/CalendarSetupDialog";
 import { PersonalEventDialog, type PersonalDetail } from "../../components/dashboard/EventDetailDialog";
 import { ParishEventDialog } from "../../components/dashboard/ParishEventDialog";
@@ -45,8 +43,7 @@ const greeting = () => {
 type ConfessionWithName = ConfessionReservationWithSchedule & { personName?: string };
 
 export default function TodayPage() {
-  const toast = useToast();
-  const { userId, profile, parish, isAdmin, tradition, chantSubscribed, setChantSubscribed, setParish } = useDashboard();
+  const { userId, profile, parish, isAdmin, tradition, chantSubscribed, setParish } = useDashboard();
   const today = useMemo(() => new Date(), []);
 
   const [orthodox, setOrthodox] = useState<OrthodoxCalendarData | null>(null);
@@ -58,7 +55,6 @@ export default function TodayPage() {
   const [activeEvent, setActiveEvent] = useState<ParishEvent | null>(null);
   const [activePersonal, setActivePersonal] = useState<PersonalDetail | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
-  const [joiningChant, setJoiningChant] = useState(false);
 
   useEffect(() => {
     setOrthodoxLoading(true);
@@ -123,24 +119,6 @@ export default function TodayPage() {
     }),
     ...personal.map((e) => bulletinItem(e, () => setActivePersonal(bulletinDetail(e)))),
   ];
-
-  const joinChant = async () => {
-    if (!parish) return;
-    setJoiningChant(true);
-    try {
-      const channels = await ChannelService.listChannels(parish.id);
-      const chant = channels.find((c) => c.is_chant);
-      if (!chant) throw new Error("Chant channel not found");
-      const result = await ChannelService.subscribe(chant.id, userId);
-      if (!result.success) throw new Error(result.error);
-      setChantSubscribed(true);
-      toast("You joined the Chant channel", "success");
-    } catch (error) {
-      toast((error as Error).message || "Couldn't join the Chant channel", "error");
-    } finally {
-      setJoiningChant(false);
-    }
-  };
 
   const name = firstName(profile?.full_name);
 
@@ -245,25 +223,6 @@ export default function TodayPage() {
                   {chantList.toggle}
                 </>
               )}
-            </Card>
-          )}
-
-          {parish && !chantEnabled && (
-            <Card className="relative overflow-hidden">
-              <div className="flex items-start gap-4">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-600/10 text-red-600 dark:text-red-400">
-                  <Icon name="musical-notes" size={20} />
-                </span>
-                <div className="flex-1">
-                  <p className="font-sans-bold text-[15px] text-zinc-900 dark:text-white">Chant at services</p>
-                  <p className="mt-0.5 text-[13px] leading-5 text-zinc-500 dark:text-zinc-400">
-                    Join the Chant channel to see upcoming services and sign up to help sing.
-                  </p>
-                  <Button size="sm" className="mt-3" icon="add" loading={joiningChant} onClick={joinChant}>
-                    Join Chant channel
-                  </Button>
-                </div>
-              </div>
             </Card>
           )}
         </div>

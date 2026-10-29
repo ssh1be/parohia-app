@@ -13,6 +13,7 @@ export interface BulletinEvent {
   event_time?: string;
   location?: string;
   contact_info?: string;
+  link?: string | null;
   volunteers_needed?: number;
   is_active: boolean;
   created_at: string;
@@ -44,6 +45,7 @@ export interface CreateEventData {
   event_time?: string;
   location?: string;
   contact_info?: string;
+  link?: string;
   volunteers_needed?: number;
 }
 
@@ -325,6 +327,7 @@ export class BulletinService {
             event_time,
             location,
             contact_info,
+            link,
             volunteers_needed,
             is_active,
             created_at,

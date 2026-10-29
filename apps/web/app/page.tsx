@@ -1,5 +1,6 @@
 import FeedbackCTA from "../components/FeedbackCTA";
 import { AppPreview } from "../components/home/AppPreview";
+import { FaqSection } from "../components/home/FaqSection";
 import { FeatureBento } from "../components/home/FeatureBento";
 import { HeroPhone } from "../components/home/HeroPhone";
 import { Icon } from "../components/Icon";
@@ -77,6 +78,8 @@ export default function LandingPage() {
           <AppPreview />
         </div>
       </section>
+
+      <FaqSection />
 
       <FeedbackCTA />
       <PageFooter />

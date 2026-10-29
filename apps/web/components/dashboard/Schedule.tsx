@@ -82,6 +82,7 @@ export const bulletinDetail = (event: BulletinEvent): PersonalDetail => ({
   when: event.event_time ? formatClockTime(event.event_time) : "All day",
   whenDetail: longDate(event.event_date),
   location: event.location,
+  link: event.link || undefined,
   description: event.description,
   notes: event.user_response?.notes,
   href: "/dashboard/bulletin",
