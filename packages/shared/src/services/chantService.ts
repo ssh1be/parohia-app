@@ -1,4 +1,5 @@
 import { supabase } from '../client';
+import { getParishProfileNames } from './profileService';
 
 const CHANT_SERVICE_TERMS = [
   'liturgy',
@@ -81,17 +82,10 @@ export class ChantService {
     const rows = data || [];
     if (rows.length === 0) return [];
 
-    const userIds = [...new Set(rows.map((r) => r.user_id))];
-    const { data: profiles, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id, full_name')
-      .in('id', userIds);
-
-    if (profileError) {
-      console.error('Error loading chant signup profiles:', profileError);
-    }
-
-    const nameById = new Map((profiles || []).map((p) => [p.id, p.full_name?.trim() || 'Unknown']));
+    const nameById = await getParishProfileNames(
+      parishId,
+      rows.map((r) => r.user_id)
+    );
 
     return rows.map((row) => ({
       id: row.id,

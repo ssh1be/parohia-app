@@ -15,3 +15,4 @@ export * from './services/chantService';
 export * from './services/confessionService';
 export * from './services/calendarService';
 export * from './services/accountService';
+export * from './services/profileService';

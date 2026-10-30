@@ -12,7 +12,12 @@ import { getBrowserSupabase } from "../../../lib/supabase/client";
 
 /** Only allow same-origin dashboard paths as post-login targets. */
 const safeNext = (next: string | null) =>
-  next && next.startsWith("/dashboard") && !next.startsWith("//") ? next : null;
+  next &&
+  next.startsWith("/dashboard") &&
+  !next.startsWith("//") &&
+  !/[\\\x00-\x1f]/.test(next)
+    ? next
+    : null;
 
 export function LoginForm() {
   const router = useRouter();

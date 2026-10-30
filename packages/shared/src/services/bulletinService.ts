@@ -1,5 +1,27 @@
 import { supabase } from '../client';
 import { ChannelService } from './channelService';
+import { getParishProfileNames } from './profileService';
+
+async function attachAuthorNames(events: BulletinEvent[]): Promise<void> {
+  const authorsByParish = new Map<string, string[]>();
+  for (const event of events) {
+    const authors = authorsByParish.get(event.parish_id) || [];
+    authors.push(event.created_by);
+    authorsByParish.set(event.parish_id, authors);
+  }
+
+  const namesByParish = new Map<string, Map<string, string>>();
+  await Promise.all(
+    [...authorsByParish].map(async ([parishId, authorIds]) => {
+      namesByParish.set(parishId, await getParishProfileNames(parishId, authorIds));
+    })
+  );
+
+  for (const event of events) {
+    const name = namesByParish.get(event.parish_id)?.get(event.created_by);
+    if (name) event.created_by_profile = { full_name: name };
+  }
+}
 
 export interface BulletinEvent {
   id: string;
@@ -26,7 +48,6 @@ export interface BulletinEvent {
   };
   created_by_profile?: {
     full_name: string;
-    email: string;
   };
   responses_count?: number;
   user_response?: {
@@ -65,8 +86,7 @@ export class BulletinService {
         .from('bulletin_events')
         .select(`
           *,
-          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_chant, is_archived),
-          created_by_profile:user_profiles!bulletin_events_created_by_fkey(full_name, email)
+          channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_chant, is_archived)
         `)
         .eq('parish_id', parishId)
         .eq('is_active', true)
@@ -89,6 +109,7 @@ export class BulletinService {
 
       // Hide posts from archived channels for everyone
       const activeData = (data || []).filter((event: any) => !event.channel?.is_archived);
+      await attachAuthorNames(activeData);
 
       if (userId && activeData.length > 0) {
         const eventIds = activeData.map((event) => event.id);
@@ -332,8 +353,7 @@ export class BulletinService {
             is_active,
             created_at,
             updated_at,
-            channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_chant),
-            created_by_profile:user_profiles!bulletin_events_created_by_fkey(full_name, email)
+            channel:bulletin_channels!bulletin_events_channel_id_fkey(id, name, is_default, is_chant)
           )
         `)
         .eq('user_id', userId)
@@ -365,6 +385,7 @@ export class BulletinService {
         },
       }));
 
+      await attachAuthorNames(events);
       return events;
     } catch (error) {
       console.error('Error in getUserPersonalEvents:', error);

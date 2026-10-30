@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { ParamListBase } from "@react-navigation/native";
 import { useFocusEffect, useNavigation } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -55,6 +57,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useParishScope } from "../../contexts/ParishScopeContext";
 import { useTabScrollToTop } from "../../hooks/useTabScrollToTop";
 import { channelIcon } from "../../utils/channelIcon";
+import { toLocalDateKey } from "../../utils/dateUtils";
 import { BulletinEvent, BulletinService, CreateEventData, EventResponse } from "@parohia/shared";
 import { BulletinChannel, ChannelService } from "@parohia/shared";
 import { ConfessionService, DaySchedule, TimeSlot } from "@parohia/shared";
@@ -201,7 +204,7 @@ export default function Events() {
   const { scrollY, onScroll } = useScrollHeader();
   const scrollRef = useRef<Animated.ScrollView>(null);  useTabScrollToTop(scrollRef);
   const reduceMotion = useReducedMotion();
-  const navigation = useNavigation();
+  const navigation = useNavigation<BottomTabNavigationProp<ParamListBase>>();
   const [isFocused, setIsFocused] = useState(true);
   const [bulletinFiltersVisible, setBulletinFiltersVisible] = useState(false);
   const [showVolunteerConfetti, setShowVolunteerConfetti] = useState(false);
@@ -370,14 +373,6 @@ export default function Events() {
     try {
       if (showLoading) {
         setLoading(true);
-      }
-      
-      // Automatically cleanup old data (7 days retention)
-      try {
-        await ConfessionService.cleanupOldData(7);
-      } catch (cleanupError) {
-        console.error('Error during automatic cleanup:', cleanupError);
-        // Don't show error to user, just log it
       }
       
       const schedule = await ConfessionService.generateWeekSchedule(parishId, new Date());
@@ -614,7 +609,7 @@ export default function Events() {
     if (!parishId) return;
     
     try {
-      const dateStr = daySchedule.date.toISOString().split('T')[0];
+      const dateStr = toLocalDateKey(daySchedule.date);
       const [hour, minute] = timeSlot.id.split('-').slice(-2).map(Number);
       const dbTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
       const newAvailability = !timeSlot.available;

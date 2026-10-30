@@ -1,6 +1,14 @@
 import type { OnboardingData, UserType } from '@parohia/shared';
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
+
+const ROUTE_STEPS: Record<string, number> = {
+  'user-type': 1,
+  'user-info': 2,
+  'parish-selection': 3,
+  'parish-details': 3,
+  'welcome-complete': 4,
+};
 
 export type { OnboardingData, UserType };
 
@@ -11,7 +19,6 @@ interface OnboardingContextType {
   updateData: (updates: Partial<OnboardingData>) => void;
   nextStep: (userTypeOverride?: UserType) => void;
   previousStep: () => void;
-  goToStep: (step: number) => void;
   resetOnboarding: () => void;
   isStepComplete: (step: number) => boolean;
   getNextStepRoute: (step?: number, userTypeOverride?: UserType) => string;
@@ -40,7 +47,9 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({
     userType: userType || undefined,
   });
   
-  const [currentStep, setCurrentStep] = useState(1);
+  // Derived from the visible screen so swipe-back and hardware back can't desync it
+  const pathname = usePathname();
+  const currentStep = ROUTE_STEPS[pathname.split('/').pop() ?? ''] ?? 1;
   
   // Determine total steps based on user type
   const getTotalSteps = (userType?: UserType) => {
@@ -72,7 +81,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({
     
     if (currentStep < currentTotalSteps) {
       const nextStepNumber = currentStep + 1;
-      setCurrentStep(nextStepNumber);
       
       // Navigate to the next screen
       const nextRoute = getNextStepRoute(nextStepNumber, userTypeToUse);
@@ -105,20 +113,12 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({
   
   const previousStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
       router.back();
-    }
-  };
-  
-  const goToStep = (step: number) => {
-    if (step >= 1 && step <= totalSteps) {
-      setCurrentStep(step);
     }
   };
   
   const resetOnboarding = () => {
     setData({ userType: userType || undefined });
-    setCurrentStep(1);
   };
   
   const isStepComplete = (step: number): boolean => {
@@ -146,7 +146,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({
     updateData,
     nextStep,
     previousStep,
-    goToStep,
     resetOnboarding,
     isStepComplete,
     getNextStepRoute,

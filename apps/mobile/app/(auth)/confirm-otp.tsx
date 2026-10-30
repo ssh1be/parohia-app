@@ -181,7 +181,7 @@ export default function ConfirmOTPScreen() {
             size="lg"
             fullWidth
             loading={loading}
-            onPress={handleConfirmOTP}
+            onPress={() => handleConfirmOTP()}
             disabled={otp.length < OTP_LENGTH}
           />
 

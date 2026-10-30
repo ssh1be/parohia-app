@@ -95,7 +95,8 @@ export class NotificationService {
       }
 
       // Get push token for remote notifications (only if project is properly configured)
-      if (Device.isDevice && canUseRemotePush) {
+      // Android emulators with Google Play services can receive FCM pushes; iOS simulators can't.
+      if ((Device.isDevice || Platform.OS === 'android') && canUseRemotePush) {
         try {
           const resolvedProjectId = (Constants as any)?.easConfig?.projectId || (Constants as any)?.expoConfig?.extra?.eas?.projectId;
           const token = resolvedProjectId
@@ -448,6 +449,21 @@ export class NotificationService {
       await AsyncStorage.removeItem(SCHEDULED_NOTIFICATIONS_KEY);
     } catch (error) {
       console.error('Error canceling all notifications:', error);
+    }
+  }
+
+  /** Drops per-user reminder state so the next account on this device starts clean. Device preferences and the push token stay. */
+  async clearUserNotificationData(): Promise<void> {
+    await this.cancelAllNotifications();
+    try {
+      await AsyncStorage.multiRemove([
+        DISABLED_EVENT_NOTIFICATIONS_KEY,
+        ENABLED_PARISH_EVENT_NOTIFICATIONS_KEY,
+        ENABLED_PARISH_EVENT_DATA_KEY,
+        'push_token',
+      ]);
+    } catch (error) {
+      console.error('Error clearing user notification data:', error);
     }
   }
 

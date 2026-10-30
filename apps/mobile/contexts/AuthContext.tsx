@@ -150,13 +150,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      // Cancel local notifications and revoke token before signing out
-      await notificationService.cancelAllNotifications();
+      // Revoke the push token while the session (and local token) still exist, then clear local data
       try {
         await notificationService.revokeStoredPushTokenForCurrentUser();
       } catch {
         // Token may already be gone after account deletion
       }
+      await notificationService.clearUserNotificationData();
       const { error } = await supabase.auth.signOut();
       if (error) {
         // Account may already be deleted server-side; still clear local session UI.

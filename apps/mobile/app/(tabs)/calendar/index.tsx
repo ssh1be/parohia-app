@@ -37,6 +37,7 @@ import { useCalendarTradition } from "../../../contexts/CalendarTraditionContext
 import { useNotifications } from "../../../contexts/NotificationContext";
 import { useParishScope } from "../../../contexts/ParishScopeContext";
 import { useTabScrollToTop } from "../../../hooks/useTabScrollToTop";
+import { toLocalDateKey } from "../../../utils/dateUtils";
 import { BulletinEvent, BulletinService } from "@parohia/shared";
 import {
     Commemoration,
@@ -270,7 +271,7 @@ export default function Calendar() {
       const fastingPromises = days.map(async (date) => {
         const data = await fetchOrthodoxCalendarData(date, tradition);
         return {
-          dateKey: date.toISOString().split('T')[0],
+          dateKey: toLocalDateKey(date),
           fasting: data.fasting
         };
       });
@@ -1090,7 +1091,7 @@ export default function Calendar() {
                   const isSelected = date.toDateString() === selectedDate.toDateString();
                   const isToday = date.toDateString() === new Date().toDateString();
                   const isSunday = date.getDay() === 0;
-                  const fastingKind = getFastingKind(fastingData[date.toISOString().split('T')[0]] || '');
+                  const fastingKind = getFastingKind(fastingData[toLocalDateKey(date)] || '');
                   const fasting = fastingStyle[fastingKind];
                   const count = weekEventsByDay[key]?.length ?? 0;
 
@@ -1190,7 +1191,7 @@ export default function Calendar() {
                 />
               )}
               {calendarDays.map((day, index) => {
-                const dateKey = day.date.toISOString().split('T')[0];
+                const dateKey = toLocalDateKey(day.date);
                 const fastingKind = getFastingKind(fastingData[dateKey] || '');
                 const fasting = fastingStyle[fastingKind];
                 const isSunday = day.date.getDay() === 0;

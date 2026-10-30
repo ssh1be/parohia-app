@@ -3,8 +3,9 @@ import { Reveal } from "./Reveal";
 
 export default function FeedbackCTA() {
   return (
-    <section className="relative z-10 px-6 py-20 md:py-28">
-      <Reveal className="mx-auto max-w-5xl">
+    <section className="relative z-10 overflow-hidden px-6 py-20 md:py-28">
+      <div className="page-grid pointer-events-none absolute inset-0" aria-hidden />
+      <Reveal className="relative mx-auto max-w-5xl">
         <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#FA433F] to-[#8D0300] px-8 py-14 text-white md:px-16 md:py-20">
           <img
             src="/App_store_1024_1x.png"

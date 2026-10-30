@@ -96,7 +96,6 @@ function useWeekSchedule(parishId: string, enabled: boolean) {
       return [];
     }
     try {
-      await ConfessionService.cleanupOldData(7).catch(() => undefined);
       const schedule = await ConfessionService.generateWeekSchedule(parishId, new Date());
       setWeek(schedule);
       return schedule;

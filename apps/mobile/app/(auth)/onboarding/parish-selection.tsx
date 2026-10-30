@@ -113,6 +113,7 @@ export default function ParishSelectionScreen() {
             icon="checkmark-circle-outline"
             size="lg"
             fullWidth
+            disabled={!selectedParishId}
             onPress={handleComplete}
           />
           <View className="mt-2">

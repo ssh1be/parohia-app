@@ -15,7 +15,8 @@ export default function LandingPage() {
       <PageHeader />
 
       <section className="relative z-10 overflow-hidden">
-        <div className="mx-auto grid min-h-[calc(100dvh-68px)] max-w-7xl items-center gap-14 px-6 pb-16 pt-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:pb-20 lg:pt-8">
+        <div className="page-grid pointer-events-none absolute inset-0" aria-hidden />
+        <div className="relative mx-auto grid min-h-[calc(100dvh-68px)] max-w-7xl items-center gap-14 px-6 pb-16 pt-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:pb-20 lg:pt-8">
           <Reveal>
             <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/70 px-4 py-1.5 text-sm text-zinc-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400">
               <span className="relative flex h-2 w-2">

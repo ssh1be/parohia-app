@@ -36,44 +36,20 @@ serve(async (req) => {
       });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id, user_type')
-      .eq('id', callerId)
-      .maybeSingle();
+    // Ownership, not the self-editable user_type, decides whether parishes get wiped.
+    // Users who abandoned onboarding have no profile and no parish and fall straight through.
+    const { data: ownedParishes, error: parishError } = await supabase
+      .from('parishes')
+      .select('id')
+      .eq('admin_user_id', callerId);
 
-    if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'Profile not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (parishError) {
+      throw parishError;
     }
 
-    const isParishAdmin = profile.user_type === 'parish_admin';
-    const isRegularUser = profile.user_type === 'regular_user';
-
-    if (!isParishAdmin && !isRegularUser) {
-      return new Response(JSON.stringify({ error: 'Unsupported account type' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Parish admins: wipe the parish and unassign members first
-    if (isParishAdmin) {
-      const { data: parish, error: parishError } = await supabase
-        .from('parishes')
-        .select('id')
-        .eq('admin_user_id', callerId)
-        .maybeSingle();
-
-      if (parishError) {
-        throw parishError;
-      }
-
-      const parishId = parish?.id as string | undefined;
-
-      if (parishId) {
+    // Wipe each owned parish and unassign its members first
+    for (const { id: parishId } of ownedParishes || []) {
+      {
         // Confession: reservations → schedules
         const { data: schedules } = await supabase
           .from('confession_schedules')

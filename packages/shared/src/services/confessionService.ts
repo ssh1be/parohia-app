@@ -45,6 +45,16 @@ export interface DaySchedule {
   timeSlots: TimeSlot[];
 }
 
+function toLocalDateString(date: Date): string {
+  return (
+    date.getFullYear() +
+    '-' +
+    String(date.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(date.getDate()).padStart(2, '0')
+  );
+}
+
 export class ConfessionService {
   // Get confession schedules for a parish within a date range
   static async getSchedules(parishId: string, startDate: Date, endDate: Date): Promise<ConfessionSchedule[]> {
@@ -97,6 +107,26 @@ export class ConfessionService {
 
     if (error) {
       console.error('Error fetching confession reservations:', error);
+      throw error;
+    }
+
+    return data || [];
+  }
+
+  /** Booked slots visible to any parish member; reservation_id is only set for the caller's own bookings (or all, for the admin). */
+  static async getBookedSlots(
+    parishId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<{ schedule_id: string; reservation_id: string | null }[]> {
+    const { data, error } = await supabase.rpc('get_booked_confession_slots', {
+      p_parish_id: parishId,
+      p_start: toLocalDateString(startDate),
+      p_end: toLocalDateString(endDate),
+    });
+
+    if (error) {
+      console.error('Error fetching booked confession slots:', error);
       throw error;
     }
 
@@ -192,19 +222,7 @@ export class ConfessionService {
         return { success: false, error: 'Schedule not available' };
       }
 
-      // Check if already reserved
-      const { data: existingReservation, error: reservationError } = await supabase
-        .from('confession_reservations')
-        .select('*')
-        .eq('schedule_id', scheduleId)
-        .eq('status', 'confirmed')
-        .single();
-
-      if (existingReservation) {
-        return { success: false, error: 'Time slot already reserved' };
-      }
-
-      // Create the reservation
+      // schedule_id is unique, so a slot someone else holds (invisible under RLS) fails here
       const { error: insertError } = await supabase
         .from('confession_reservations')
         .insert({
@@ -214,6 +232,9 @@ export class ConfessionService {
           notes
         });
 
+      if (insertError?.code === '23505') {
+        return { success: false, error: 'Time slot already reserved' };
+      }
       if (insertError) throw insertError;
 
       return { success: true };
@@ -356,7 +377,7 @@ export class ConfessionService {
     endDate.setDate(startDate.getDate() + 6);
 
     const schedules = await this.getSchedules(parishId, startDate, endDate);
-    const reservations = await this.getReservations(parishId, startDate, endDate);
+    const reservations = await this.getBookedSlots(parishId, startDate, endDate);
 
     const weekSchedule: DaySchedule[] = [];
     
@@ -406,7 +427,7 @@ export class ConfessionService {
             available: schedule?.is_available || false,
             reservedBy: reservation ? 'Reserved' : undefined,
             scheduleId: schedule?.id,
-            reservationId: reservation?.id
+            reservationId: reservation?.reservation_id ?? undefined
           });
         }
       }
@@ -422,105 +443,4 @@ export class ConfessionService {
     return weekSchedule;
   }
 
-  // Clean up old confession schedules and reservations
-  static async cleanupOldData(daysToKeep: number = 7): Promise<{ success: boolean; error?: string }> {
-    try {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
-      const cutoffDateStr = cutoffDate.getFullYear() + '-' + 
-        String(cutoffDate.getMonth() + 1).padStart(2, '0') + '-' + 
-        String(cutoffDate.getDate()).padStart(2, '0');
-
-      // First, get old schedule IDs
-      const { data: oldSchedules, error: scheduleQueryError } = await supabase
-        .from('confession_schedules')
-        .select('id')
-        .lt('date', cutoffDateStr);
-
-      if (scheduleQueryError) {
-        console.error('Error querying old schedules:', scheduleQueryError);
-        return { success: false, error: scheduleQueryError.message };
-      }
-
-      // Delete reservations for old schedules
-      if (oldSchedules && oldSchedules.length > 0) {
-        const scheduleIds = oldSchedules.map(s => s.id);
-        const { error: reservationError } = await supabase
-          .from('confession_reservations')
-          .delete()
-          .in('schedule_id', scheduleIds);
-
-        if (reservationError) {
-          console.error('Error deleting old reservations:', reservationError);
-          return { success: false, error: reservationError.message };
-        }
-      }
-
-      // Then, delete old schedules
-      const { error: scheduleError } = await supabase
-        .from('confession_schedules')
-        .delete()
-        .lt('date', cutoffDateStr);
-
-      if (scheduleError) {
-        console.error('Error deleting old schedules:', scheduleError);
-        return { success: false, error: scheduleError.message };
-      }
-
-      console.log(`Cleaned up data older than ${daysToKeep} days`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error cleaning up old data:', error);
-      return { success: false, error: (error as Error).message };
-    }
-  }
-
-  // Clean up data for a specific date range
-  static async cleanupDateRange(startDate: string, endDate: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      // First, get schedule IDs in the date range
-      const { data: schedulesInRange, error: scheduleQueryError } = await supabase
-        .from('confession_schedules')
-        .select('id')
-        .gte('date', startDate)
-        .lte('date', endDate);
-
-      if (scheduleQueryError) {
-        console.error('Error querying schedules in date range:', scheduleQueryError);
-        return { success: false, error: scheduleQueryError.message };
-      }
-
-      // Delete reservations for schedules in the date range
-      if (schedulesInRange && schedulesInRange.length > 0) {
-        const scheduleIds = schedulesInRange.map(s => s.id);
-        const { error: reservationError } = await supabase
-          .from('confession_reservations')
-          .delete()
-          .in('schedule_id', scheduleIds);
-
-        if (reservationError) {
-          console.error('Error deleting reservations in date range:', reservationError);
-          return { success: false, error: reservationError.message };
-        }
-      }
-
-      // Then, delete schedules in the date range
-      const { error: scheduleError } = await supabase
-        .from('confession_schedules')
-        .delete()
-        .gte('date', startDate)
-        .lte('date', endDate);
-
-      if (scheduleError) {
-        console.error('Error deleting schedules in date range:', scheduleError);
-        return { success: false, error: scheduleError.message };
-      }
-
-      console.log(`Cleaned up data from ${startDate} to ${endDate}`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error cleaning up date range:', error);
-      return { success: false, error: (error as Error).message };
-    }
-  }
 } 

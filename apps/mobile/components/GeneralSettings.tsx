@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Platform, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { entrance, palette } from '../constants/theme';
@@ -252,7 +252,8 @@ export default function GeneralSettings() {
             }}
             right={<Ionicons name="chevron-forward" size={16} color={palette.blue} />}
           />
-          <SettingsRow
+          {/* App Store guideline 3.1.1: tipping the developer from iOS must go through in-app purchase */}
+          {Platform.OS !== 'ios' && <SettingsRow
             icon="cafe-outline"
             iconColor={palette.amber}
             title="Buy me a coffee"
@@ -264,7 +265,7 @@ export default function GeneralSettings() {
               });
             }}
             right={<Ionicons name="open-outline" size={16} color={palette.amber} />}
-          />
+          />}
         </SettingsGroup>
       </Animated.View>
 

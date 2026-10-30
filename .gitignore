@@ -18,6 +18,9 @@ desktop.ini
 *.swp
 .idea/
 
+# Supabase CLI local state (project ref, pooler URL, etc.)
+supabase/.temp/
+
 # pre-monorepo leftovers (old standalone repo folders + design archive)
 /Parohia/
 /landing/
