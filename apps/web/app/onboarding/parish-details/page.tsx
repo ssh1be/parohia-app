@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { AddressAutocomplete } from "../../../components/app/AddressAutocomplete";
 import { FormError } from "../../../components/app/AuthChrome";
 import { Button, Notice, TextField } from "../../../components/app/ui";
 import { StepHeader, useOnboarding } from "../OnboardingShell";
@@ -60,7 +61,26 @@ export default function ParishDetailsStep() {
           <TextField label="Parish name" required placeholder="St. Mary Orthodox Church" autoFocus {...field("parishName")} />
           <TextField label="Jurisdiction" required placeholder="Orthodox Church in America (OCA)" {...field("jurisdiction")} />
         </div>
-        <TextField label="Street address" required placeholder="123 Main St" autoComplete="street-address" {...field("address")} />
+        <AddressAutocomplete
+          label="Street address"
+          required
+          placeholder="123 Main St"
+          value={form.address}
+          onChange={(address) => setForm((prev) => ({ ...prev, address }))}
+          onAddressSelect={(parts) => {
+            const street =
+              parts.street_number && parts.route
+                ? `${parts.street_number} ${parts.route}`
+                : parts.route || form.address;
+            setForm((prev) => ({
+              ...prev,
+              address: street,
+              city: parts.locality || prev.city,
+              state: parts.administrative_area_level_1 || prev.state,
+              zipCode: parts.postal_code || prev.zipCode,
+            }));
+          }}
+        />
         <div className="grid grid-cols-[1fr_96px_140px] gap-x-4">
           <TextField label="City" required placeholder="Portland" autoComplete="address-level2" {...field("city")} />
           <TextField

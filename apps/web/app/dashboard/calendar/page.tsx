@@ -46,7 +46,7 @@ type ConfessionWithName = ConfessionReservationWithSchedule & { personName?: str
 type ReservationRow = { id: string; date: string; time_slot?: string; schedule_id: string; notes?: string };
 
 export default function CalendarPage() {
-  const { userId, parish, isAdmin, tradition, chantSubscribed, setParish } = useDashboard();
+  const { userId, parish, isAdmin, tradition, calendarSystem, chantSubscribed, setParish } = useDashboard();
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -68,7 +68,7 @@ export default function CalendarPage() {
   const gridStart = useMemo(() => addDays(month, -month.getDay()), [month]);
   const days = useMemo(() => Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)), [gridStart]);
   const chantEnabled = isAdmin || chantSubscribed;
-  const fastingByDay = useFastingForDays(days, tradition);
+  const fastingByDay = useFastingForDays(days, tradition, calendarSystem);
 
   const loadMonth = useCallback(async () => {
     setLoading(true);
@@ -120,10 +120,10 @@ export default function CalendarPage() {
 
   useEffect(() => {
     setOrthodoxLoading(true);
-    getOrthodoxDay(selected, tradition)
+    getOrthodoxDay(selected, tradition, calendarSystem)
       .then(setOrthodox)
       .finally(() => setOrthodoxLoading(false));
-  }, [selected, tradition]);
+  }, [selected, tradition, calendarSystem]);
 
   // Month rows lack names and times, so admins fetch a day's confessions the first time it's previewed
   const loadAdminConfessions = useCallback(

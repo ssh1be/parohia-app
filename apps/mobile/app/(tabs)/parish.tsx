@@ -8,6 +8,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { Alert, Keyboard, Linking, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AddressAutocomplete from "../../components/AddressAutocomplete";
 import GeneralSettings from "../../components/GeneralSettings";
 import ParishCalendarSetup from "../../components/ParishCalendarSetup";
 import { Button } from "../../components/ui/Button";
@@ -1019,7 +1020,42 @@ export default function Parish() {
       >
         <Field label="Parish name" required value={editForm.name} onChangeText={(text) => setEditForm({...editForm, name: text})} placeholder="Parish name" />
         <Field label="Jurisdiction" required value={editForm.jurisdiction} onChangeText={(text) => setEditForm({...editForm, jurisdiction: text})} placeholder="e.g., Orthodox Church in America" />
-        <Field label="Address" required value={editForm.address} onChangeText={(text) => setEditForm({...editForm, address: text})} placeholder="Street address" />
+        <View className="mb-4">
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="font-sans-semibold text-[13px] text-gray-700 dark:text-gray-300">
+              Address
+              <Text className="text-red-600 dark:text-red-400"> *</Text>
+            </Text>
+            {(editForm.address || editForm.city || editForm.state || editForm.zip_code) && (
+              <Button
+                label="Clear"
+                variant="ghost"
+                size="sm"
+                onPress={() =>
+                  setEditForm((prev) => ({ ...prev, address: '', city: '', state: '', zip_code: '' }))
+                }
+              />
+            )}
+          </View>
+          <AddressAutocomplete
+            placeholder="Street address"
+            value={editForm.address}
+            onChangeText={(text) => setEditForm((prev) => ({ ...prev, address: text }))}
+            onAddressSelect={(parts) => {
+              const street =
+                parts.street_number && parts.route
+                  ? `${parts.street_number} ${parts.route}`
+                  : parts.route || editForm.address;
+              setEditForm((prev) => ({
+                ...prev,
+                address: street,
+                city: parts.locality || prev.city,
+                state: parts.administrative_area_level_1 || prev.state,
+                zip_code: parts.postal_code || prev.zip_code,
+              }));
+            }}
+          />
+        </View>
         <View className="flex-row">
           <Field containerClassName="flex-1 mr-2" label="City" required value={editForm.city} onChangeText={(text) => setEditForm({...editForm, city: text})} placeholder="City" />
           <Field containerClassName="flex-1" label="State" required value={editForm.state} onChangeText={(text) => setEditForm({...editForm, state: text})} placeholder="State" />

@@ -51,7 +51,7 @@ export default function UserTypeStep() {
                 {option.icon ? (
                   <Icon name={option.icon} size={24} />
                 ) : (
-                  <img src="/App_store_1024_1x.png" alt="" className="h-14 w-14 rounded-[18px]" />
+                  <img src="/parohia_icon.png" alt="" className="h-12 w-12 object-contain" />
                 )}
               </span>
               <span className="font-sans-bold text-[17px] text-zinc-900 dark:text-white">{option.title}</span>

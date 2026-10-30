@@ -1,11 +1,12 @@
 "use client";
 
 import { BulletinService, type BulletinChannel, type BulletinEvent, type CreateEventData } from "@parohia/shared";
-import { useEffect, useState } from "react";
-import { Button, Checkbox, Dialog, Segmented, SelectField, Switch, TextArea, TextField } from "../../../components/app/ui";
+import { useEffect, useId, useRef, useState } from "react";
+import { Icon } from "../../../components/Icon";
+import { Button, Checkbox, Dialog, Segmented, Switch, TextArea, TextField, cx } from "../../../components/app/ui";
 import { useToast } from "../../../components/app/toast";
 import { getBrowserSupabase } from "../../../lib/supabase/client";
-import { VOLUNTEERS_UNLIMITED, isUnlimitedVolunteers } from "./shared";
+import { VOLUNTEERS_UNLIMITED, channelIcon, isUnlimitedVolunteers } from "./shared";
 
 type PostType = CreateEventData["event_type"];
 
@@ -195,7 +196,7 @@ export function PostEditorDialog({
         />
       </div>
 
-      <div className="grid grid-cols-[1fr_220px] gap-x-4">
+      <div className="grid grid-cols-[1fr_240px] gap-x-4">
         <TextField
           label="Title"
           required
@@ -204,14 +205,11 @@ export function PostEditorDialog({
           placeholder={form.event_type === "volunteer" ? "Help set up the parish hall" : "Parish picnic this Sunday"}
           autoFocus
         />
-        <SelectField label="Channel" required value={form.channel_id} onChange={(e) => set("channel_id", e.target.value)}>
-          {channels.length === 0 && <option value="">No channels available</option>}
-          {channels.map((channel) => (
-            <option key={channel.id} value={channel.id}>
-              {channel.name}
-            </option>
-          ))}
-        </SelectField>
+        <ChannelSelect
+          channels={channels}
+          value={form.channel_id}
+          onChange={(channelId) => set("channel_id", channelId)}
+        />
       </div>
 
       <TextArea
@@ -266,5 +264,134 @@ export function PostEditorDialog({
         placeholder="https://example.com"
       />
     </Dialog>
+  );
+}
+
+function ChannelSelect({
+  channels,
+  value,
+  onChange,
+}: {
+  channels: BulletinChannel[];
+  value: string;
+  onChange: (channelId: string) => void;
+}) {
+  const listId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const selected = channels.find((c) => c.id === value) ?? channels[0] ?? null;
+  const locked = channels.length <= 1;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (channels.length === 0) return;
+    if (!channels.some((c) => c.id === value)) onChange(channels[0].id);
+    // onChange is a setState wrapper from the parent; omit from deps to avoid reset loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channels, value]);
+
+  return (
+    <div ref={rootRef} className="relative mb-4">
+      <label className="mb-1.5 block font-sans-semibold text-[13px] text-zinc-700 dark:text-zinc-300">
+        Channel
+        <span className="text-red-600 dark:text-red-400"> *</span>
+      </label>
+
+      {locked ? (
+        <div className="flex h-12 items-center gap-2.5 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 dark:border-white/10 dark:bg-white/[0.03]">
+          {selected ? (
+            <>
+              <Icon name={channelIcon(selected)} size={16} className="shrink-0 text-zinc-500" />
+              <span className="truncate text-[15px] font-semibold text-zinc-900 dark:text-white">
+                {selected.name}
+              </span>
+            </>
+          ) : (
+            <span className="text-[14px] text-zinc-400">No channels available</span>
+          )}
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-controls={listId}
+            onClick={() => setOpen((prev) => !prev)}
+            className={cx(
+              "flex h-12 w-full items-center gap-2.5 rounded-2xl border bg-white px-4 text-left outline-none transition-[border-color,box-shadow] dark:bg-white/[0.04]",
+              open
+                ? "border-red-400/70 ring-4 ring-red-500/10 dark:border-red-400/50"
+                : "border-zinc-200 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/20"
+            )}
+          >
+            {selected ? (
+              <>
+                <Icon name={channelIcon(selected)} size={16} className="shrink-0 text-zinc-500" />
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-zinc-900 dark:text-white">
+                  {selected.name}
+                </span>
+              </>
+            ) : (
+              <span className="flex-1 text-[15px] text-zinc-400">Choose a channel</span>
+            )}
+            <Icon
+              name="chevron-down"
+              size={14}
+              className={cx("shrink-0 text-zinc-400 transition-transform", open && "rotate-180")}
+            />
+          </button>
+
+          {open && (
+            <ul
+              id={listId}
+              role="listbox"
+              className="absolute left-0 right-0 z-50 mt-1.5 max-h-56 overflow-auto rounded-2xl border border-zinc-100 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-zinc-900"
+            >
+              {channels.map((channel) => {
+                const active = channel.id === selected?.id;
+                return (
+                  <li key={channel.id} role="option" aria-selected={active}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChange(channel.id);
+                        setOpen(false);
+                      }}
+                      className={cx(
+                        "flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors",
+                        active
+                          ? "bg-red-600/[0.08] dark:bg-red-500/[0.12]"
+                          : "hover:bg-zinc-50 dark:hover:bg-white/[0.04]"
+                      )}
+                    >
+                      <Icon name={channelIcon(channel)} size={15} className="shrink-0 text-zinc-500" />
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-zinc-800 dark:text-zinc-100">
+                        {channel.name}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
   );
 }

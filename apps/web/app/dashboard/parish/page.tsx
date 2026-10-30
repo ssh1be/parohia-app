@@ -33,10 +33,11 @@ import {
   TextField,
   useSeeMore,
 } from "../../../components/app/ui";
+import { AddressAutocomplete } from "../../../components/app/AddressAutocomplete";
 import { useToast } from "../../../components/app/toast";
 import { CalendarSetupDialog } from "../../../components/dashboard/CalendarSetupDialog";
 import { ParishPicker } from "../../../components/dashboard/ParishPicker";
-import { formatPhone, formatRelativeTime } from "../../../lib/format";
+import { formatPhone } from "../../../lib/format";
 import { useDashboard } from "../DashboardContext";
 import { PageHeader } from "../DashboardShell";
 
@@ -196,7 +197,6 @@ function ParishOverview({ parish }: { parish: Parish }) {
                       <th className="pb-2 font-semibold">Email</th>
                       <th className="pb-2 font-semibold">Phone</th>
                       <th className="pb-2 font-semibold">Role</th>
-                      <th className="pb-2 text-right font-semibold">Joined parish</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.06]">
@@ -217,7 +217,6 @@ function ParishOverview({ parish }: { parish: Parish }) {
                             {member.role === "admin" ? "Admin" : member.role === "manager" ? "Manager" : "Member"}
                           </Pill>
                         </td>
-                        <td className="py-2.5 text-right text-zinc-500">{member.joined_at ? formatRelativeTime(member.joined_at) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -552,7 +551,25 @@ function ParishDetailsDialog({
         <TextField label="Parish name" required {...field("name")} />
         <TextField label="Jurisdiction" required {...field("jurisdiction")} />
       </div>
-      <TextField label="Street address" required {...field("address")} />
+      <AddressAutocomplete
+        label="Street address"
+        required
+        value={form.address}
+        onChange={(address) => setForm((prev) => ({ ...prev, address }))}
+        onAddressSelect={(parts) => {
+          const street =
+            parts.street_number && parts.route
+              ? `${parts.street_number} ${parts.route}`
+              : parts.route || form.address;
+          setForm((prev) => ({
+            ...prev,
+            address: street,
+            city: parts.locality || prev.city,
+            state: parts.administrative_area_level_1 || prev.state,
+            zip_code: parts.postal_code || prev.zip_code,
+          }));
+        }}
+      />
       <div className="grid grid-cols-[1fr_96px_140px] gap-x-4">
         <TextField label="City" required {...field("city")} />
         <TextField label="State" required maxLength={2} className="uppercase" {...field("state")} />

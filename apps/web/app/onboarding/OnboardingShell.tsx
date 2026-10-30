@@ -106,67 +106,69 @@ export function OnboardingShell({
   return (
     <OnboardingContext.Provider value={{ userId, email, rejoin, data, updateData, reset, signOut }}>
       <div className="ambient-glow min-h-[100dvh]">
-        <div className="mx-auto grid min-h-[100dvh] max-w-6xl grid-cols-[280px_1fr] gap-16 px-10 py-12">
-          <aside className="flex flex-col">
-            <a href="/" className="flex items-center gap-2.5">
-              <img src="/App_store_1024_1x.png" alt="" className="h-10 w-10 rounded-full shadow-md shadow-brand-red/20" />
-              <span className="font-display text-[24px] leading-none">Parohia</span>
-            </a>
+        <div className="mx-auto flex min-h-[100dvh] max-w-6xl flex-col px-10 py-12">
+          <a href="/" className="flex w-fit items-center gap-2.5">
+            <img src="/App_store_1024_1x.png" alt="" className="h-10 w-10 rounded-full shadow-md shadow-brand-red/20" />
+            <span className="font-display text-[24px] leading-none">Parohia</span>
+          </a>
 
-            {!rejoin && (
-              <ol className="mt-16 space-y-1">
-                {STEPS.map((step, index) => {
-                  const done = index < current;
-                  const active = index === current;
-                  return (
-                    <li key={step.key} className="relative flex gap-4 pb-8 last:pb-0">
-                      {index < STEPS.length - 1 && (
-                        <span
-                          aria-hidden
-                          className={cx(
-                            "absolute left-[15px] top-9 h-[calc(100%-36px)] w-px",
-                            done ? "bg-red-500/60" : "bg-zinc-200 dark:bg-white/10"
-                          )}
-                        />
-                      )}
-                      <span
-                        className={cx(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold transition-colors",
-                          done && "bg-red-600 text-white",
-                          active && "bg-brand-gradient text-white shadow-md shadow-brand-red/30",
-                          !done && !active && "bg-zinc-100 text-zinc-400 dark:bg-white/[0.06] dark:text-zinc-500"
+          <div className="relative grid flex-1 grid-cols-[280px_1fr] gap-16">
+            <aside className="flex flex-col">
+              {!rejoin && (
+                <ol className="my-auto space-y-1">
+                  {STEPS.map((step, index) => {
+                    const done = index < current;
+                    const active = index === current;
+                    return (
+                      <li key={step.key} className="relative flex gap-4 pb-8 last:pb-0">
+                        {index < STEPS.length - 1 && (
+                          <span
+                            aria-hidden
+                            className={cx(
+                              "absolute left-[15px] top-9 h-[calc(100%-36px)] w-px",
+                              done ? "bg-red-500/60" : "bg-zinc-200 dark:bg-white/10"
+                            )}
+                          />
                         )}
-                      >
-                        {done ? <Icon name="checkmark" size={15} /> : index + 1}
-                      </span>
-                      <div className="pt-1">
-                        <p
+                        <span
                           className={cx(
-                            "font-sans-semibold text-[14px]",
-                            active ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold transition-colors",
+                            done && "bg-red-600 text-white",
+                            active && "bg-brand-gradient text-white shadow-md shadow-brand-red/30",
+                            !done && !active && "bg-zinc-100 text-zinc-400 dark:bg-white/[0.06] dark:text-zinc-500"
                           )}
                         >
-                          {step.label}
-                        </p>
-                        <p className="text-[12px] text-zinc-400 dark:text-zinc-500">{step.description}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
+                          {done ? <Icon name="checkmark" size={15} /> : index + 1}
+                        </span>
+                        <div className="pt-1">
+                          <p
+                            className={cx(
+                              "font-sans-semibold text-[14px]",
+                              active ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"
+                            )}
+                          >
+                            {step.label}
+                          </p>
+                          <p className="text-[12px] text-zinc-400 dark:text-zinc-500">{step.description}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </aside>
 
-            <div className="mt-auto pt-10">
+            <main className="flex items-center">
+              <div className="w-full max-w-[620px]">{hydrated ? children : null}</div>
+            </main>
+
+            <div className="absolute bottom-0 left-0 w-[280px]">
               <p className="truncate text-[12px] text-zinc-400 dark:text-zinc-500">Signed in as {email}</p>
               <Button variant="ghost" size="sm" icon="log-out-outline" className="-ml-3 mt-1" onClick={signOut}>
                 Sign out
               </Button>
             </div>
-          </aside>
-
-          <main className="flex items-center py-6">
-            <div className="w-full max-w-[620px]">{hydrated ? children : null}</div>
-          </main>
+          </div>
         </div>
       </div>
     </OnboardingContext.Provider>

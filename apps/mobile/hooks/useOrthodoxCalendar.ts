@@ -16,7 +16,7 @@ interface UseOrthodoxCalendarReturn {
 }
 
 export const useOrthodoxCalendar = (userId?: string): UseOrthodoxCalendarReturn => {
-  const { tradition } = useCalendarTradition();
+  const { tradition, calendarSystem } = useCalendarTradition();
   const { parishEpoch } = useParishScope();
   const [calendarData, setCalendarData] = useState<OrthodoxCalendarData | null>(null);
   const [parishEvents, setParishEvents] = useState<ParishEvent[]>([]);
@@ -37,7 +37,7 @@ export const useOrthodoxCalendar = (userId?: string): UseOrthodoxCalendarReturn 
       setLoading(true);
       setError(null);
       const [calendar, parish] = await Promise.all([
-        fetchOrthodoxCalendarData(today, tradition),
+        fetchOrthodoxCalendarData(today, tradition, calendarSystem),
         fetchParishEventsForToday(today, userId)
       ]);
       setCalendarData(calendar);
@@ -58,7 +58,7 @@ export const useOrthodoxCalendar = (userId?: string): UseOrthodoxCalendarReturn 
 
   useEffect(() => {
     fetchData();
-  }, [userId, tradition, parishEpoch]);
+  }, [userId, tradition, calendarSystem, parishEpoch]);
 
   return {
     calendarData,

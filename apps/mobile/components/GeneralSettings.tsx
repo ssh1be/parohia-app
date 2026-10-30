@@ -7,7 +7,7 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { entrance, palette } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
-import { CalendarTradition, useCalendarTradition } from '../contexts/CalendarTraditionContext';
+import { CalendarSystem, CalendarTradition, useCalendarTradition } from '../contexts/CalendarTraditionContext';
 import { ThemePreference, useTheme } from '../contexts/ThemeContext';
 import { deleteAccount } from '@parohia/shared';
 import { getUserProfile } from '@parohia/shared';
@@ -77,7 +77,7 @@ function ThemePreview({ scheme }: { scheme: ThemePreference }) {
 
 export default function GeneralSettings() {
   const { themePreference, setThemePreference } = useTheme();
-  const { tradition, setTradition } = useCalendarTradition();
+  const { tradition, setTradition, calendarSystem, setCalendarSystem } = useCalendarTradition();
   const { user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
   const [isParishAdmin, setIsParishAdmin] = useState(false);
@@ -105,6 +105,11 @@ export default function GeneralSettings() {
   const traditionFooters: Record<CalendarTradition, string> = {
     greek: 'Greek tradition follows Antiochian and Greek Orthodox Archdiocese (GOA) rubrics for commemorations, readings, and fasting.',
     slavic: 'Slavic tradition follows OCA and ROCOR rubrics for commemorations, readings, and fasting.',
+  };
+
+  const systemFooters: Record<CalendarSystem, string> = {
+    gregorian: 'Gregorian is the New Calendar used by most Greek and Antiochian parishes.',
+    julian: 'Julian is the Old Calendar used by ROCOR and many Slavic parishes.',
   };
 
   const active = themeOptions.find((o) => o.value === themePreference);
@@ -218,8 +223,11 @@ export default function GeneralSettings() {
       </Animated.View>
 
       <Animated.View entering={entrance.card(40)}>
-        <SettingsGroup title="Liturgical calendar" footer={traditionFooters[tradition]}>
-          <View className="p-4">
+        <SettingsGroup
+          title="Liturgical calendar"
+          footer={`${traditionFooters[tradition]} ${systemFooters[calendarSystem]}`}
+        >
+          <View className="p-4 border-b border-gray-100 dark:border-white/5">
             <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white mb-1">
               Calendar tradition
             </Text>
@@ -233,6 +241,22 @@ export default function GeneralSettings() {
               ]}
               value={tradition}
               onChange={setTradition}
+            />
+          </View>
+          <View className="p-4">
+            <Text className="font-sans-semibold text-[15px] text-gray-900 dark:text-white mb-1">
+              Calendar style
+            </Text>
+            <Text className="font-sans text-[12.5px] leading-[17px] text-gray-500 dark:text-gray-400 mb-3">
+              Gregorian (New) or Julian (Old) calendar for Orthocal dates.
+            </Text>
+            <SegmentedControl
+              segments={[
+                { key: 'gregorian', label: 'Gregorian' },
+                { key: 'julian', label: 'Julian' },
+              ]}
+              value={calendarSystem}
+              onChange={setCalendarSystem}
             />
           </View>
         </SettingsGroup>

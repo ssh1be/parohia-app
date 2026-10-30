@@ -1,6 +1,6 @@
 "use client";
 
-import { clearOnboardingStatus, deleteAccount, type CalendarTradition } from "@parohia/shared";
+import { clearOnboardingStatus, deleteAccount, type CalendarSystem, type CalendarTradition } from "@parohia/shared";
 import { useState, type ReactNode } from "react";
 import { Icon, type IconName } from "../../../components/Icon";
 import { useTheme, type ThemePreference } from "../../../components/ThemeProvider";
@@ -23,9 +23,24 @@ const TRADITION_FOOTERS: Record<CalendarTradition, string> = {
   slavic: "Slavic tradition follows OCA and ROCOR rubrics for commemorations, readings, and fasting.",
 };
 
+const SYSTEM_FOOTERS: Record<CalendarSystem, string> = {
+  gregorian: "Gregorian is the New Calendar used by most Greek and Antiochian parishes.",
+  julian: "Julian is the Old Calendar used by ROCOR and many Slavic parishes (currently 13 days behind Gregorian).",
+};
+
 export default function SettingsPage() {
   const toast = useToast();
-  const { profile, email, isAdmin, parish, tradition, setTradition, signOut } = useDashboard();
+  const {
+    profile,
+    email,
+    isAdmin,
+    parish,
+    tradition,
+    setTradition,
+    calendarSystem,
+    setCalendarSystem,
+    signOut,
+  } = useDashboard();
   const { preference, setPreference } = useTheme();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [deleting, setDeleting] = useState(false);
@@ -98,8 +113,11 @@ export default function SettingsPage() {
         </Section>
 
         <div className="space-y-6">
-          <Section title="Liturgical calendar" footer={TRADITION_FOOTERS[tradition]}>
-            <div className="flex items-center justify-between gap-4">
+          <Section
+            title="Liturgical calendar"
+            footer={`${TRADITION_FOOTERS[tradition]} ${SYSTEM_FOOTERS[calendarSystem]}`}
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-zinc-100 pb-4 dark:border-white/[0.06]">
               <div>
                 <p className="font-sans-semibold text-[15px] text-zinc-900 dark:text-white">Calendar tradition</p>
                 <p className="text-[13px] text-zinc-500 dark:text-zinc-400">Used for readings, commemorations, and fasting.</p>
@@ -110,6 +128,20 @@ export default function SettingsPage() {
                 options={[
                   { value: "greek", label: "Greek" },
                   { value: "slavic", label: "Slavic" },
+                ]}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 pt-4">
+              <div>
+                <p className="font-sans-semibold text-[15px] text-zinc-900 dark:text-white">Civil calendar</p>
+                <p className="text-[13px] text-zinc-500 dark:text-zinc-400">Gregorian (New) or Julian (Old) for Orthocal dates.</p>
+              </div>
+              <Segmented
+                value={calendarSystem}
+                onChange={setCalendarSystem}
+                options={[
+                  { value: "gregorian", label: "Gregorian" },
+                  { value: "julian", label: "Julian" },
                 ]}
               />
             </div>

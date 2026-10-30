@@ -261,7 +261,7 @@ export default function Calendar() {
   const monthEnterY = useRef(-1);
 
   const { user } = useAuth();
-  const { tradition } = useCalendarTradition();
+  const { tradition, calendarSystem } = useCalendarTradition();
   const { parishEpoch } = useParishScope();
   const { preferences, setParishEventNotificationEnabled, isParishEventNotificationEnabled } = useNotifications();
 
@@ -269,7 +269,7 @@ export default function Calendar() {
   const fetchFastingDataForDays = async (days: Date[]) => {
     try {
       const fastingPromises = days.map(async (date) => {
-        const data = await fetchOrthodoxCalendarData(date, tradition);
+        const data = await fetchOrthodoxCalendarData(date, tradition, calendarSystem);
         return {
           dateKey: toLocalDateKey(date),
           fasting: data.fasting
@@ -297,7 +297,7 @@ export default function Calendar() {
       
       // Fetch calendar data and parish events
       const [calendar, parish] = await Promise.all([
-        fetchOrthodoxCalendarData(date, tradition),
+        fetchOrthodoxCalendarData(date, tradition, calendarSystem),
         fetchParishEventsForToday(date, user?.id)
       ]);
       setCalendarData(calendar);
@@ -469,10 +469,10 @@ export default function Calendar() {
     }
   };
 
-  // Fetch data when selected date, calendar tradition, or parish changes
+  // Fetch data when selected date, calendar tradition/system, or parish changes
   useEffect(() => {
     fetchDataForDate(selectedDate);
-  }, [selectedDate, user, tradition, parishEpoch]);
+  }, [selectedDate, user, tradition, calendarSystem, parishEpoch]);
 
   const handleCalendarSetupSuccess = () => {
     setParishHasCalendar(true);
@@ -524,11 +524,11 @@ export default function Calendar() {
 
   const calendarDays = generateCalendarDays();
 
-  // Fetch fasting data when calendar days or tradition change
+  // Fetch fasting data when calendar days or tradition/system change
   useEffect(() => {
     const dates = calendarDays.map(day => day.date);
     fetchFastingDataForDays(dates);
-  }, [currentMonth, tradition]);
+  }, [currentMonth, tradition, calendarSystem]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 

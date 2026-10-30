@@ -47,10 +47,16 @@ import { getGoogleCalendarApiKey } from '../client';
 import { getParishCalendarId } from './parishService';
 
 export type CalendarTradition = 'greek' | 'slavic';
+/** Civil calendar used by Orthocal: Gregorian (New) or Julian (Old). Defaults to Gregorian. */
+export type CalendarSystem = 'gregorian' | 'julian';
 
-/** Orthocal path segment for a tradition on the Gregorian (new) calendar. */
-export function orthocalTraditionPath(tradition: CalendarTradition): string {
-  return tradition === 'greek' ? 'greek/gregorian' : 'slavic/gregorian';
+/** Orthocal path segment for a tradition + civil calendar (e.g. `slavic/julian`). */
+export function orthocalTraditionPath(
+  tradition: CalendarTradition,
+  system: CalendarSystem = 'gregorian'
+): string {
+  const traditionPath = tradition === 'greek' ? 'greek' : 'slavic';
+  return `${traditionPath}/${system}`;
 }
 
 /** Turn Orthocal `fast_abstentions` into a short note when no exception text is provided. */
@@ -164,13 +170,14 @@ function buildCommemorations(
 export const fetchOrthodoxCalendarData = async (
   date: Date,
   tradition: CalendarTradition = 'greek',
+  system: CalendarSystem = 'gregorian',
 ): Promise<OrthodoxCalendarData> => {
   try {
     // Format date for Orthocal API
     const year = date.getFullYear();
     const month = date.getMonth() + 1; // JS months are 0-based
     const day = date.getDate();
-    const url = `https://orthocal.info/api/${orthocalTraditionPath(tradition)}/${year}/${month}/${day}/`;
+    const url = `https://orthocal.info/api/${orthocalTraditionPath(tradition, system)}/${year}/${month}/${day}/`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

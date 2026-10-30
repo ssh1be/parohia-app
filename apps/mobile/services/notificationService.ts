@@ -299,9 +299,7 @@ export class NotificationService {
       }
 
       console.log(`Scheduling notification for "${event.title}" at ${reminderTime.toISOString()} (${Math.round(timeUntilReminder / 60000)} minutes from now)`);
-      
-      const eventTitle = parishName || 'Upcoming Parish Event';
-      
+
       // Convert minutes to hours when appropriate
       let timeText: string;
       if (preferences.reminderTime >= 60) {
@@ -315,21 +313,20 @@ export class NotificationService {
       } else {
         timeText = `${preferences.reminderTime} minute${preferences.reminderTime > 1 ? 's' : ''}`;
       }
-      
-      const eventBody = `${event.title} starts in ${timeText}`;
 
-      // Log the event notification for testing
+      const notificationTitle = event.title || 'Upcoming parish event';
+      const notificationBody = `Starts in ${timeText}`;
+
       console.log(`🔔 EVENT NOTIFICATION:`);
-      console.log(`   Title: "${eventTitle}"`);
-      console.log(`   Body: "${eventBody}"`);
-      console.log(`   Event: "${event.title}"`);
+      console.log(`   Title: "${notificationTitle}"`);
+      console.log(`   Body: "${notificationBody}"`);
       console.log(`   Scheduled for: ${reminderTime.toLocaleString()}`);
       console.log(`   Event time: ${eventTime.toLocaleString()}`);
 
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: eventTitle,
-          body: eventBody,
+          title: notificationTitle,
+          body: notificationBody,
           data: {
             eventId: event.id,
             eventTitle: event.title,
@@ -347,12 +344,11 @@ export class NotificationService {
 
       console.log(`✅ Successfully scheduled event notification with ID: ${notificationId}`);
 
-      // Save scheduled notification info
       await this.saveScheduledNotification({
         id: notificationId,
         eventId: event.id,
-        title: event.title,
-        body: `${event.title} starts in ${preferences.reminderTime} minutes`,
+        title: notificationTitle,
+        body: notificationBody,
         scheduledTime: reminderTime,
         eventTime: eventTime,
       });
@@ -392,15 +388,13 @@ export class NotificationService {
       }
 
       const eventCount = upcomingEvents.length;
-      const eventTitles = upcomingEvents.slice(0, 3).map(e => e.title).join(', ');
-      const moreText = upcomingEvents.length > 3 ? ` and ${upcomingEvents.length - 3} more` : '';
-
       const isDayBefore = mode === 'day_before';
       const dayLabel = isDayBefore ? 'tomorrow' : 'today';
-      const digestTitle = isDayBefore
-        ? `Tomorrow at ${parishName || 'Your Parish'}`
-        : (parishName || 'Today\'s Parish Events');
-      const digestBody = `${eventCount} event${eventCount > 1 ? 's' : ''} ${dayLabel}: ${eventTitles}${moreText}`;
+      const digestTitle = `${eventCount} event${eventCount === 1 ? '' : 's'} ${dayLabel}`;
+      const shownTitles = upcomingEvents.slice(0, 3).map((e) => e.title).join(', ');
+      const moreCount = upcomingEvents.length - 3;
+      const digestBody =
+        moreCount > 0 ? `${shownTitles}, and ${moreCount} more` : shownTitles;
 
       console.log(`📅 DAILY DIGEST (${mode}) for ${eventDate.toDateString()}:`);
       console.log(`   Title: "${digestTitle}"`);

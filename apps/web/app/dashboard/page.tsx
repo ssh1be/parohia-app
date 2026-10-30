@@ -43,7 +43,7 @@ const greeting = () => {
 type ConfessionWithName = ConfessionReservationWithSchedule & { personName?: string };
 
 export default function TodayPage() {
-  const { userId, profile, parish, isAdmin, tradition, chantSubscribed, setParish } = useDashboard();
+  const { userId, profile, parish, isAdmin, tradition, calendarSystem, chantSubscribed, setParish } = useDashboard();
   const today = useMemo(() => new Date(), []);
 
   const [orthodox, setOrthodox] = useState<OrthodoxCalendarData | null>(null);
@@ -58,10 +58,10 @@ export default function TodayPage() {
 
   useEffect(() => {
     setOrthodoxLoading(true);
-    getOrthodoxDay(today, tradition)
+    getOrthodoxDay(today, tradition, calendarSystem)
       .then(setOrthodox)
       .finally(() => setOrthodoxLoading(false));
-  }, [today, tradition]);
+  }, [today, tradition, calendarSystem]);
 
   const loadSchedule = useCallback(async () => {
     setScheduleLoading(true);

@@ -56,9 +56,9 @@ function FaqItem({ question, answer, open, onToggle }: { question: string; answe
         >
           <span className="font-display text-[22px] leading-[1.2] text-zinc-900 sm:text-[26px] dark:text-white">{question}</span>
           <span
-            className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition-all dark:border-white/10 dark:text-zinc-400 ${
+            className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center text-zinc-500 transition-all dark:border-white/10 dark:text-zinc-400 ${
               open
-                ? "rotate-180 border-brand-red/30 bg-brand-red/10 text-brand-red"
+                ? "rotate-180"
                 : "group-hover:border-zinc-300 dark:group-hover:border-white/20"
             }`}
           >

@@ -124,40 +124,13 @@ serve(async (req) => {
       return new Response('No tokens', { status: 200, headers: corsHeaders });
     }
 
-    const titlePrefix =
+    const notificationTitle =
       event.event_type === 'volunteer'
-        ? 'Volunteers needed - '
+        ? 'Volunteering opportunity'
         : event.event_type === 'event'
-          ? 'Parish event - '
-          : 'Announcement - ';
-    const channelSuffix = channel.name ? ` · ${channel.name}` : '';
-    const notificationTitle = `${parish.name || 'Parish Bulletin'}${channelSuffix}`;
-
-    let timing = '';
-    try {
-      if (event.event_date) {
-        const [y, m, d] = event.event_date.split('-').map(Number);
-        const localDate = new Date(y, (m ?? 1) - 1, d ?? 1);
-        const dateText = localDate.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        });
-        if (event.event_time) {
-          const [hh, mm] = event.event_time.split(':').map(Number);
-          const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
-          const ampm = hh >= 12 ? 'PM' : 'AM';
-          const min = String(mm ?? 0).padStart(2, '0');
-          timing = ` on ${dateText} at ${h12}:${min} ${ampm}`;
-        } else {
-          timing = ` on ${dateText}`;
-        }
-      }
-    } catch {
-      // ignore date formatting errors
-    }
-
-    const body = `${titlePrefix}${event.title}${timing}${event.location ? ` • ${event.location}` : ''}`;
+          ? 'Event'
+          : 'Announcement';
+    const body = event.title || 'New parish post';
     const chunkSize = 100;
     for (let i = 0; i < distinctTokens.length; i += chunkSize) {
       const chunk = distinctTokens.slice(i, i + chunkSize);

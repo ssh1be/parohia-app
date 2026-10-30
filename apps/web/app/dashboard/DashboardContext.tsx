@@ -5,6 +5,7 @@ import {
   getParishByAdminId,
   getParishByUserId,
   getUserProfile,
+  type CalendarSystem,
   type CalendarTradition,
   type Parish,
   type UserProfile,
@@ -14,6 +15,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { getBrowserSupabase } from "../../lib/supabase/client";
 
 const TRADITION_KEY = "@calendar_tradition";
+const SYSTEM_KEY = "@calendar_system";
 
 interface DashboardContextValue {
   userId: string;
@@ -28,6 +30,8 @@ interface DashboardContextValue {
   setChantSubscribed: (value: boolean) => void;
   tradition: CalendarTradition;
   setTradition: (value: CalendarTradition) => void;
+  calendarSystem: CalendarSystem;
+  setCalendarSystem: (value: CalendarSystem) => void;
   /** Re-reads profile, parish, and roles from Supabase. */
   refresh: () => Promise<void>;
   setParish: (parish: Parish | null) => void;
@@ -60,6 +64,7 @@ export function DashboardProvider({
   const [managedChannelIds, setManagedChannelIds] = useState<string[]>([]);
   const [chantSubscribed, setChantSubscribed] = useState(false);
   const [tradition, setTraditionState] = useState<CalendarTradition>("greek");
+  const [calendarSystem, setCalendarSystemState] = useState<CalendarSystem>("gregorian");
 
   const isAdmin = profile?.user_type === "parish_admin";
 
@@ -95,8 +100,10 @@ export function DashboardProvider({
   useEffect(() => {
     getBrowserSupabase();
     try {
-      const stored = localStorage.getItem(TRADITION_KEY);
-      if (stored === "greek" || stored === "slavic") setTraditionState(stored);
+      const storedTradition = localStorage.getItem(TRADITION_KEY);
+      if (storedTradition === "greek" || storedTradition === "slavic") setTraditionState(storedTradition);
+      const storedSystem = localStorage.getItem(SYSTEM_KEY);
+      if (storedSystem === "gregorian" || storedSystem === "julian") setCalendarSystemState(storedSystem);
     } catch {
       // Storage unavailable
     }
@@ -107,6 +114,15 @@ export function DashboardProvider({
     setTraditionState(value);
     try {
       localStorage.setItem(TRADITION_KEY, value);
+    } catch {
+      // Storage unavailable
+    }
+  }, []);
+
+  const setCalendarSystem = useCallback((value: CalendarSystem) => {
+    setCalendarSystemState(value);
+    try {
+      localStorage.setItem(SYSTEM_KEY, value);
     } catch {
       // Storage unavailable
     }
@@ -132,6 +148,8 @@ export function DashboardProvider({
         setChantSubscribed,
         tradition,
         setTradition,
+        calendarSystem,
+        setCalendarSystem,
         refresh,
         setParish,
         signOut,
