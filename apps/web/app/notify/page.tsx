@@ -31,8 +31,9 @@ export default function NotifyPage() {
       <div className="ambient-glow pointer-events-none fixed inset-0" aria-hidden />
       <PageHeader />
 
-      <section className="relative z-10 flex flex-1 items-center">
-        <div className="mx-auto w-full max-w-7xl px-6 pb-24 pt-16 md:pt-24 lg:px-8">
+      <section className="relative z-10 flex flex-1 items-center overflow-hidden">
+        <div className="page-grid pointer-events-none absolute inset-0" aria-hidden />
+        <div className="relative mx-auto w-full max-w-7xl px-6 pb-24 pt-16 md:pt-24 lg:px-8">
           <Reveal className="max-w-2xl">
             <h1 className="font-display text-5xl leading-[1.04] tracking-[-0.015em] md:text-7xl">Join the waitlist</h1>
             <p className="mt-6 max-w-[52ch] text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">

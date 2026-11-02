@@ -33,7 +33,7 @@ export function WelcomeLogo({ size = 100 }: WelcomeLogoProps) {
     };
   }, [ready]);
 
-  const icon = Math.round(size * 0.78);
+  const icon = Math.round(size * 0.95);
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>

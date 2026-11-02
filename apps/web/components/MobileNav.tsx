@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/#screenshots", label: "Preview" },
   { href: "/about", label: "About" },
   { href: "mailto:support@parohia.app", label: "Contact" },
+  { href: "/donate", label: "Donate" },
 ];
 
 export default function MobileNav() {

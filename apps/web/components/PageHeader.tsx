@@ -6,6 +6,7 @@ export const NAV_LINKS = [
   { href: "/features", label: "Features" },
   { href: "/#screenshots", label: "Preview" },
   { href: "/about", label: "About" },
+  { href: "/donate", label: "Donate" },
 ];
 
 export default function PageHeader() {

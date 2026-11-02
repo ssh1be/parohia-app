@@ -16,7 +16,7 @@ const FAQS = [
   },
   {
     q: "How much does it cost?",
-    a: "Parohia is currently free for parishioners and for parishes. The app is fully supported by user donations, so communities can use everything without a subscription.",
+    a: "Parohia is currently free for both parishioners and parishes. The app is fully supported by user donations, so communities can use everything without a subscription.",
   },
   {
     q: "Does it work with my parish calendar?",

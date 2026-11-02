@@ -16,6 +16,7 @@ const COLUMNS = [
     links: [
       { href: "mailto:support@parohia.app", label: "Support" },
       { href: "mailto:support@parohia.app", label: "Contact" },
+      { href: "/donate", label: "Donate" },
     ],
   },
   {
