@@ -60,6 +60,16 @@ const noteAt = (i: number, n: number) => (i + 0.05) / (n + HOLD_STEPS);
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 /** Screen space kept free around the phone below lg. */
 const COMPACT_MARGIN = 40;
+
+/** `100svh` in px — stable while Safari's collapsing chrome changes `innerHeight`. */
+function smallViewportHeight() {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:absolute;left:0;top:0;height:100svh;width:0;pointer-events:none;visibility:hidden";
+  document.documentElement.appendChild(probe);
+  const height = probe.offsetHeight;
+  probe.remove();
+  return height || window.innerHeight;
+}
 const CARD_GAP = 28;
 /** How far the card may hang past the phone's screen before it has to close in on the highlight. */
 const CARD_OVERHANG = 56;
@@ -237,11 +247,8 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false, 
   const easeIn = useSpring(entry, { stiffness: 220, damping: 34, mass: 0.6 });
   const easeOut = useSpring(exit, { stiffness: 220, damping: 34, mass: 0.6 });
   const phoneOpacity = useTransform([easeIn, easeOut], ([i, o]: number[]) => Math.min(clamp01((i - 0.3) / 0.55), 1 - clamp01((o - 0.15) / 0.55)));
-  // Desktop scales the phone in/out with scroll; on mobile fade alone is enough.
-  const phoneZoom = useTransform([easeIn, easeOut, raw.mobile], ([i, o, mobile]: number[]) => {
-    if (mobile) return 1;
-    return 0.9 + 0.1 * Math.min(clamp01((i - 0.3) / 0.7), 1 - clamp01(o / 0.7));
-  });
+  // Desktop only — on mobile the wrapper must not take a transform scale (it fights `--s` and snaps when overlays mount).
+  const phoneZoom = useTransform([easeIn, easeOut], ([i, o]: number[]) => 0.9 + 0.1 * Math.min(clamp01((i - 0.3) / 0.7), 1 - clamp01(o / 0.7)));
   // Match the phone opacity curve (starts dropping around 0.15) so overlays aren't yanked early.
   useMotionValueEvent(exit, "change", (o) => setLeaving(o > 0.18));
 
@@ -431,11 +438,20 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false, 
 
   useEffect(() => {
     if (pinned) return;
+    // Fit to width and the stable small viewport (svh). Live innerHeight tracks Safari chrome
+    // and used to retarget `--s` whenever the URL/bottom bar expanded.
+    let widthKey = -1;
     const update = () => {
-      if (!window.matchMedia("(max-width: 1023px)").matches) return setCompactScale(null);
-      const byHeight = (window.innerHeight - COMPACT_MARGIN) / DEVICE.height;
-      const byWidth = (document.documentElement.clientWidth - COMPACT_MARGIN) / DEVICE.width;
-      setCompactScale(Math.max(0.5, Math.min(0.9, byHeight, byWidth)));
+      if (!window.matchMedia("(max-width: 1023px)").matches) {
+        widthKey = -1;
+        return setCompactScale(null);
+      }
+      const width = document.documentElement.clientWidth;
+      if (width === widthKey) return;
+      widthKey = width;
+      const byHeight = (smallViewportHeight() - COMPACT_MARGIN) / DEVICE.height;
+      const byWidth = (width - COMPACT_MARGIN) / DEVICE.width;
+      setCompactScale(Math.max(0.5, Math.min(0.85, byHeight, byWidth)));
     };
     update();
     window.addEventListener("resize", update);
@@ -472,8 +488,11 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false, 
   });
 
   const zoomFrame = useRef(0);
+  const compactRef = useRef(compact);
+  compactRef.current = compact;
   useMotionValueEvent(phoneZoom, "change", () => {
-    if (zoomFrame.current) return;
+    // Compact tours keep a fixed size; remasuring on zoom only matters for desktop scroll-scale.
+    if (compactRef.current || zoomFrame.current) return;
     zoomFrame.current = requestAnimationFrame(() => {
       zoomFrame.current = 0;
       measure();
@@ -562,7 +581,7 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false, 
     >
       <ol className="hidden flex-col gap-12 lg:flex">{sides.left.map(renderNote)}</ol>
 
-      <div className="flex flex-col items-center max-lg:min-h-[100dvh] max-lg:justify-center max-lg:py-5">
+      <div className="flex flex-col items-center max-lg:min-h-[100svh] max-lg:justify-center max-lg:py-5">
         <motion.div
           onPointerEnter={(e) => e.pointerType === "mouse" && engagePhone(true)}
           onPointerLeave={(e) => {
@@ -579,7 +598,8 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false, 
           style={
             {
               opacity: phoneOpacity,
-              scale: phoneZoom,
+              // Never put a CSS transform scale on the compact phone — PhoneFrame already scales via `--s`.
+              ...(compact ? {} : { scale: phoneZoom }),
               ...(pinned ? { "--s": phoneScale } : compactScale ? { "--s": compactScale } : {}),
             } as unknown as MotionStyle
           }
