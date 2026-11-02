@@ -62,6 +62,7 @@ export function FeatureChapters() {
         <FeatureTour
           pinned={pinned}
           id="calendar-schedule"
+          nextId="notifications"
           title="The liturgical year and your parish, on one calendar"
           intro="Feasts, fasts, and saints sit right alongside your parish's own services, so every day reads at a glance."
           screens={[{ label: "Calendar", render: () => <CalendarScreen day={SEPTEMBER_10} /> }]}
@@ -88,6 +89,7 @@ export function FeatureChapters() {
         <FeatureTour
           pinned={pinned}
           id="notifications"
+          nextId="announcements-events"
           title="Reminders on your terms"
           intro="Choose when Parohia reaches you, get one calm summary a day, and keep the day's scripture close."
           screens={[
@@ -100,7 +102,7 @@ export function FeatureChapters() {
               spot: "reminder-time",
               side: "left",
               title: "Choose your timing",
-              body: "Decide how far ahead you're notified, from 15 minutes to 2 hours.",
+              body: "Decide how far ahead you're notified, from 30 minutes to 4 hours.",
             },
             { screen: 0, spot: "digest", side: "left", title: "A daily digest", body: "Receive one summary of everything happening at your parish." },
             {
@@ -117,6 +119,7 @@ export function FeatureChapters() {
         <FeatureTour
           pinned={pinned}
           id="announcements-events"
+          nextId="volunteering-confessions"
           title="Parish news, the moment it's posted"
           intro="Clergy, administrators, and ministry leaders share announcements and events. Parishioners respond with a tap."
           screens={[

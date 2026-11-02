@@ -408,10 +408,12 @@ export default function Calendar() {
     if (user) {
       const profile = await getUserProfile(user.id);
       let nextParishId: string | null = null;
+      let nextParish: Awaited<ReturnType<typeof getParishByUserId>> = null;
       if (profile?.user_type === 'parish_admin') {
         setIsParishAdmin(true);
         const parish = await getParishByAdminId(user.id);
         if (parish) {
+          nextParish = parish;
           setParishHasCalendar(!!parish.parish_calendar_id);
           setParishName(parish.name);
           nextParishId = parish.id;
@@ -421,12 +423,14 @@ export default function Calendar() {
         setIsParishAdmin(false);
         const parish = await getParishByUserId(user.id);
         if (parish) {
+          nextParish = parish;
           setParishHasCalendar(!!parish.parish_calendar_id);
           setParishName(parish.name);
           nextParishId = parish.id;
           await ChannelService.ensureChantChannel(parish.id);
         }
       }
+      setParishDetails(nextParish);
       setParishId(nextParishId);
       if (nextParishId) {
         const subscribed = await ChannelService.isUserSubscribedToChant(user.id, nextParishId);
@@ -1260,7 +1264,7 @@ export default function Calendar() {
                 weekLoading
                   ? 'Loading parish events'
                   : weekEvents.length > 0
-                    ? `${weekEvents.length} ${weekEvents.length === 1 ? 'event' : 'events'} at ${parishName || 'your parish'}`
+                    ? `${weekEvents.length} ${weekEvents.length === 1 ? 'event' : 'events'}`
                     : parishHasCalendar
                       ? 'Nothing scheduled this week'
                       : parishName || undefined
@@ -1522,7 +1526,11 @@ export default function Calendar() {
                 compact
                 icon="person-outline"
                 title="Nothing planned"
-                message="No personal events scheduled for this day. Book confession or RSVP to parish events from the Events tab."
+                message={
+                  parishDetails?.confession_enabled
+                    ? 'No personal events scheduled for this day. Book confession or RSVP to parish events from the Events tab.'
+                    : 'No personal events scheduled for this day. Volunteer or RSVP to parish events from the Events tab.'
+                }
               />
             )}
           </View>

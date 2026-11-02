@@ -248,7 +248,7 @@ export default function GeneralSettings() {
               Calendar style
             </Text>
             <Text className="font-sans text-[12.5px] leading-[17px] text-gray-500 dark:text-gray-400 mb-3">
-              Gregorian (New) or Julian (Old) calendar for Orthocal dates.
+              Gregorian (New) or Julian (Old) calendar for dates.
             </Text>
             <SegmentedControl
               segments={[

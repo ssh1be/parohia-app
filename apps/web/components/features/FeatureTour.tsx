@@ -40,6 +40,8 @@ interface FeatureTourProps {
   notes: TourNote[];
   /** Pin the tour while scrolling and step through its notes with the scroll, instead of autoplaying. */
   pinned?: boolean;
+  /** On mobile, show a scroll cue that jumps to this section when tapped. */
+  nextId?: string;
 }
 
 const AUTOPLAY_MS = 6500;
@@ -98,7 +100,7 @@ function placeCard(o: number, y: number, h: number, oh: number, ch: number) {
  */
 const HOLE_MASK = "linear-gradient(#000 0 0), linear-gradient(#000 0 0)";
 
-export function FeatureTour({ id, title, intro, screens, notes, pinned = false }: FeatureTourProps) {
+export function FeatureTour({ id, title, intro, screens, notes, pinned = false, nextId }: FeatureTourProps) {
   const reduce = useReducedMotion();
   const trackRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -235,7 +237,11 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
   const easeIn = useSpring(entry, { stiffness: 220, damping: 34, mass: 0.6 });
   const easeOut = useSpring(exit, { stiffness: 220, damping: 34, mass: 0.6 });
   const phoneOpacity = useTransform([easeIn, easeOut], ([i, o]: number[]) => Math.min(clamp01((i - 0.3) / 0.55), 1 - clamp01((o - 0.15) / 0.55)));
-  const phoneZoom = useTransform([easeIn, easeOut], ([i, o]: number[]) => 0.9 + 0.1 * Math.min(clamp01((i - 0.3) / 0.7), 1 - clamp01(o / 0.7)));
+  // Desktop scales the phone in/out with scroll; on mobile fade alone is enough.
+  const phoneZoom = useTransform([easeIn, easeOut, raw.mobile], ([i, o, mobile]: number[]) => {
+    if (mobile) return 1;
+    return 0.9 + 0.1 * Math.min(clamp01((i - 0.3) / 0.7), 1 - clamp01(o / 0.7));
+  });
   // Match the phone opacity curve (starts dropping around 0.15) so overlays aren't yanked early.
   useMotionValueEvent(exit, "change", (o) => setLeaving(o > 0.18));
 
@@ -810,6 +816,28 @@ export function FeatureTour({ id, title, intro, screens, notes, pinned = false }
         <div ref={trackRef} className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           {grid}
         </div>
+      )}
+
+      {nextId && !pinned && (
+        <motion.button
+          type="button"
+          aria-label="Scroll to next section"
+          onClick={() => document.getElementById(nextId)?.scrollIntoView({ behavior: "smooth" })}
+          initial={reduce ? false : { opacity: 0, y: -10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.6 }}
+          transition={{ duration: 0.7, ease: EASE, delay: 0.15 }}
+          className="mx-auto mt-6 flex h-11 w-11 items-center justify-center text-zinc-400 outline-none transition-colors hover:text-zinc-600 focus-visible:ring-2 focus-visible:ring-brand-red/60 lg:hidden dark:text-zinc-500 dark:hover:text-zinc-300"
+        >
+          <motion.span
+            aria-hidden
+            animate={reduce ? undefined : { y: [0, 5, 0] }}
+            transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+            className="flex"
+          >
+            <Icon name="chevron-down" size={22} />
+          </motion.span>
+        </motion.button>
       )}
     </section>
   );

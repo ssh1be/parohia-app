@@ -7,10 +7,10 @@ import { palette } from "../tokens";
 import { Pressable, Rise, SegmentedControl, SettingsGroup, SettingsRow, Switch } from "../ui";
 
 const REMINDER_OPTIONS = [
-  { label: "15 min", value: 15 },
   { label: "30 min", value: 30 },
   { label: "1 hr", value: 60 },
   { label: "2 hr", value: 120 },
+  { label: "4 hr", value: 240 },
 ];
 
 /** Notification settings, presented as the app's iOS page sheet over the Calendar tab. */

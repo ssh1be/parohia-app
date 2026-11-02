@@ -781,7 +781,8 @@ export default function Events() {
         return 'yesterday';
       } else if (diffInDays < 7) {
         return `${diffInDays}d ago`;
-      } else if (diffInWeeks < 4) {
+      } else if (diffInDays < 30) {
+        // Weeks through day 29 — floor(days/30) is 0 for 28–29 and used to show "0mo ago".
         return `${diffInWeeks}w ago`;
       } else if (diffInMonths < 12) {
         return `${diffInMonths}mo ago`;

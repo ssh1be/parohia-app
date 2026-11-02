@@ -60,7 +60,8 @@ export const formatRelativeTime = (value: string) => {
   if (hours < 24) return `${hours}h ago`;
   if (days === 1) return "yesterday";
   if (days < 7) return `${days}d ago`;
-  if (days < 28) return `${Math.floor(days / 7)}w ago`;
+  // Keep weeks through day 29 — floor(days/30) is 0 for 28–29 and used to show "0mo ago".
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
   if (days < 365) return `${Math.floor(days / 30)}mo ago`;
   return `${Math.floor(days / 365)}y ago`;
 };

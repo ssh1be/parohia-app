@@ -22,7 +22,7 @@ export default function FeaturesPage() {
           <Reveal>
             <h1 className="max-w-[12ch] font-display text-5xl leading-[1.04] tracking-[-0.015em] md:text-[64px]">One home for your parish life</h1>
             <p className="mt-5 max-w-[44ch] text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Calendar, schedules, announcements, volunteering, and confession in one place. Every screen below is the real app, so tap around.
+              Calendar, schedules, announcements, volunteering, and confession in one place.
             </p>
           </Reveal>
           <ChapterIndex />

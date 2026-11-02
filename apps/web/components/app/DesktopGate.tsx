@@ -10,39 +10,28 @@ export function UseTheAppMessage() {
         <img
           src="/App_store_1024_1x.png"
           alt=""
-          className="mx-auto mb-8 h-20 w-20 rounded-[24px] shadow-lg shadow-brand-red/25"
+          className="mx-auto mb-7 h-16 w-16 rounded-[20px] shadow-lg shadow-brand-red/25"
         />
-        <p className="mb-2 font-sans-semibold text-[12px] uppercase tracking-[0.16em] text-red-600 dark:text-red-400">
-          On your phone?
-        </p>
-        <h1 className="font-display text-[38px] leading-[1.05] text-zinc-900 dark:text-white">
-          Parohia lives in the app
-        </h1>
-        <p className="mt-4 font-display-italic text-[18px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-          The web dashboard is built for desktop. On a phone, sign in with the Parohia app for the calendar,
-          bulletin, and confession booking.
+        <h1 className="font-display text-[32px] leading-[1.1] text-zinc-900 dark:text-white">Use the Parohia app</h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+          The dashboard is for desktop. On your phone, open the app to sign in.
         </p>
 
-        <div className="mt-8 flex flex-col gap-3">
-          <a
-            href={APP_STORE_URL || "/notify"}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-gradient px-6 text-[15px] font-semibold text-white shadow-md shadow-brand-red/25"
-          >
-            <Icon name="phone-portrait-outline" size={18} />
-            {APP_STORE_URL ? "Get the Parohia app" : "Join the waitlist"}
-          </a>
-          <a
-            href="/"
-            className="inline-flex h-12 items-center justify-center rounded-full px-6 text-[15px] font-semibold text-zinc-600 hover:bg-zinc-900/[0.05] dark:text-zinc-300 dark:hover:bg-white/[0.06]"
-          >
-            Back to parohia.app
-          </a>
-        </div>
+        <a
+          href={APP_STORE_URL || "/notify"}
+          className="mt-8 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand-gradient px-6 text-[15px] font-semibold text-white shadow-md shadow-brand-red/25"
+        >
+          <Icon name="phone-portrait-outline" size={18} />
+          {APP_STORE_URL ? "Get the Parohia app" : "Join the waitlist"}
+        </a>
 
-        <p className="mt-10 flex items-center justify-center gap-2 text-[12px] text-zinc-400 dark:text-zinc-500">
-          <Icon name="desktop-outline" size={14} />
-          On a computer? Widen your browser window to continue.
-        </p>
+        <a
+          href="/"
+          className="mt-8 inline-flex items-center justify-center gap-1.5 text-[13px] text-zinc-400 transition-colors hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
+        >
+          <Icon name="arrow-back" size={13} />
+          Back to parohia.app
+        </a>
       </div>
     </div>
   );

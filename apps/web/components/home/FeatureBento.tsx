@@ -150,8 +150,8 @@ function ReadingsTile() {
   );
 }
 
-const LEADS = ["15 min", "30 min", "1 hr", "2 hr"];
-const LEAD_TEXT: Record<string, string> = { "15 min": "15 minutes", "30 min": "30 minutes", "1 hr": "1 hour", "2 hr": "2 hours" };
+const LEADS = ["30 min", "1 hr", "2 hr", "4 hr"];
+const LEAD_TEXT: Record<string, string> = { "30 min": "30 minutes", "1 hr": "1 hour", "2 hr": "2 hours", "4 hr": "4 hours" };
 
 /** Trails `value` by `ms`, so notifications land a beat after the control that triggered them. */
 function useDelayed<T>(value: T, ms: number) {
