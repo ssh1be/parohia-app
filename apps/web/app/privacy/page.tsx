@@ -103,7 +103,15 @@ export default function PrivacyPage() {
           <h2 className="font-display text-[28px] leading-tight">7. Your Rights</h2>
           <p className="mt-4 text-zinc-700 dark:text-zinc-300 leading-relaxed">
             Depending on your location, you may have rights to access, update,
-            or delete your data. You may request these by contacting us.
+            or delete your data. You can delete your account in the Parohia app or
+            web dashboard, or follow the steps on our{" "}
+            <a
+              href="/delete-account"
+              className="text-zinc-900 dark:text-white hover:text-brand-red transition-colors underline underline-offset-4 decoration-zinc-300 dark:decoration-white/20 hover:decoration-brand-red/50"
+            >
+              Delete account
+            </a>{" "}
+            page. You may also contact us at the address below.
           </p>
         </section>
 

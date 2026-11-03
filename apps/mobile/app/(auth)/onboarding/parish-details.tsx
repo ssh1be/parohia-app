@@ -96,7 +96,7 @@ export default function ParishDetailsScreen() {
         <Field
           label="Parish Name"
           required
-          placeholder="St. Mary Orthodox Church"
+          placeholder="St. John's Greek Orthodox"
           value={parishName}
           onChangeText={setParishName}
         />

@@ -58,7 +58,7 @@ export default function ParishDetailsStep() {
       <FormError message={error} />
       <form onSubmit={handleSubmit} noValidate>
         <div className="grid grid-cols-2 gap-x-4">
-          <TextField label="Parish name" required placeholder="St. Mary Orthodox Church" autoFocus {...field("parishName")} />
+          <TextField label="Parish name" required placeholder="St. John Orthodox Church" autoFocus {...field("parishName")} />
           <TextField label="Jurisdiction" required placeholder="Orthodox Church in America (OCA)" {...field("jurisdiction")} />
         </div>
         <AddressAutocomplete

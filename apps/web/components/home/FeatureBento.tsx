@@ -247,7 +247,7 @@ function RemindersTile({
           {notify && notifiedLead && (
             <Notification
               key={`paraklesis-${notifiedLead}`}
-              title="Paraklesis to St. John the Baptist"
+              title="Paraklesis to the Theotokos"
               body={`Starts in ${LEAD_TEXT[notifiedLead]}`}
               delay={notifiedSlot ? 0.14 : 0}
             />

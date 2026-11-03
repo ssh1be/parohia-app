@@ -28,6 +28,8 @@ const COLUMNS = [
   },
 ];
 
+
+
 export default function PageFooter() {
   return (
     <footer className="relative z-10 border-t border-zinc-200 dark:border-white/[0.06]">
