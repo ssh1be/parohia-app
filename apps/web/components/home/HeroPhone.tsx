@@ -1,7 +1,6 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
 import { Icon } from "../Icon";
 import { PhoneFrame } from "../phone/PhoneFrame";
 import { HomeScreen } from "../phone/screens/HomeScreen";
@@ -10,19 +9,11 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 
 export function HeroPhone() {
   const reduce = useReducedMotion();
-  const [mobile, setMobile] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1023px)");
-    const update = () => setMobile(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
 
   return (
     <div className="relative flex justify-center lg:justify-end">
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
+      {/* Glow blobs stay desktop-only — large blurs go blank mid-scroll on Safari mobile. */}
+      <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden>
         <motion.div
           initial={reduce ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -42,26 +33,22 @@ export function HeroPhone() {
       </div>
 
       <motion.div
-        initial={reduce ? false : { opacity: 0, y: 60, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 1.1, ease: EASE, delay: 0.15 }}
+        initial={reduce ? false : { opacity: 0, y: 36 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: EASE, delay: reduce ? 0 : 0.05 }}
         className="pointer-events-none relative"
       >
         <PhoneFrame label="Parohia home screen preview" className="relative [--s:0.72] sm:[--s:0.78] lg:[--s:0.82]">
           <HomeScreen scrollable={false} />
         </PhoneFrame>
 
+        {/* Mount `animate` (not whileInView): Safari on tall phones defers intersection until scroll settles. */}
         <motion.div
           aria-hidden
-          initial={reduce ? false : { opacity: 0, y: 24, scale: 0.94 }}
-          {...(mobile && !reduce
-            ? {
-                whileInView: { opacity: 1, y: 0, scale: 1 },
-                viewport: { once: true, amount: 0.7 },
-              }
-            : { animate: { opacity: 1, y: 0, scale: 1 } })}
-          transition={{ type: "spring", damping: 22, stiffness: 160, delay: mobile ? 0.08 : 1.1 }}
-          className="app-screen glass absolute -left-6 top-[22%] w-[280px] rounded-[22px] border border-white/80 p-3.5 shadow-[0_28px_56px_-18px_rgba(9,9,11,0.4)] sm:-left-24 dark:border-white/[0.14] dark:shadow-[0_28px_56px_-18px_rgba(0,0,0,0.65)]"
+          initial={reduce ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: EASE, delay: reduce ? 0 : 0.2 }}
+          className="app-screen glass absolute -left-6 top-[22%] w-[280px] transform-gpu rounded-[22px] border border-white/80 p-3.5 shadow-[0_28px_56px_-18px_rgba(9,9,11,0.4)] sm:-left-24 dark:border-white/[0.14] dark:shadow-[0_28px_56px_-18px_rgba(0,0,0,0.65)]"
         >
           <div className="flex items-start gap-3">
             <img src="/App_store_1024_1x.png" alt="" className="h-9 w-9 shrink-0 rounded-[10px] shadow-sm shadow-brand-red/20" />
@@ -77,15 +64,10 @@ export function HeroPhone() {
 
         <motion.div
           aria-hidden
-          initial={reduce ? false : { opacity: 0, y: 24, scale: 0.94 }}
-          {...(mobile && !reduce
-            ? {
-                whileInView: { opacity: 1, y: 0, scale: 1 },
-                viewport: { once: true, amount: 0.7 },
-              }
-            : { animate: { opacity: 1, y: 0, scale: 1 } })}
-          transition={{ type: "spring", damping: 22, stiffness: 160, delay: mobile ? 0.22 : 1.45 }}
-          className="app-screen glass absolute bottom-[18%] -right-8 flex w-max items-center gap-2.5 whitespace-nowrap rounded-full border border-white/80 py-2 pl-2 pr-4 shadow-[0_28px_56px_-18px_rgba(9,9,11,0.4)] sm:-right-16 dark:border-white/[0.14] dark:shadow-[0_28px_56px_-18px_rgba(0,0,0,0.65)]"
+          initial={reduce ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: EASE, delay: reduce ? 0 : 0.32 }}
+          className="app-screen glass absolute bottom-[18%] -right-8 flex w-max transform-gpu items-center gap-2.5 whitespace-nowrap rounded-full border border-white/80 py-2 pl-2 pr-4 shadow-[0_28px_56px_-18px_rgba(9,9,11,0.4)] sm:-right-16 dark:border-white/[0.14] dark:shadow-[0_28px_56px_-18px_rgba(0,0,0,0.65)]"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15">
             <Icon name="checkmark-circle" size={17} color="#10B981" />

@@ -16,9 +16,7 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
+    "supabase": "^2.120.0",
     "turbo": "^2.11.7"
-  },
-  "dependencies": {
-    "expo-updates": "~58.0.19"
   }
 }

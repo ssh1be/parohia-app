@@ -7,6 +7,7 @@ import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
 import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
 import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { useFonts } from 'expo-font';
+import { Observe, ObserveRoot, useObserve } from 'expo-observe';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider, Stack } from "expo-router";
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
@@ -25,6 +26,12 @@ import { ParishScopeProvider } from "../contexts/ParishScopeContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import "../global.css";
 
+Observe.configure({
+  integrations: {
+    'expo-router': true,
+  },
+});
+
 // Prevent the splash screen from auto-hiding before asset loading is complete
 SplashScreen.preventAutoHideAsync();
 
@@ -42,6 +49,7 @@ const navigationDarkTheme = {
 
 function InitialLoadingScreen() {
   const [appIsReady, setAppIsReady] = useState(false);
+  const { markInteractive } = useObserve();
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_500Medium,
     CormorantGaramond_600SemiBold,
@@ -89,6 +97,11 @@ function InitialLoadingScreen() {
     };
   }, [fontsReady]);
 
+  // App-wide TTI after splash work. Entry screens also mark interactive for router-scoped metrics.
+  useEffect(() => {
+    if (appIsReady) markInteractive();
+  }, [appIsReady, markInteractive]);
+
   if (!appIsReady) {
     return null;
   }
@@ -103,7 +116,7 @@ function InitialLoadingScreen() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
@@ -122,3 +135,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default ObserveRoot.wrap(RootLayout);

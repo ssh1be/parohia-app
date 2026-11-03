@@ -16,11 +16,13 @@
     "production": {
       "autoIncrement": true,
       "channel": "production",
-      "distribution": "store"
+      "distribution": "store",
+      "uploadSourceMaps": true
     },
     "production-internal": {
       "distribution": "internal",
-      "channel": "production"
+      "channel": "production",
+      "uploadSourceMaps": true
     }
   },
   "submit": {
