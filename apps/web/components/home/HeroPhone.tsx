@@ -1,14 +1,25 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 import { Icon } from "../Icon";
 import { PhoneFrame } from "../phone/PhoneFrame";
 import { HomeScreen } from "../phone/screens/HomeScreen";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+const SPRING = { type: "spring" as const, damping: 22, stiffness: 160 };
 
 export function HeroPhone() {
   const reduce = useReducedMotion();
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   return (
     <div className="relative flex justify-center lg:justify-end">
@@ -33,21 +44,21 @@ export function HeroPhone() {
       </div>
 
       <motion.div
-        initial={reduce ? false : { opacity: 0, y: 36 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: EASE, delay: reduce ? 0 : 0.05 }}
+        initial={reduce ? false : { opacity: 0, y: 60, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 1.1, ease: EASE, delay: 0.15 }}
         className="pointer-events-none relative"
       >
         <PhoneFrame label="Parohia home screen preview" className="relative [--s:0.72] sm:[--s:0.78] lg:[--s:0.82]">
           <HomeScreen scrollable={false} />
         </PhoneFrame>
 
-        {/* Mount `animate` (not whileInView): Safari on tall phones defers intersection until scroll settles. */}
+        {/* First card: mount animate so Safari never leaves it at opacity 0 waiting on intersection. */}
         <motion.div
           aria-hidden
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: EASE, delay: reduce ? 0 : 0.2 }}
+          initial={reduce ? false : { opacity: 0, y: 24, scale: 0.94 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ ...SPRING, delay: mobile ? 0.45 : 1.1 }}
           className="app-screen glass absolute -left-6 top-[22%] w-[280px] transform-gpu rounded-[22px] border border-white/80 p-3.5 shadow-[0_28px_56px_-18px_rgba(9,9,11,0.4)] sm:-left-24 dark:border-white/[0.14] dark:shadow-[0_28px_56px_-18px_rgba(0,0,0,0.65)]"
         >
           <div className="flex items-start gap-3">
@@ -62,11 +73,20 @@ export function HeroPhone() {
           </div>
         </motion.div>
 
+        {/*
+          Second card: stagger from viewport on mobile. Start slightly visible (not opacity 0) so
+          Safari still paints the layer during scroll; finish when it enters view.
+        */}
         <motion.div
           aria-hidden
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: EASE, delay: reduce ? 0 : 0.32 }}
+          initial={reduce ? false : { opacity: mobile ? 0.4 : 0, y: 24, scale: 0.94 }}
+          {...(mobile && !reduce
+            ? {
+                whileInView: { opacity: 1, y: 0, scale: 1 },
+                viewport: { once: true, amount: 0.35 },
+              }
+            : { animate: { opacity: 1, y: 0, scale: 1 } })}
+          transition={{ ...SPRING, delay: mobile ? 0.06 : 1.45 }}
           className="app-screen glass absolute bottom-[18%] -right-8 flex w-max transform-gpu items-center gap-2.5 whitespace-nowrap rounded-full border border-white/80 py-2 pl-2 pr-4 shadow-[0_28px_56px_-18px_rgba(9,9,11,0.4)] sm:-right-16 dark:border-white/[0.14] dark:shadow-[0_28px_56px_-18px_rgba(0,0,0,0.65)]"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15">
