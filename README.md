@@ -75,10 +75,3 @@ supabase functions deploy delete-parish-admin-account
 ```
 
 Run from the repo root (the `supabase/` folder lives there now).
-
-## Cutover checklist
-
-1. Point the Netlify site at this repo with package directory `apps/web` (base directory empty), add the env vars, and deploy.
-2. Add the Supabase redirect URLs above.
-3. Smoke test on production: sign in, sign up + email code, password reset, onboarding, each dashboard page as both a member and an admin.
-4. Archive the old `Parohia-landing` GitHub repo (its history is preserved in `apps/web`).
