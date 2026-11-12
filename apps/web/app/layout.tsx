@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Cormorant_Garamond, Manrope } from 'next/font/google'
 import { ThemeProvider } from '../components/ThemeProvider'
 import './globals.css'
-
+import 'lenis/dist/lenis.css';
+import SmoothScroll from '@/components/SmoothScroll';
 const display = Cormorant_Garamond({
   subsets: ['latin', 'latin-ext'],
   weight: ['500', '600', '700'],
@@ -41,7 +42,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-[100dvh] font-sans bg-white text-zinc-900 dark:bg-ink dark:text-white">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <SmoothScroll>{children}</SmoothScroll>
+        </ThemeProvider>
       </body>
     </html>
   )
